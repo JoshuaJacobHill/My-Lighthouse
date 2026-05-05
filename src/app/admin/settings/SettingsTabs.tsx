@@ -21,7 +21,7 @@ interface SettingsTabsProps {
   isSuperAdmin: boolean
 }
 
-type Tab = 'email' | 'general' | 'induction' | 'admins'
+type Tab = 'email' | 'general' | 'availability' | 'induction' | 'admins'
 
 async function saveSettings(
   settings: Record<string, string>
@@ -101,6 +101,7 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
   const tabs: { id: Tab; label: string }[] = [
     { id: 'email', label: 'Email' },
     { id: 'general', label: 'General' },
+    { id: 'availability', label: 'Availability' },
     { id: 'induction', label: 'Induction' },
     ...(isSuperAdmin ? [{ id: 'admins' as Tab, label: 'Admin Users' }] : []),
   ]
@@ -247,6 +248,78 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             value={values.app_url ?? 'https://volunteers.lighthousecare.org.au'}
             onChange={update}
           />
+
+          <SaveBar saving={saving} error={saveError} success={saveSuccess} onSave={handleSave} />
+        </div>
+      )}
+
+      {/* ── Availability tab ──────────────────────────────────────────── */}
+      {tab === 'availability' && (
+        <div className="space-y-6 max-w-xl">
+          <p className="text-sm text-gray-600">
+            Customise the labels and hour ranges shown on the volunteer availability grid and sign-up form.
+            These three time periods appear as rows when volunteers set their weekly availability.
+          </p>
+
+          {/* Morning */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">Morning</h3>
+            <SettingField
+              label="Label"
+              settingKey="availability_morning_label"
+              value={values.availability_morning_label ?? 'Morning'}
+              onChange={update}
+              placeholder="Morning"
+            />
+            <SettingField
+              label="Hours"
+              settingKey="availability_morning_hours"
+              value={values.availability_morning_hours ?? '9 am – 12 pm'}
+              onChange={update}
+              placeholder="9 am – 12 pm"
+              helpText="Shown below the label in the grid, e.g. &quot;9 am – 12 pm&quot;"
+            />
+          </div>
+
+          {/* Afternoon */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">Afternoon</h3>
+            <SettingField
+              label="Label"
+              settingKey="availability_afternoon_label"
+              value={values.availability_afternoon_label ?? 'Afternoon'}
+              onChange={update}
+              placeholder="Afternoon"
+            />
+            <SettingField
+              label="Hours"
+              settingKey="availability_afternoon_hours"
+              value={values.availability_afternoon_hours ?? '12 pm – 5 pm'}
+              onChange={update}
+              placeholder="12 pm – 5 pm"
+              helpText="Shown below the label in the grid, e.g. &quot;12 pm – 5 pm&quot;"
+            />
+          </div>
+
+          {/* Evening */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">Evening</h3>
+            <SettingField
+              label="Label"
+              settingKey="availability_evening_label"
+              value={values.availability_evening_label ?? 'Evening'}
+              onChange={update}
+              placeholder="Evening"
+            />
+            <SettingField
+              label="Hours"
+              settingKey="availability_evening_hours"
+              value={values.availability_evening_hours ?? '5 pm – 9 pm'}
+              onChange={update}
+              placeholder="5 pm – 9 pm"
+              helpText="Shown below the label in the grid, e.g. &quot;5 pm – 9 pm&quot;"
+            />
+          </div>
 
           <SaveBar saving={saving} error={saveError} success={saveSuccess} onSave={handleSave} />
         </div>

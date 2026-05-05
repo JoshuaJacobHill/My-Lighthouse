@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { AvailabilityGrid, type AvailabilityMap } from '@/components/volunteer/AvailabilityGrid'
+import { AvailabilityGrid, type AvailabilityMap, type TimePeriodConfig } from '@/components/volunteer/AvailabilityGrid'
 import { updateAvailabilityAction } from '@/lib/actions/volunteer.actions'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
@@ -11,9 +11,10 @@ import { Loader2, CheckCircle2 } from 'lucide-react'
 
 interface AvailabilityEditorClientProps {
   initialAvailability: AvailabilityMap
+  timePeriods?: TimePeriodConfig[]
 }
 
-export default function AvailabilityEditorClient({ initialAvailability }: AvailabilityEditorClientProps) {
+export default function AvailabilityEditorClient({ initialAvailability, timePeriods }: AvailabilityEditorClientProps) {
   const [availability, setAvailability] = React.useState<AvailabilityMap>(initialAvailability)
   const [isPending, startTransition] = useTransition()
   const [savedAt, setSavedAt] = React.useState<Date | null>(null)
@@ -54,6 +55,7 @@ export default function AvailabilityEditorClient({ initialAvailability }: Availa
         <AvailabilityGrid
           value={availability}
           onChange={setAvailability}
+          timePeriods={timePeriods}
         />
 
         <div className="flex items-center justify-between border-t border-gray-100 pt-4">

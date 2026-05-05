@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import AvailabilityEditorClient from './AvailabilityEditorClient'
 import type { Metadata } from 'next'
 import type { AvailabilityMap } from '@/components/volunteer/AvailabilityGrid'
+import { getTimePeriodConfig } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,9 +16,14 @@ export default async function AvailabilityPage() {
   const session = await getSession()
   if (!session?.volunteerId) redirect('/login')
 
-  const records = await prisma.volunteerAvailability.findMany({
-    where: { volunteerId: session.volunteerId },
-  })
+  const [records, availabilitySettings] = await Promise.all([
+    prisma.volunteerAvailability.findMany({
+      where: { volunteerId: session.volunteerId },
+    }),
+    prisma.appSetting.findMany({
+      where: { key: { startsWith: 'availability_' } },
+    }),
+  ])
 
   // Convert DB records to the AvailabilityMap format the grid expects
   const initialAvailability: AvailabilityMap = {}
@@ -29,6 +35,9 @@ export default async function AvailabilityPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(initialAvailability[day] as any)[record.timePeriod] = true
   }
+
+  const settingsMap = Object.fromEntries(availabilitySettings.map((s) => [s.key, s.value]))
+  const timePeriods = getTimePeriodConfig(settingsMap)
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -46,7 +55,7 @@ export default async function AvailabilityPage() {
           <li>We are closed Sundays</li>
         </ul>
       </div>
-      <AvailabilityEditorClient initialAvailability={initialAvailability} />
+      <AvailabilityEditorClient initialAvailability={initialAvailability} timePeriods={timePeriods} />
     </div>
   )
 }

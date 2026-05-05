@@ -2,15 +2,38 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Pencil, Trash2, Loader2 } from 'lucide-react'
+import { Trash2, Loader2 } from 'lucide-react'
+import { EditShiftModal } from './EditShiftModal'
 
-interface RosterActionsProps {
-  shiftId: string
-  locationId: string
-  shiftDate: string
+interface Location {
+  id: string
+  name: string
 }
 
-export function RosterActions({ shiftId }: RosterActionsProps) {
+interface Department {
+  id: string
+  name: string
+}
+
+interface ShiftData {
+  id: string
+  date: string | Date
+  startTime: string | Date
+  endTime: string | Date
+  locationId: string
+  departmentId: string | null
+  title: string | null
+  capacity: number
+  notes: string | null
+}
+
+interface RosterActionsProps {
+  shift: ShiftData
+  locations: Location[]
+  departments: Department[]
+}
+
+export function RosterActions({ shift, locations, departments }: RosterActionsProps) {
   const router = useRouter()
   const [deleting, setDeleting] = React.useState(false)
 
@@ -19,7 +42,7 @@ export function RosterActions({ shiftId }: RosterActionsProps) {
 
     setDeleting(true)
     try {
-      const response = await fetch(`/api/admin/shifts/${shiftId}`, {
+      const response = await fetch(`/api/admin/shifts/${shift.id}`, {
         method: 'DELETE',
       })
       const result = await response.json()
@@ -37,14 +60,7 @@ export function RosterActions({ shiftId }: RosterActionsProps) {
 
   return (
     <div className="flex items-center gap-1.5">
-      <button
-        onClick={() => alert('Edit shift — coming soon.')}
-        className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-        aria-label="Edit shift"
-        title="Edit shift"
-      >
-        <Pencil className="h-4 w-4" />
-      </button>
+      <EditShiftModal shift={shift} locations={locations} departments={departments} />
       <button
         onClick={handleDelete}
         disabled={deleting}

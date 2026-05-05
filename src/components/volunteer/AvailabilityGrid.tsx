@@ -35,11 +35,17 @@ const DAYS: { key: DayOfWeek; label: string; short: string }[] = [
   { key: 'SUNDAY', label: 'Sunday', short: 'Sun' },
 ]
 
-const TIME_PERIODS: { key: TimePeriod; label: string; hours: string }[] = [
-  { key: 'MORNING', label: 'Morning', hours: '8 am – 12 pm' },
+const DEFAULT_TIME_PERIODS: { key: TimePeriod; label: string; hours: string }[] = [
+  { key: 'MORNING', label: 'Morning', hours: '9 am – 12 pm' },
   { key: 'AFTERNOON', label: 'Afternoon', hours: '12 pm – 5 pm' },
   { key: 'EVENING', label: 'Evening', hours: '5 pm – 9 pm' },
 ]
+
+export interface TimePeriodConfig {
+  key: TimePeriod
+  label: string
+  hours: string
+}
 
 interface AvailabilityGridProps {
   /** Current availability values */
@@ -49,6 +55,8 @@ interface AvailabilityGridProps {
   /** When true, the grid is read-only — e.g. for admin view */
   readOnly?: boolean
   className?: string
+  /** Optional custom time period labels loaded from app settings */
+  timePeriods?: TimePeriodConfig[]
 }
 
 function isAvailable(value: AvailabilityMap, day: DayOfWeek, slot: TimePeriod): boolean {
@@ -60,7 +68,9 @@ export function AvailabilityGrid({
   onChange,
   readOnly = false,
   className,
+  timePeriods,
 }: AvailabilityGridProps) {
+  const TIME_PERIODS = timePeriods ?? DEFAULT_TIME_PERIODS
   const isEditable = !readOnly && !!onChange
 
   const toggle = (day: DayOfWeek, slot: TimePeriod) => {

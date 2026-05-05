@@ -10,7 +10,7 @@ import { ChangeStatusModal } from '@/components/admin/ChangeStatusModal'
 import { AddNoteModal } from '@/components/admin/AddNoteModal'
 import { SendEmailModal } from '@/components/admin/SendEmailModal'
 import { OnboardingForm } from '@/components/admin/OnboardingForm'
-import { formatDate, formatDateTime, formatDuration } from '@/lib/utils'
+import { formatDate, formatDateTime, formatDuration, getTimePeriodConfig } from '@/lib/utils'
 import { VOLUNTEER_STATUSES, SHIFT_ASSIGNMENT_STATUSES } from '@/lib/constants'
 import type { DayOfWeek, TimePeriod } from '@/components/volunteer/AvailabilityGrid'
 
@@ -23,33 +23,38 @@ export default async function VolunteerProfilePage({
 }) {
   const { id } = await params
 
-  const volunteer = await prisma.volunteerProfile.findUnique({
-    where: { id },
-    include: {
-      user: true,
-      availability: true,
-      inductionProgress: { include: { section: true } },
-      shiftAssignments: {
-        include: { shift: { include: { location: true, department: true } } },
-        orderBy: { shift: { date: 'desc' } },
-        take: 20,
+  const [volunteer, availabilitySettings] = await Promise.all([
+    prisma.volunteerProfile.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        availability: true,
+        inductionProgress: { include: { section: true } },
+        shiftAssignments: {
+          include: { shift: { include: { location: true, department: true } } },
+          orderBy: { shift: { date: 'desc' } },
+          take: 20,
+        },
+        attendanceRecords: {
+          include: { location: true },
+          orderBy: { signInAt: 'desc' },
+          take: 20,
+        },
+        adminNotes: {
+          include: { createdBy: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        emailLogs: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
+        quizAnswers: true,
       },
-      attendanceRecords: {
-        include: { location: true },
-        orderBy: { signInAt: 'desc' },
-        take: 20,
-      },
-      adminNotes: {
-        include: { createdBy: true },
-        orderBy: { createdAt: 'desc' },
-      },
-      emailLogs: {
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      },
-      quizAnswers: true,
-    },
-  })
+    }),
+    prisma.appSetting.findMany({
+      where: { key: { startsWith: 'availability_' } },
+    }),
+  ])
 
   if (!volunteer) notFound()
 
@@ -63,6 +68,9 @@ export default async function VolunteerProfilePage({
     if (!availabilityMap[day]) availabilityMap[day] = {}
     availabilityMap[day]![period] = true
   }
+
+  const availabilitySettingsMap = Object.fromEntries(availabilitySettings.map((s) => [s.key, s.value]))
+  const timePeriods = getTimePeriodConfig(availabilitySettingsMap)
 
   // Induction progress
   const totalSections = volunteer.inductionProgress.length
@@ -153,7 +161,7 @@ export default async function VolunteerProfilePage({
   )
 
   const availabilityTab = (
-    <AvailabilityGrid value={availabilityMap} readOnly />
+    <AvailabilityGrid value={availabilityMap} readOnly timePeriods={timePeriods} />
   )
 
   const shiftsTab = (

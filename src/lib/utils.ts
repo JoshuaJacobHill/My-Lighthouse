@@ -98,3 +98,37 @@ const STATUS_COLOURS: Record<string, string> = {
 export function statusColour(status: string): string {
   return STATUS_COLOURS[status] ?? 'bg-gray-100 text-gray-600'
 }
+
+// ─── Availability time period config ─────────────────────────────────────────
+
+import type { TimePeriod } from '@/components/volunteer/AvailabilityGrid'
+
+export interface TimePeriodConfig {
+  key: TimePeriod
+  label: string
+  hours: string
+}
+
+/**
+ * Build the timePeriods array from AppSetting records, falling back to defaults.
+ * Pass in a plain Record<string, string> of all availability_ settings.
+ */
+export function getTimePeriodConfig(settings: Record<string, string>): TimePeriodConfig[] {
+  return [
+    {
+      key: 'MORNING' as const,
+      label: settings.availability_morning_label ?? 'Morning',
+      hours: settings.availability_morning_hours ?? '9 am – 12 pm',
+    },
+    {
+      key: 'AFTERNOON' as const,
+      label: settings.availability_afternoon_label ?? 'Afternoon',
+      hours: settings.availability_afternoon_hours ?? '12 pm – 5 pm',
+    },
+    {
+      key: 'EVENING' as const,
+      label: settings.availability_evening_label ?? 'Evening',
+      hours: settings.availability_evening_hours ?? '5 pm – 9 pm',
+    },
+  ]
+}
