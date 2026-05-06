@@ -54,8 +54,12 @@ export async function loginAction(formData: FormData): Promise<{
       return { success: false, error: 'Invalid email or password' }
     }
 
-    // Create session and set cookie
-    await createSession(user.id)
+    // Create session and set cookie (pass data we already have — no extra DB query)
+    await createSession({
+      userId: user.id,
+      role: user.role,
+      volunteerId: user.volunteerProfile?.id ?? undefined,
+    })
 
     // Update last login timestamp
     await prisma.user.update({

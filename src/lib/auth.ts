@@ -1,7 +1,6 @@
 import crypto from 'crypto'
 import bcryptjs from 'bcryptjs'
 import { cookies } from 'next/headers'
-import prisma from '@/lib/prisma'
 
 const SESSION_COOKIE_NAME = 'SESSION_TOKEN'
 const SESSION_DURATION_DAYS = 30
@@ -82,26 +81,17 @@ function verifyToken(token: string): SessionPayload | null {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export async function createSession(userId: string): Promise<void> {
-  // Fetch the user's role and volunteerId once at login time — they're then
-  // embedded in the signed cookie for the session lifetime.
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      role: true,
-      isActive: true,
-      volunteerProfile: { select: { id: true } },
-    },
-  })
-
-  if (!user || !user.isActive) return
-
+export async function createSession(data: {
+  userId: string
+  role: string
+  volunteerId?: string
+}): Promise<void> {
   const exp = Math.floor(Date.now() / 1000) + SESSION_DURATION_DAYS * 86400
 
   const payload: SessionPayload = {
-    userId,
-    role: user.role,
-    volunteerId: user.volunteerProfile?.id ?? undefined,
+    userId: data.userId,
+    role: data.role,
+    volunteerId: data.volunteerId,
     exp,
   }
 
