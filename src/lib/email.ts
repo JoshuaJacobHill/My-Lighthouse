@@ -20,41 +20,72 @@ interface SendEmailResult {
   error?: string
 }
 
-function getProvider(): EmailProvider {
-  const provider = process.env.EMAIL_PROVIDER as EmailProvider
-  if (provider === 'resend' || provider === 'smtp' || provider === 'mock') {
-    return provider
+// ─── Read settings from DB, fall back to env vars ─────────────────────────────
+
+async function getEmailSettings(): Promise<Record<string, string>> {
+  try {
+    const rows = await prisma.appSetting.findMany({
+      where: {
+        key: {
+          in: [
+            'email_provider',
+            'email_from_name',
+            'email_from_address',
+            'resend_api_key',
+            'smtp_host',
+            'smtp_port',
+            'smtp_user',
+            'smtp_pass',
+          ],
+        },
+      },
+    })
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  } catch {
+    return {}
   }
+}
+
+function resolveProvider(settings: Record<string, string>): EmailProvider {
+  const val = settings.email_provider ?? process.env.EMAIL_PROVIDER ?? 'mock'
+  if (val === 'resend' || val === 'smtp') return val
   return 'mock'
 }
 
-function getFromAddress(): string {
-  const name = process.env.EMAIL_FROM_NAME ?? 'Lighthouse Care Volunteers'
-  const address = process.env.EMAIL_FROM_ADDRESS ?? 'volunteers@lighthousecare.org.au'
+function resolveFromAddress(settings: Record<string, string>): string {
+  const name =
+    settings.email_from_name ??
+    process.env.EMAIL_FROM_NAME ??
+    'Lighthouse Care Volunteers'
+  const address =
+    settings.email_from_address ??
+    process.env.EMAIL_FROM_ADDRESS ??
+    'volunteers@lighthousecare.org.au'
   return `${name} <${address}>`
 }
 
+// ─── Providers ────────────────────────────────────────────────────────────────
+
 async function sendViaMock(options: SendEmailOptions): Promise<SendEmailResult> {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('\n📧 [Mock Email]')
-    console.log(`  To:      ${options.to}`)
-    console.log(`  Subject: ${options.subject}`)
-    console.log(`  Text:    ${options.text?.slice(0, 100) ?? '(html only)'}`)
-    console.log('')
-  }
+  console.log('\n📧 [Mock Email]')
+  console.log(`  To:      ${options.to}`)
+  console.log(`  Subject: ${options.subject}`)
   return { success: true, messageId: `mock-${Date.now()}` }
 }
 
-async function sendViaResend(options: SendEmailOptions): Promise<SendEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY
+async function sendViaResend(
+  options: SendEmailOptions,
+  settings: Record<string, string>
+): Promise<SendEmailResult> {
+  const apiKey = settings.resend_api_key ?? process.env.RESEND_API_KEY
   if (!apiKey) {
-    throw new Error('RESEND_API_KEY environment variable is not set')
+    return { success: false, error: 'Resend API key is not configured. Add it in Admin → Settings → Email.' }
   }
 
   const resend = new Resend(apiKey)
 
   const { data, error } = await resend.emails.send({
-    from: getFromAddress(),
+    from: resolveFromAddress(settings),
     to: options.to,
     subject: options.subject,
     html: options.html,
@@ -68,14 +99,17 @@ async function sendViaResend(options: SendEmailOptions): Promise<SendEmailResult
   return { success: true, messageId: data?.id }
 }
 
-async function sendViaSMTP(options: SendEmailOptions): Promise<SendEmailResult> {
-  const host = process.env.SMTP_HOST
-  const port = parseInt(process.env.SMTP_PORT ?? '587', 10)
-  const user = process.env.SMTP_USER
-  const pass = process.env.SMTP_PASS
+async function sendViaSMTP(
+  options: SendEmailOptions,
+  settings: Record<string, string>
+): Promise<SendEmailResult> {
+  const host = settings.smtp_host ?? process.env.SMTP_HOST
+  const port = parseInt(settings.smtp_port ?? process.env.SMTP_PORT ?? '587', 10)
+  const user = settings.smtp_user ?? process.env.SMTP_USER
+  const pass = settings.smtp_pass ?? process.env.SMTP_PASS
 
   if (!host) {
-    throw new Error('SMTP_HOST environment variable is not set')
+    return { success: false, error: 'SMTP host is not configured. Add it in Admin → Settings → Email.' }
   }
 
   const transporter = nodemailer.createTransport({
@@ -86,7 +120,7 @@ async function sendViaSMTP(options: SendEmailOptions): Promise<SendEmailResult> 
   })
 
   const info = await transporter.sendMail({
-    from: getFromAddress(),
+    from: resolveFromAddress(settings),
     to: options.to,
     subject: options.subject,
     html: options.html,
@@ -96,10 +130,14 @@ async function sendViaSMTP(options: SendEmailOptions): Promise<SendEmailResult> 
   return { success: true, messageId: info.messageId }
 }
 
-export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
-  const provider = getProvider()
+// ─── Main export ──────────────────────────────────────────────────────────────
 
-  // Create a pending log entry first
+export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
+  // Load settings from DB (with env var fallbacks)
+  const settings = await getEmailSettings()
+  const provider = resolveProvider(settings)
+
+  // Create a pending log entry
   const logEntry = await prisma.emailLog.create({
     data: {
       to: options.to,
@@ -115,10 +153,10 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
   try {
     switch (provider) {
       case 'resend':
-        result = await sendViaResend(options)
+        result = await sendViaResend(options, settings)
         break
       case 'smtp':
-        result = await sendViaSMTP(options)
+        result = await sendViaSMTP(options, settings)
         break
       case 'mock':
       default:
