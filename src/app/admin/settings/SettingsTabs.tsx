@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Save, Loader2, Plus, Trash2, UserPlus } from 'lucide-react'
+import { Save, Loader2, Plus, Trash2, UserPlus, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface AdminUser {
@@ -52,6 +52,72 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
   })
   const [addAdminLoading, setAddAdminLoading] = React.useState(false)
   const [addAdminError, setAddAdminError] = React.useState<string | null>(null)
+
+  // Edit admin
+  const [editAdmin, setEditAdmin] = React.useState<AdminUser | null>(null)
+  const [editForm, setEditForm] = React.useState({ name: '', email: '', role: 'ADMIN', password: '' })
+  const [editLoading, setEditLoading] = React.useState(false)
+  const [editError, setEditError] = React.useState<string | null>(null)
+
+  function openEdit(admin: AdminUser) {
+    setEditAdmin(admin)
+    setEditForm({ name: admin.name ?? '', email: admin.email, role: admin.role, password: '' })
+    setEditError(null)
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editAdmin) return
+    setEditError(null)
+    setEditLoading(true)
+    try {
+      const body: Record<string, string> = {
+        name: editForm.name,
+        email: editForm.email,
+        role: editForm.role,
+      }
+      if (editForm.password) body.password = editForm.password
+      const res = await fetch(`/api/admin/users/${editAdmin.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await res.json()
+      if (!result.success) {
+        setEditError(result.error ?? 'Failed to update user.')
+      } else {
+        setEditAdmin(null)
+        router.refresh()
+      }
+    } catch {
+      setEditError('Something went wrong.')
+    }
+    setEditLoading(false)
+  }
+
+  // Delete admin
+  const [deleteAdmin, setDeleteAdmin] = React.useState<AdminUser | null>(null)
+  const [deleteLoading, setDeleteLoading] = React.useState(false)
+  const [deleteError, setDeleteError] = React.useState<string | null>(null)
+
+  async function handleDelete() {
+    if (!deleteAdmin) return
+    setDeleteError(null)
+    setDeleteLoading(true)
+    try {
+      const res = await fetch(`/api/admin/users/${deleteAdmin.id}`, { method: 'DELETE' })
+      const result = await res.json()
+      if (!result.success) {
+        setDeleteError(result.error ?? 'Failed to delete user.')
+      } else {
+        setDeleteAdmin(null)
+        router.refresh()
+      }
+    } catch {
+      setDeleteError('Something went wrong.')
+    }
+    setDeleteLoading(false)
+  }
 
   function update(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -382,6 +448,7 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                   <th className="text-left px-5 py-3 font-medium text-gray-600">Role</th>
                   <th className="text-left px-5 py-3 font-medium text-gray-600">Last Login</th>
                   <th className="text-left px-5 py-3 font-medium text-gray-600">Status</th>
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -418,11 +485,152 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                         {admin.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-1 justify-end">
+                        <button
+                          onClick={() => openEdit(admin)}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { setDeleteAdmin(admin); setDeleteError(null) }}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {/* ── Edit admin modal ── */}
+          {editAdmin && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+              <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900">Edit Admin User</h2>
+                  <button
+                    onClick={() => setEditAdmin(null)}
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                  >×</button>
+                </div>
+                <form onSubmit={handleEdit} className="px-6 py-5 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.name}
+                      onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={editForm.email}
+                      onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <select
+                      value={editForm.role}
+                      onChange={(e) => setEditForm((p) => ({ ...p, role: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none bg-white"
+                    >
+                      <option value="ADMIN">Admin</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      New Password <span className="text-gray-400 font-normal">(leave blank to keep current)</span>
+                    </label>
+                    <input
+                      type="password"
+                      minLength={8}
+                      value={editForm.password}
+                      onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))}
+                      placeholder="Leave blank to keep unchanged"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+                    />
+                  </div>
+                  {editError && (
+                    <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                      {editError}
+                    </div>
+                  )}
+                </form>
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => setEditAdmin(null)}
+                    className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleEdit}
+                    disabled={editLoading}
+                    className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                  >
+                    {editLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Delete confirmation modal ── */}
+          {deleteAdmin && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+              <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div className="px-6 py-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                      <Trash2 className="h-5 w-5 text-red-600" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-gray-900">Delete Admin User</h2>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Are you sure you want to delete <strong>{deleteAdmin.name ?? deleteAdmin.email}</strong>? This cannot be undone.
+                  </p>
+                  {deleteError && (
+                    <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                      {deleteError}
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <button
+                    onClick={() => setDeleteAdmin(null)}
+                    className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleteLoading}
+                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    {deleteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Add admin modal */}
           {addAdminOpen && (
