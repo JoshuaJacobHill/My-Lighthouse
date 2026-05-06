@@ -12,6 +12,7 @@ interface SendEmailOptions {
   text?: string
   templateType?: EmailTemplateType
   volunteerId?: string
+  attachments?: { filename: string; content: string; contentType: string }[]
 }
 
 interface SendEmailResult {
@@ -90,6 +91,10 @@ async function sendViaResend(
     subject: options.subject,
     html: options.html,
     text: options.text,
+    attachments: options.attachments?.map((a) => ({
+      filename: a.filename,
+      content: Buffer.from(a.content).toString('base64'),
+    })),
   })
 
   if (error) {

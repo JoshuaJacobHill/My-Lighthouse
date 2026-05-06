@@ -14,6 +14,53 @@ import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 import { loginSchema, volunteerSignupSchema } from '@/lib/validations'
 
+// ─── ICS Calendar helper ──────────────────────────────────────────────────────
+
+function generateICS(opts: {
+  summary: string
+  description: string
+  date: string
+  period: string
+  location: string
+  organizerEmail: string
+}): string {
+  const [year, month, day] = opts.date.split('-')
+
+  let startHour = 9
+  let endHour = 12
+  const p = opts.period.toLowerCase()
+  if (p.includes('6') || p.includes('pre') || p.includes('open')) {
+    startHour = 6
+    endHour = 9
+  } else if (p.includes('12') || p.includes('afternoon') || p.includes('5')) {
+    startHour = 12
+    endHour = 17
+  }
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const dtStart = `${year}${month}${day}T${pad(startHour)}0000`
+  const dtEnd = `${year}${month}${day}T${pad(endHour)}0000`
+  const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Lighthouse Care Volunteers//EN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${now}-volunteer@lighthousecare.org.au`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `SUMMARY:${opts.summary}`,
+    `DESCRIPTION:${opts.description.replace(/\n/g, '\\n')}`,
+    `LOCATION:${opts.location}`,
+    `ORGANIZER:mailto:${opts.organizerEmail}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+}
+
 // ─── Login ────────────────────────────────────────────────────────────────────
 
 export async function loginAction(formData: FormData): Promise<{
@@ -242,34 +289,129 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         volunteerId: user.volunteerProfile?.id,
       })
 
-      // Notify admin of new volunteer — always send to main admin email
-      const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL
-      if (adminEmail) {
-        const adminTemplate = await renderTemplate('ADMIN_NEW_VOLUNTEER', {
-          first_name: data.firstName,
-          last_name: data.lastName,
-          portal_link: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/volunteers`,
-        })
-        await sendEmail({
-          to: adminEmail,
-          subject: adminTemplate.subject,
-          html: adminTemplate.html,
-          text: adminTemplate.text,
-          templateType: 'ADMIN_NEW_VOLUNTEER',
-        })
+      // Send coordinator email with first visit details
+      const preferredStore = formData.get('preferredStore') as string | null
+      const firstVisitDate = formData.get('firstVisitDate') as string | null
+      const firstVisitPeriod = formData.get('firstVisitPeriod') as string | null
 
-        // Also notify Hillcrest if that's their preferred store
-        const preferredStore = formData.get('preferredStore') as string | null
-        if (preferredStore === 'Hillcrest') {
-          await sendEmail({
-            to: 'hillcrest@lighthousecare.org.au',
-            subject: adminTemplate.subject,
-            html: adminTemplate.html,
-            text: adminTemplate.text,
-            templateType: 'ADMIN_NEW_VOLUNTEER',
-          })
+      // Load coordinator emails from AppSettings (with hardcoded fallbacks)
+      let coordinatorSettings: Record<string, string> = {}
+      try {
+        const settingRows = await prisma.appSetting.findMany({
+          where: { key: { in: ['loganholme_coordinator_email', 'hillcrest_coordinator_email'] } },
+        })
+        coordinatorSettings = Object.fromEntries(settingRows.map((r) => [r.key, r.value]))
+      } catch {
+        // fall through to defaults
+      }
+
+      const loganholmeEmail =
+        coordinatorSettings.loganholme_coordinator_email ?? 'rochelle@lighthousecare.org.au'
+      const hillcrestEmail =
+        coordinatorSettings.hillcrest_coordinator_email ?? 'georgina@lighthousecare.org.au'
+
+      const coordinatorEmail =
+        preferredStore === 'Hillcrest' ? hillcrestEmail : loganholmeEmail
+      const storeName = preferredStore ?? 'Loganholme'
+
+      // Resolve the period label for display
+      // firstVisitPeriod is stored as the key (e.g. "MORNING", "AFTERNOON")
+      // We display the human-readable label in the email
+      const periodDisplayMap: Record<string, string> = {
+        MORNING: 'Morning',
+        AFTERNOON: 'Afternoon',
+        EVENING: 'Evening',
+      }
+      const periodLabel = firstVisitPeriod
+        ? (periodDisplayMap[firstVisitPeriod] ?? firstVisitPeriod)
+        : 'Not specified'
+
+      const visitDateFormatted = firstVisitDate
+        ? (() => {
+            const [y, m, d] = firstVisitDate.split('-')
+            return `${d}/${m}/${y}`
+          })()
+        : 'Not specified'
+
+      const coordinatorSubject = `New Volunteer: ${data.firstName} ${data.lastName} — First Visit ${visitDateFormatted}`
+
+      const coordinatorHtml = `
+<html><body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+  <h2 style="color: #f97316;">New Volunteer Registration — Lighthouse Care</h2>
+  <p>A new volunteer has registered and selected their preferred first visit date.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr>
+      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold; width: 40%;">Name</td>
+      <td style="padding: 8px 12px;">${data.firstName} ${data.lastName}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold;">Email</td>
+      <td style="padding: 8px 12px;">${data.email}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold;">Mobile</td>
+      <td style="padding: 8px 12px;">${data.mobile}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold;">Preferred Store</td>
+      <td style="padding: 8px 12px;">${storeName}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold;">First Visit Date</td>
+      <td style="padding: 8px 12px;">${visitDateFormatted}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold;">Time Period</td>
+      <td style="padding: 8px 12px;">${periodLabel}</td>
+    </tr>
+  </table>
+  <p style="color: #6b7280; font-size: 14px;">Please reach out to welcome this volunteer and confirm their visit.</p>
+  <p style="color: #6b7280; font-size: 12px;">— Lighthouse Care Volunteer System</p>
+</body></html>`
+
+      const coordinatorText = [
+        'New Volunteer Registration — Lighthouse Care',
+        '',
+        `Name: ${data.firstName} ${data.lastName}`,
+        `Email: ${data.email}`,
+        `Mobile: ${data.mobile}`,
+        `Preferred Store: ${storeName}`,
+        `First Visit Date: ${visitDateFormatted}`,
+        `Time Period: ${periodLabel}`,
+        '',
+        'Please reach out to welcome this volunteer and confirm their visit.',
+      ].join('\n')
+
+      // Generate .ics calendar invite if we have a date
+      let icsAttachment: { filename: string; content: string; contentType: string } | undefined
+      if (firstVisitDate) {
+        const icsContent = generateICS({
+          summary: `Volunteer First Visit — ${data.firstName} ${data.lastName}`,
+          description: [
+            `Volunteer: ${data.firstName} ${data.lastName}`,
+            `Email: ${data.email}`,
+            `Mobile: ${data.mobile}`,
+            `Store: ${storeName}`,
+          ].join('\n'),
+          date: firstVisitDate,
+          period: firstVisitPeriod ?? '',
+          location: storeName,
+          organizerEmail: coordinatorEmail,
+        })
+        icsAttachment = {
+          filename: 'first-visit.ics',
+          content: icsContent,
+          contentType: 'text/calendar',
         }
       }
+
+      await sendEmail({
+        to: coordinatorEmail,
+        subject: coordinatorSubject,
+        html: coordinatorHtml,
+        text: coordinatorText,
+        attachments: icsAttachment ? [icsAttachment] : undefined,
+      })
     } catch (emailErr) {
       console.error('[registerVolunteerAction] email error:', emailErr)
     }

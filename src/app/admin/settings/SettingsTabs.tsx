@@ -314,6 +314,22 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             value={values.app_url ?? 'https://volunteers.lighthousecare.org.au'}
             onChange={update}
           />
+          <SettingField
+            label="Loganholme Coordinator Email"
+            settingKey="loganholme_coordinator_email"
+            type="email"
+            value={values.loganholme_coordinator_email ?? 'rochelle@lighthousecare.org.au'}
+            onChange={update}
+            helpText="Receives new volunteer notifications for the Loganholme store."
+          />
+          <SettingField
+            label="Hillcrest Coordinator Email"
+            settingKey="hillcrest_coordinator_email"
+            type="email"
+            value={values.hillcrest_coordinator_email ?? 'georgina@lighthousecare.org.au'}
+            onChange={update}
+            helpText="Receives new volunteer notifications for the Hillcrest store."
+          />
 
           <SaveBar saving={saving} error={saveError} success={saveSuccess} onSave={handleSave} />
         </div>
