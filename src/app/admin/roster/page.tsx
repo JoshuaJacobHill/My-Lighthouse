@@ -97,15 +97,24 @@ function getMonthStart(monthParam?: string): Date {
   return startOfMonth(new Date())
 }
 
-// Dot colours per location index
-const DOT_COLOURS = [
-  'bg-orange-400',
-  'bg-blue-400',
-  'bg-green-400',
-  'bg-purple-400',
-  'bg-pink-400',
-  'bg-amber-400',
-]
+// Fill-status colours — used consistently across all views
+function fillStatus(assigned: number, capacity: number): 'empty' | 'partial' | 'full' {
+  if (assigned === 0) return 'empty'
+  if (assigned >= capacity) return 'full'
+  return 'partial'
+}
+
+const FILL_CHIP: Record<'empty' | 'partial' | 'full', string> = {
+  empty:   'bg-red-400',
+  partial: 'bg-amber-400',
+  full:    'bg-green-500',
+}
+
+const FILL_BORDER: Record<'empty' | 'partial' | 'full', string> = {
+  empty:   'border-l-4 border-red-400',
+  partial: 'border-l-4 border-amber-400',
+  full:    'border-l-4 border-green-500',
+}
 
 export default async function RosterPage({ searchParams }: PageProps) {
   const session = await getSession()
@@ -121,12 +130,6 @@ export default async function RosterPage({ searchParams }: PageProps) {
     prisma.location.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
     prisma.department.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
   ])
-
-  // Build location colour map for month view dots
-  const locationColourMap: Record<string, string> = {}
-  locations.forEach((loc, idx) => {
-    locationColourMap[loc.id] = DOT_COLOURS[idx % DOT_COLOURS.length]
-  })
 
   // ─── Compute date ranges ──────────────────────────────────────────────────────
 
@@ -176,10 +179,10 @@ export default async function RosterPage({ searchParams }: PageProps) {
     const assignedCount = shift.assignments.filter(
       (a) => a.status !== 'ADMIN_CANCELLED' && a.status !== 'CANCELLED_BY_VOLUNTEER'
     ).length
-    const isFull = assignedCount >= shift.capacity
+    const status = fillStatus(assignedCount, shift.capacity)
 
     return (
-      <div className="px-5 py-4">
+      <div className={`px-5 py-4 ${FILL_BORDER[status]}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 min-w-0">
             {/* Shift info */}
@@ -201,7 +204,11 @@ export default async function RosterPage({ searchParams }: PageProps) {
                 </>
               )}
               <span>·</span>
-              <span className={`font-medium ${isFull ? 'text-green-600' : 'text-amber-600'}`}>
+              <span className={`font-medium ${
+                status === 'full' ? 'text-green-600' :
+                status === 'partial' ? 'text-amber-600' :
+                'text-red-500'
+              }`}>
                 {assignedCount}/{shift.capacity} filled
               </span>
             </div>
@@ -528,17 +535,23 @@ export default async function RosterPage({ searchParams }: PageProps) {
                         </div>
                         {dayShifts.length > 0 && (
                           <div className="space-y-0.5">
-                            {dayShifts.slice(0, 3).map((shift) => (
+                            {dayShifts.slice(0, 3).map((shift) => {
+                              const count = shift.assignments.filter(
+                                (a) => a.status !== 'ADMIN_CANCELLED' && a.status !== 'CANCELLED_BY_VOLUNTEER'
+                              ).length
+                              const chipStatus = fillStatus(count, shift.capacity)
+                              return (
                               <div
                                 key={shift.id}
                                 className={`rounded px-1 py-0.5 text-[10px] font-medium text-white truncate ${
-                                  locationColourMap[shift.locationId] ?? 'bg-gray-400'
+                                  FILL_CHIP[chipStatus]
                                 }`}
                               >
                                 {format(new Date(shift.startTime), 'h:mma')}{' '}
                                 {shift.location.name}
                               </div>
-                            ))}
+                              )
+                            })}
                             {dayShifts.length > 3 && (
                               <div className="text-[10px] text-gray-400 pl-1">
                                 +{dayShifts.length - 3} more
@@ -555,18 +568,20 @@ export default async function RosterPage({ searchParams }: PageProps) {
           </div>
 
           {/* Legend */}
-          {locations.length > 0 && (
-            <div className="flex flex-wrap gap-3">
-              {locations.map((loc) => (
-                <div key={loc.id} className="flex items-center gap-1.5 text-xs text-gray-600">
-                  <span
-                    className={`inline-block h-2.5 w-2.5 rounded-sm ${locationColourMap[loc.id] ?? 'bg-gray-400'}`}
-                  />
-                  {loc.name}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-4">
+            {(
+              [
+                { status: 'empty',   label: 'No volunteers rostered' },
+                { status: 'partial', label: 'Partially rostered' },
+                { status: 'full',    label: 'Fully rostered' },
+              ] as const
+            ).map(({ status, label }) => (
+              <div key={status} className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className={`inline-block h-2.5 w-2.5 rounded-sm ${FILL_CHIP[status]}`} />
+                {label}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
