@@ -4,7 +4,7 @@
 import Link from 'next/link'
 import {
   Heart, Package, Users, MapPin, CheckCircle,
-  Warehouse, CalendarDays, Wrench, Sparkles, ArrowRight, Store,
+  CalendarDays, Wrench, Sparkles, ArrowRight, Store,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/Header'
@@ -18,7 +18,6 @@ export const metadata = {
 
 const roleCards = [
   { icon: Package, title: 'Packing Orders', description: 'Help pack grocery orders for families in need — making sure every bag is filled with care.' },
-  { icon: Warehouse, title: 'Warehouse', description: 'Sort, stock, and organise our warehouse to keep everything running smoothly behind the scenes.' },
   { icon: Store, title: 'Grocery Store', description: 'Serve shoppers in our not-for-profit stores at Loganholme and Hillcrest with a friendly face.' },
   { icon: CalendarDays, title: 'Events', description: 'Help run community events and outreach activities that bring people together.' },
   { icon: Wrench, title: 'Admin', description: 'Support the team with administration, data entry, communications, and coordination.' },
@@ -41,7 +40,6 @@ const steps = [
 const locations = [
   { name: 'Loganholme Store', icon: Store, description: 'Our Loganholme store serves the local community with affordable groceries and a warm, welcoming environment.', suburb: 'Loganholme, QLD' },
   { name: 'Hillcrest Store', icon: Store, description: 'The Hillcrest store brings affordable food and dignified shopping to families in the Hillcrest area.', suburb: 'Hillcrest, QLD' },
-  { name: 'Warehouse & Events', icon: Warehouse, description: 'Our warehouse is the hub of our operation — packing orders, managing stock, and coordinating community events.', suburb: 'Logan, QLD' },
 ]
 
 export default function HomePage() {

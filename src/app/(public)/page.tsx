@@ -13,7 +13,6 @@ import {
   Sparkles,
   ArrowRight,
   Store,
-  Warehouse,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -28,11 +27,6 @@ const roleCards = [
     icon: Package,
     title: 'Packing Orders',
     description: 'Help pack grocery orders for families in need — making sure every bag is filled with care.',
-  },
-  {
-    icon: Warehouse,
-    title: 'Warehouse',
-    description: 'Sort, stock, and organise our warehouse to keep everything running smoothly behind the scenes.',
   },
   {
     icon: Store,
@@ -103,13 +97,6 @@ const locations = [
     description:
       'The Hillcrest store brings affordable food and dignified shopping to families in the Hillcrest area.',
     suburb: 'Hillcrest, QLD',
-  },
-  {
-    name: 'Warehouse & Events',
-    icon: Warehouse,
-    description:
-      'Our warehouse is the hub of our operation — packing orders, managing stock, and coordinating community events.',
-    suburb: 'Logan, QLD',
   },
 ]
 

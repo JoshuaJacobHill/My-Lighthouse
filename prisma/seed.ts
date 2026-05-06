@@ -32,28 +32,6 @@ async function main() {
     },
   })
 
-  const warehouse = await prisma.location.upsert({
-    where: { name: 'Distribution Warehouse' },
-    update: {},
-    create: {
-      name: 'Distribution Warehouse',
-      address: '15 Commerce Drive, Loganholme QLD 4129',
-      isActive: true,
-      sortOrder: 3,
-    },
-  })
-
-  const online = await prisma.location.upsert({
-    where: { name: 'Online / Home Delivery' },
-    update: {},
-    create: {
-      name: 'Online / Home Delivery',
-      address: 'South East Queensland',
-      isActive: true,
-      sortOrder: 4,
-    },
-  })
-
   console.log('  Locations created.')
 
   // ─── 2. Departments ───────────────────────────────────────────────────────────
@@ -68,18 +46,6 @@ async function main() {
     where: { name: 'Packing' },
     update: {},
     create: { name: 'Packing', isActive: true, sortOrder: 2 },
-  })
-
-  const deptWarehouse = await prisma.department.upsert({
-    where: { name: 'Warehouse' },
-    update: {},
-    create: { name: 'Warehouse', isActive: true, sortOrder: 3 },
-  })
-
-  const deptDelivery = await prisma.department.upsert({
-    where: { name: 'Delivery' },
-    update: {},
-    create: { name: 'Delivery', isActive: true, sortOrder: 4 },
   })
 
   const deptEvents = await prisma.department.upsert({
@@ -219,8 +185,8 @@ async function main() {
       joinedAt: new Date('2022-11-08'),
       lastActiveAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
       lastAttendedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      preferredLocations: ['Hillcrest Store', 'Distribution Warehouse'],
-      areasOfInterest: ['Warehouse', 'Delivery'],
+      preferredLocations: ['Hillcrest Store'],
+      areasOfInterest: ['Store', 'Packing'],
       blueCardStatus: 'CURRENT',
       blueCardNumber: 'BC-2023-31902',
       blueCardExpiry: new Date('2025-11-07'),
@@ -802,28 +768,6 @@ The Lighthouse Care Team`,
         isActive: true,
       },
     }),
-    prisma.shift.create({
-      data: {
-        locationId: warehouse.id,
-        departmentId: deptWarehouse.id,
-        title: 'Warehouse Stock Receive — Loganholme',
-        ...shiftDates(10, 7, 4),
-        capacity: 3,
-        isActive: true,
-        notes: 'Large delivery expected. Steel-capped boots required.',
-      },
-    }),
-    prisma.shift.create({
-      data: {
-        locationId: loganholme.id,
-        departmentId: deptDelivery.id,
-        title: 'Home Delivery Run — South Logan',
-        ...shiftDates(14, 9, 5),
-        capacity: 2,
-        isActive: true,
-        notes: 'Valid driver\'s licence required. 12 deliveries to Beenleigh and surrounding suburbs.',
-      },
-    }),
   ])
 
   // Past shifts
@@ -860,16 +804,6 @@ The Lighthouse Care Team`,
     }),
     prisma.shift.create({
       data: {
-        locationId: warehouse.id,
-        departmentId: deptWarehouse.id,
-        title: 'Warehouse Stocktake',
-        ...shiftDates(-21, 7, 6),
-        capacity: 4,
-        isActive: true,
-      },
-    }),
-    prisma.shift.create({
-      data: {
         locationId: hillcrest.id,
         departmentId: deptPacking.id,
         title: 'Community Hamper Day — Hillcrest',
@@ -881,7 +815,7 @@ The Lighthouse Care Team`,
     }),
   ])
 
-  console.log('  10 shifts created (5 upcoming, 5 past).')
+  console.log('  7 shifts created (3 upcoming, 4 past).')
 
   // ─── 10. Assignments and attendance ──────────────────────────────────────────
 
@@ -903,11 +837,6 @@ The Lighthouse Care Team`,
     update: {},
     create: { shiftId: upcomingShifts[2].id, volunteerId: davidProfile.id, status: 'CONFIRMED', confirmedAt: new Date() },
   })
-  await prisma.shiftAssignment.upsert({
-    where: { shiftId_volunteerId: { shiftId: upcomingShifts[3].id, volunteerId: davidProfile.id } },
-    update: {},
-    create: { shiftId: upcomingShifts[3].id, volunteerId: davidProfile.id, status: 'SCHEDULED' },
-  })
 
   // Attendance records for past shifts (Sarah)
   function pastAttendance(shift: { startTime: Date; locationId: string }, volunteerId: string, durationMins: number) {
@@ -921,8 +850,7 @@ The Lighthouse Care Team`,
   await prisma.attendanceRecord.create({ data: pastAttendance(pastShifts[0], sarahProfile.id, 238) })
   await prisma.attendanceRecord.create({ data: pastAttendance(pastShifts[1], sarahProfile.id, 185) })
   await prisma.attendanceRecord.create({ data: pastAttendance(pastShifts[2], davidProfile.id, 302) })
-  await prisma.attendanceRecord.create({ data: pastAttendance(pastShifts[3], davidProfile.id, 355) })
-  await prisma.attendanceRecord.create({ data: pastAttendance(pastShifts[4], sarahProfile.id, 245) })
+  await prisma.attendanceRecord.create({ data: pastAttendance(pastShifts[3], sarahProfile.id, 245) })
 
   // Update last attended
   await prisma.volunteerProfile.update({ where: { id: sarahProfile.id }, data: { lastAttendedAt: pastShifts[0].startTime } })
