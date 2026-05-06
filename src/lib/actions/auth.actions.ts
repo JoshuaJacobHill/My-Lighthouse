@@ -7,7 +7,6 @@ import {
   comparePassword,
   createSession,
   destroySession,
-  setSessionCookie,
   clearSessionCookie,
 } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
@@ -56,8 +55,7 @@ export async function loginAction(formData: FormData): Promise<{
     }
 
     // Create session and set cookie
-    const token = await createSession(user.id)
-    await setSessionCookie(token)
+    await createSession(user.id)
 
     // Update last login timestamp
     await prisma.user.update({
@@ -83,8 +81,7 @@ export async function loginAction(formData: FormData): Promise<{
 // ─── Logout ───────────────────────────────────────────────────────────────────
 
 export async function logoutAction(): Promise<void> {
-  await destroySession()
-  await clearSessionCookie()
+  await destroySession() // clears the cookie
   redirect('/login')
 }
 
