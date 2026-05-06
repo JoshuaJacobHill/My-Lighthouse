@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate-shifts",
+      "schedule": "0 20 * * 0"
+    }
+  ]
+}

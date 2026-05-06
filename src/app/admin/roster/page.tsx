@@ -22,6 +22,7 @@ import { AddShiftModal } from './AddShiftModal'
 import { RosterActions } from './RosterActions'
 import { RosterControls } from './RosterControls'
 import { AssignVolunteerModal } from './AssignVolunteerModal'
+import { GenerateShiftsButton } from './GenerateShiftsButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -295,6 +296,7 @@ export default async function RosterPage({ searchParams }: PageProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <GenerateShiftsButton />
           <AddShiftModal
             locations={locations.map((l) => ({ id: l.id, name: l.name }))}
             departments={departments.map((d) => ({ id: d.id, name: d.name }))}
