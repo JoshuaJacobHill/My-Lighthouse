@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import bcryptjs from 'bcryptjs'
 import { cookies } from 'next/headers'
+import prisma from '@/lib/prisma'
 
 const SESSION_COOKIE_NAME = 'SESSION_TOKEN'
 const SESSION_DURATION_DAYS = 30
@@ -15,88 +16,22 @@ export async function comparePassword(password: string, hash: string): Promise<b
   return bcryptjs.compare(password, hash)
 }
 
-// ─── Signed-cookie sessions ───────────────────────────────────────────────────
-//
-// Session data is embedded directly in the cookie as a HMAC-signed payload.
-// This means getSession() never needs a DB query — it just verifies the
-// signature and reads the payload. Much faster for every page load.
-//
-// Format:  <base64url(JSON payload)>.<base64url(HMAC-SHA256 signature)>
+// ─── Session management ───────────────────────────────────────────────────────
 
-interface SessionPayload {
-  userId: string
-  role: string
-  volunteerId?: string
-  exp: number // Unix timestamp (seconds)
-}
+export async function createSession(userId: string): Promise<string> {
+  const token = crypto.randomBytes(32).toString('hex')
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + SESSION_DURATION_DAYS)
 
-function getHmacKey(): string {
-  const key = process.env.SESSION_SECRET
-  if (!key) {
-    // In development fall back to a constant so sessions survive restarts.
-    // In production SESSION_SECRET must be set in Vercel env vars.
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('SESSION_SECRET env var is not set')
-    }
-    return 'dev-lighthouse-secret-do-not-use-in-production'
-  }
-  return key
-}
+  await prisma.userSession.create({
+    data: {
+      userId,
+      token,
+      expiresAt,
+    },
+  })
 
-function signPayload(payload: SessionPayload): string {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const sig = crypto
-    .createHmac('sha256', getHmacKey())
-    .update(encoded)
-    .digest('base64url')
-  return `${encoded}.${sig}`
-}
-
-function verifyToken(token: string): SessionPayload | null {
-  try {
-    const dotIdx = token.lastIndexOf('.')
-    if (dotIdx === -1) return null
-    const encoded = token.slice(0, dotIdx)
-    const sig = token.slice(dotIdx + 1)
-
-    const expected = crypto
-      .createHmac('sha256', getHmacKey())
-      .update(encoded)
-      .digest('base64url')
-
-    // Constant-time comparison to prevent timing attacks
-    const sigBuf = Buffer.from(sig)
-    const expBuf = Buffer.from(expected)
-    if (sigBuf.length !== expBuf.length) return null
-    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null
-
-    const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as SessionPayload
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null // expired
-
-    return payload
-  } catch {
-    return null
-  }
-}
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-export async function createSession(data: {
-  userId: string
-  role: string
-  volunteerId?: string
-}): Promise<void> {
-  const exp = Math.floor(Date.now() / 1000) + SESSION_DURATION_DAYS * 86400
-
-  const payload: SessionPayload = {
-    userId: data.userId,
-    role: data.role,
-    volunteerId: data.volunteerId,
-    exp,
-  }
-
-  const token = signPayload(payload)
-  await setSessionCookie(token)
+  return token
 }
 
 export async function getSession(): Promise<{
@@ -107,15 +42,43 @@ export async function getSession(): Promise<{
   try {
     const cookieStore = await cookies()
     const tokenCookie = cookieStore.get(SESSION_COOKIE_NAME)
-    if (!tokenCookie?.value) return null
 
-    const payload = verifyToken(tokenCookie.value)
-    if (!payload) return null
+    if (!tokenCookie?.value) {
+      return null
+    }
+
+    const token = tokenCookie.value
+
+    const session = await prisma.userSession.findUnique({
+      where: { token },
+      include: {
+        user: {
+          include: {
+            volunteerProfile: {
+              select: { id: true },
+            },
+          },
+        },
+      },
+    })
+
+    if (!session) {
+      return null
+    }
+
+    if (session.expiresAt < new Date()) {
+      await prisma.userSession.delete({ where: { id: session.id } })
+      return null
+    }
+
+    if (!session.user.isActive) {
+      return null
+    }
 
     return {
-      userId: payload.userId,
-      role: payload.role,
-      volunteerId: payload.volunteerId,
+      userId: session.userId,
+      role: session.user.role,
+      volunteerId: session.user.volunteerProfile?.id ?? undefined,
     }
   } catch {
     return null
@@ -124,9 +87,16 @@ export async function getSession(): Promise<{
 
 export async function destroySession(): Promise<void> {
   try {
-    await clearSessionCookie()
+    const cookieStore = await cookies()
+    const tokenCookie = cookieStore.get(SESSION_COOKIE_NAME)
+
+    if (tokenCookie?.value) {
+      await prisma.userSession.deleteMany({
+        where: { token: tokenCookie.value },
+      })
+    }
   } catch {
-    // Silently fail
+    // Silently fail — session may already be gone
   }
 }
 

@@ -7,6 +7,7 @@ import {
   comparePassword,
   createSession,
   destroySession,
+  setSessionCookie,
   clearSessionCookie,
 } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
@@ -54,12 +55,9 @@ export async function loginAction(formData: FormData): Promise<{
       return { success: false, error: 'Invalid email or password' }
     }
 
-    // Create session and set cookie (pass data we already have — no extra DB query)
-    await createSession({
-      userId: user.id,
-      role: user.role,
-      volunteerId: user.volunteerProfile?.id ?? undefined,
-    })
+    // Create session and set cookie
+    const token = await createSession(user.id)
+    await setSessionCookie(token)
 
     // Update last login timestamp
     await prisma.user.update({
@@ -85,7 +83,8 @@ export async function loginAction(formData: FormData): Promise<{
 // ─── Logout ───────────────────────────────────────────────────────────────────
 
 export async function logoutAction(): Promise<void> {
-  await destroySession() // clears the cookie
+  await destroySession()
+  await clearSessionCookie()
   redirect('/login')
 }
 
