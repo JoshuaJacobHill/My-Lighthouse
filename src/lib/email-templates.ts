@@ -46,12 +46,15 @@ export const defaultTemplates: Record<
     html: wrap(`
       <p style="${P}">Hi {{first_name}},</p>
       <p style="${P}">Thank you for registering as a volunteer with Lighthouse Care. We&rsquo;re so glad you&rsquo;ve decided to join our community — your time and care genuinely makes a difference to families across South East Queensland.</p>
-      <p style="${P}">To get started, please complete your induction by visiting the volunteer portal. It only takes a short while and covers everything you need to know before your first shift.</p>
+      <p style="${P}">Your first visit is booked for:</p>
+      ${shiftTable()}
+      <p style="${P}">We&rsquo;ve attached a calendar invite so you don&rsquo;t forget. Our coordinator will be there to meet you and get you settled in.</p>
+      <p style="${P}">In the meantime, please complete your induction by visiting the volunteer portal. It only takes a short while and covers everything you need to know before you start.</p>
       ${btn('{{portal_link}}', 'Start My Induction &rarr;')}
       <p style="${P}">If you have any questions, don&rsquo;t hesitate to reach out — we&rsquo;re here to help.</p>
       <p style="${P};margin-bottom:0;">Warm regards,<br>The {{organisation_name}} Team</p>
     `),
-    text: `Welcome to Lighthouse Care Volunteers, {{first_name}}!\n\nThank you for registering as a volunteer. We're so glad you've decided to join our community.\n\nTo get started, please complete your induction at: {{portal_link}}\n\nWarm regards,\nThe {{organisation_name}} Team`,
+    text: `Welcome to Lighthouse Care Volunteers, {{first_name}}!\n\nThank you for registering as a volunteer. We're so glad you've decided to join our community.\n\nYour first visit is booked for:\nDate: {{shift_date}}\nTime: {{shift_time}}\nLocation: {{location}}\n\nWe've attached a calendar invite so you don't forget.\n\nTo get started, please complete your induction at: {{portal_link}}\n\nWarm regards,\nThe {{organisation_name}} Team`,
   },
 
   INDUCTION_REMINDER: {

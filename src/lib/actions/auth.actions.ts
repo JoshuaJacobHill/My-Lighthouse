@@ -16,30 +16,42 @@ import { loginSchema, volunteerSignupSchema } from '@/lib/validations'
 
 // ─── ICS Calendar helper ──────────────────────────────────────────────────────
 
+/**
+ * Format a "HH:MM" 24-hour time string into a human-readable label.
+ * e.g. "09:00" → "9:00 AM", "13:30" → "1:30 PM"
+ */
+function formatTimeLabel(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(':')
+  const h = parseInt(hStr, 10)
+  const m = parseInt(mStr, 10)
+  const ampm = h < 12 ? 'AM' : 'PM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  const mPadded = String(m).padStart(2, '0')
+  return `${h12}:${mPadded} ${ampm}`
+}
+
 function generateICS(opts: {
   summary: string
   description: string
   date: string
-  period: string
+  /** "HH:MM" 24-hour arrival time — event runs for 1 hour from this time */
+  startTime: string
   location: string
   organizerEmail: string
 }): string {
   const [year, month, day] = opts.date.split('-')
-
-  let startHour = 9
-  let endHour = 12
-  const p = opts.period.toLowerCase()
-  if (p.includes('6') || p.includes('pre') || p.includes('open')) {
-    startHour = 6
-    endHour = 9
-  } else if (p.includes('12') || p.includes('afternoon') || p.includes('5')) {
-    startHour = 12
-    endHour = 17
-  }
+  const [hStr, mStr] = opts.startTime.split(':')
+  const startHour = parseInt(hStr, 10)
+  const startMinute = parseInt(mStr, 10)
+  // 1-hour appointment block
+  const endHour = startMinute === 0 ? startHour + 1 : startHour
+  const endMinute = startMinute === 0 ? 0 : startMinute
 
   const pad = (n: number) => String(n).padStart(2, '0')
-  const dtStart = `${year}${month}${day}T${pad(startHour)}0000`
-  const dtEnd = `${year}${month}${day}T${pad(endHour)}0000`
+  // Store as AEST (UTC+10) — QLD never observes daylight saving
+  const dtStart = `${year}${month}${day}T${pad(startHour)}${pad(startMinute)}00`
+  const dtEnd = `${year}${month}${day}T${pad(endHour)}${pad(endMinute)}00`
+  const tzid = 'Australia/Brisbane'
   const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
 
   return [
@@ -47,11 +59,20 @@ function generateICS(opts: {
     'VERSION:2.0',
     'PRODID:-//Lighthouse Care Volunteers//EN',
     'METHOD:REQUEST',
+    'BEGIN:VTIMEZONE',
+    `TZID:${tzid}`,
+    'BEGIN:STANDARD',
+    'TZOFFSETFROM:+1000',
+    'TZOFFSETTO:+1000',
+    'TZNAME:AEST',
+    'DTSTART:19700101T000000',
+    'END:STANDARD',
+    'END:VTIMEZONE',
     'BEGIN:VEVENT',
     `UID:${now}-volunteer@lighthousecare.org.au`,
     `DTSTAMP:${now}`,
-    `DTSTART:${dtStart}`,
-    `DTEND:${dtEnd}`,
+    `DTSTART;TZID=${tzid}:${dtStart}`,
+    `DTEND;TZID=${tzid}:${dtEnd}`,
     `SUMMARY:${opts.summary}`,
     `DESCRIPTION:${opts.description.replace(/\n/g, '\\n')}`,
     `LOCATION:${opts.location}`,
@@ -274,10 +295,72 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
 
     // Send confirmation email — fire and forget, don't block registration
     try {
+      const preferredStore = formData.get('preferredStore') as string | null
+      const firstVisitDate = formData.get('firstVisitDate') as string | null
+      // firstVisitPeriod is now a "HH:MM" 24-hour time string (e.g. "09:00")
+      const firstVisitPeriod = formData.get('firstVisitPeriod') as string | null
+
+      const storeName = preferredStore ?? 'Loganholme'
+
+      // Format date as DD/MM/YYYY for email display
+      const visitDateFormatted = firstVisitDate
+        ? (() => {
+            const [y, m, d] = firstVisitDate.split('-')
+            return `${d}/${m}/${y}`
+          })()
+        : 'Not specified'
+
+      // Format time as "9:00 AM" for email display
+      const visitTimeFormatted = firstVisitPeriod
+        ? formatTimeLabel(firstVisitPeriod)
+        : 'Not specified'
+
+      // Generate .ics calendar invite if we have a date and time
+      let icsAttachment: { filename: string; content: string; contentType: string } | undefined
+      if (firstVisitDate && firstVisitPeriod) {
+        // Load coordinator email for ORGANIZER field
+        let coordinatorEmailForIcs = 'rochelle@lighthousecare.org.au'
+        try {
+          const settingRows = await prisma.appSetting.findMany({
+            where: { key: { in: ['loganholme_coordinator_email', 'hillcrest_coordinator_email'] } },
+          })
+          const s = Object.fromEntries(settingRows.map((r) => [r.key, r.value]))
+          coordinatorEmailForIcs =
+            preferredStore === 'Hillcrest'
+              ? (s.hillcrest_coordinator_email ?? 'georgina@lighthousecare.org.au')
+              : (s.loganholme_coordinator_email ?? 'rochelle@lighthousecare.org.au')
+        } catch { /* fall through */ }
+
+        const icsContent = generateICS({
+          summary: `Volunteer First Visit — ${storeName} Lighthouse Care`,
+          description: [
+            `Welcome to Lighthouse Care Volunteers, ${data.firstName}!`,
+            `Your coordinator will meet you at the ${storeName} store.`,
+            ``,
+            `Volunteer: ${data.firstName} ${data.lastName}`,
+            `Email: ${data.email}`,
+            `Mobile: ${data.mobile}`,
+          ].join('\n'),
+          date: firstVisitDate,
+          startTime: firstVisitPeriod,
+          location: `Lighthouse Care ${storeName} Store`,
+          organizerEmail: coordinatorEmailForIcs,
+        })
+        icsAttachment = {
+          filename: 'first-visit.ics',
+          content: icsContent,
+          contentType: 'text/calendar',
+        }
+      }
+
+      // ── Volunteer confirmation email ────────────────────────────────────────
       const template = await renderTemplate('SIGNUP_CONFIRMATION', {
         first_name: data.firstName,
         last_name: data.lastName,
-        portal_link: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/volunteer/dashboard`,
+        portal_link: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/volunteer`,
+        shift_date: visitDateFormatted,
+        shift_time: visitTimeFormatted,
+        location: storeName,
       })
 
       await sendEmail({
@@ -287,13 +370,10 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         text: template.text,
         templateType: 'SIGNUP_CONFIRMATION',
         volunteerId: user.volunteerProfile?.id,
+        attachments: icsAttachment ? [icsAttachment] : undefined,
       })
 
-      // Send coordinator email with first visit details
-      const preferredStore = formData.get('preferredStore') as string | null
-      const firstVisitDate = formData.get('firstVisitDate') as string | null
-      const firstVisitPeriod = formData.get('firstVisitPeriod') as string | null
-
+      // ── Coordinator notification email ─────────────────────────────────────
       // Load coordinator emails from AppSettings (with hardcoded fallbacks)
       let coordinatorSettings: Record<string, string> = {}
       try {
@@ -312,33 +392,13 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
 
       const coordinatorEmail =
         preferredStore === 'Hillcrest' ? hillcrestEmail : loganholmeEmail
-      const storeName = preferredStore ?? 'Loganholme'
-
-      // Resolve the period label for display
-      // firstVisitPeriod is stored as the key (e.g. "MORNING", "AFTERNOON")
-      // We display the human-readable label in the email
-      const periodDisplayMap: Record<string, string> = {
-        MORNING: 'Morning',
-        AFTERNOON: 'Afternoon',
-        EVENING: 'Evening',
-      }
-      const periodLabel = firstVisitPeriod
-        ? (periodDisplayMap[firstVisitPeriod] ?? firstVisitPeriod)
-        : 'Not specified'
-
-      const visitDateFormatted = firstVisitDate
-        ? (() => {
-            const [y, m, d] = firstVisitDate.split('-')
-            return `${d}/${m}/${y}`
-          })()
-        : 'Not specified'
 
       const coordinatorSubject = `New Volunteer: ${data.firstName} ${data.lastName} — First Visit ${visitDateFormatted}`
 
       const coordinatorHtml = `
 <html><body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
   <h2 style="color: #f97316;">New Volunteer Registration — Lighthouse Care</h2>
-  <p>A new volunteer has registered and selected their preferred first visit date.</p>
+  <p>A new volunteer has registered and selected their preferred first visit appointment.</p>
   <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
     <tr>
       <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold; width: 40%;">Name</td>
@@ -361,11 +421,11 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
       <td style="padding: 8px 12px;">${visitDateFormatted}</td>
     </tr>
     <tr>
-      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold;">Time Period</td>
-      <td style="padding: 8px 12px;">${periodLabel}</td>
+      <td style="padding: 8px 12px; background: #f9fafb; font-weight: bold;">Arrival Time</td>
+      <td style="padding: 8px 12px;">${visitTimeFormatted}</td>
     </tr>
   </table>
-  <p style="color: #6b7280; font-size: 14px;">Please reach out to welcome this volunteer and confirm their visit.</p>
+  <p style="color: #6b7280; font-size: 14px;">A calendar invite is attached. Please reach out to welcome this volunteer and confirm their visit.</p>
   <p style="color: #6b7280; font-size: 12px;">— Lighthouse Care Volunteer System</p>
 </body></html>`
 
@@ -377,33 +437,10 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         `Mobile: ${data.mobile}`,
         `Preferred Store: ${storeName}`,
         `First Visit Date: ${visitDateFormatted}`,
-        `Time Period: ${periodLabel}`,
+        `Arrival Time: ${visitTimeFormatted}`,
         '',
-        'Please reach out to welcome this volunteer and confirm their visit.',
+        'A calendar invite is attached. Please reach out to welcome this volunteer and confirm their visit.',
       ].join('\n')
-
-      // Generate .ics calendar invite if we have a date
-      let icsAttachment: { filename: string; content: string; contentType: string } | undefined
-      if (firstVisitDate) {
-        const icsContent = generateICS({
-          summary: `Volunteer First Visit — ${data.firstName} ${data.lastName}`,
-          description: [
-            `Volunteer: ${data.firstName} ${data.lastName}`,
-            `Email: ${data.email}`,
-            `Mobile: ${data.mobile}`,
-            `Store: ${storeName}`,
-          ].join('\n'),
-          date: firstVisitDate,
-          period: firstVisitPeriod ?? '',
-          location: storeName,
-          organizerEmail: coordinatorEmail,
-        })
-        icsAttachment = {
-          filename: 'first-visit.ics',
-          content: icsContent,
-          contentType: 'text/calendar',
-        }
-      }
 
       await sendEmail({
         to: coordinatorEmail,
