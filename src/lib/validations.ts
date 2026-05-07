@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DAYS_OF_WEEK, TIME_PERIODS, LOCATIONS } from '@/lib/constants'
+import { DAYS_OF_WEEK, LOCATIONS } from '@/lib/constants'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -12,14 +12,13 @@ export type LoginInput = z.infer<typeof loginSchema>
 
 // Spread readonly tuples into mutable tuples for zod enum
 const DAYS_ENUM = [...DAYS_OF_WEEK] as [string, ...string[]]
-const PERIODS_ENUM = [...TIME_PERIODS] as [string, ...string[]]
 const LOCATIONS_ENUM = [...LOCATIONS] as [string, ...string[]]
 
 // ─── Volunteer signup ─────────────────────────────────────────────────────────
 
 const availabilityItemSchema = z.object({
   dayOfWeek: z.enum(DAYS_ENUM),
-  timePeriod: z.enum(PERIODS_ENUM),
+  timePeriod: z.string().min(1),
 })
 
 export const volunteerSignupSchema = z.object({

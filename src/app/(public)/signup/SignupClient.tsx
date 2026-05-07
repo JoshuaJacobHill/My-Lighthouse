@@ -78,7 +78,7 @@ const INITIAL_FORM: FormData = {
   blueCardNumber: '',
   blueCardExpiry: '',
   firstVisitDate: '',
-  firstVisitPeriod: '',
+  firstVisitPeriod: '09:00',
   availability: [],
   notes: '',
   password: '',
