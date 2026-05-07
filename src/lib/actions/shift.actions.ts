@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
+import { renderTemplate } from '@/lib/email-templates'
 import { format } from 'date-fns'
 
 export type RecurringFrequency = 'ONE_OFF' | 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'
@@ -137,6 +138,45 @@ export async function bookShiftAction(
           frequency,
         },
       })
+    }
+
+    // ── Volunteer confirmation email ───────────────────────────────────────────
+    try {
+      const BRISBANE_TZ = 'Australia/Brisbane'
+      const shiftDateFormatted = new Date(shift.date).toLocaleDateString('en-AU', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: BRISBANE_TZ,
+      })
+      const shiftTimeFormatted = `${new Date(shift.startTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: BRISBANE_TZ })} – ${new Date(shift.endTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: BRISBANE_TZ })}`
+
+      let recurringNote = ''
+      if (frequency !== 'ONE_OFF') {
+        const freqLabel = frequency === 'WEEKLY' ? 'weekly' : frequency === 'FORTNIGHTLY' ? 'fortnightly' : 'monthly (every 4 weeks)'
+        recurringNote = `This is a standing shift — we've booked you in ${freqLabel} from this date (${bookedCount} shift${bookedCount !== 1 ? 's' : ''} total). New shifts will be added automatically as they're rostered. To cancel individual shifts or stop the recurring booking, visit the volunteer portal.`
+      } else {
+        recurringNote = 'This is a one-off booking. If your plans change, you can cancel from the volunteer portal.'
+      }
+
+      const template = await renderTemplate('SHIFT_BOOKED', {
+        first_name: volunteer.firstName,
+        last_name: volunteer.lastName,
+        shift_date: shiftDateFormatted,
+        shift_time: shiftTimeFormatted,
+        location: shift.location.name,
+        recurring_note: recurringNote,
+        portal_link: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/volunteer/roster`,
+      })
+
+      await sendEmail({
+        to: volunteer.email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+        templateType: 'SHIFT_BOOKED',
+        volunteerId,
+      })
+    } catch (emailErr) {
+      console.error('[bookShiftAction] confirmation email failed:', emailErr)
+      // Don't fail the booking if email fails
     }
 
     // ── Admin notification ─────────────────────────────────────────────────────

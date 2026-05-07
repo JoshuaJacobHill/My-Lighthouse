@@ -83,6 +83,20 @@ export const defaultTemplates: Record<
     text: `Hi {{first_name}},\n\nCongratulations — you've completed your induction and are now officially part of the Lighthouse Care volunteer family!\n\nHead to the portal to browse and book upcoming shifts: {{portal_link}}\n\nThank you for giving your time — it means the world.\n\nWarm regards,\nThe {{organisation_name}} Team`,
   },
 
+  SHIFT_BOOKED: {
+    subject: "You're booked in, {{first_name}}!",
+    html: wrap(`
+      <p style="${P}">Hi {{first_name}},</p>
+      <p style="${P}">Great news — your shift is confirmed. Here are the details:</p>
+      ${shiftTable()}
+      <p style="${P}">{{recurring_note}}</p>
+      <p style="${P}">If you need to cancel or can&rsquo;t make it, please let us know as soon as possible through the volunteer portal so we can plan ahead.</p>
+      ${btn('{{portal_link}}', 'Manage My Shifts &rarr;')}
+      <p style="${P};margin-bottom:0;">Thanks for giving your time — we&rsquo;ll see you then!<br><br>Warm regards,<br>The {{organisation_name}} Team</p>
+    `),
+    text: `Hi {{first_name}},\n\nYour shift is confirmed!\n\nDate: {{shift_date}}\nTime: {{shift_time}}\nLocation: {{location}}\n\n{{recurring_note}}\n\nIf you need to cancel, please update your shifts at: {{portal_link}}\n\nThanks for giving your time — we'll see you then!\n\nWarm regards,\nThe {{organisation_name}} Team`,
+  },
+
   SHIFT_REMINDER: {
     subject: 'Reminder: Your volunteer shift is coming up',
     html: wrap(`

@@ -14,6 +14,7 @@ const TEMPLATE_NAMES: Record<string, string> = {
   SIGNUP_CONFIRMATION: 'Sign-Up Confirmation',
   INDUCTION_REMINDER: 'Induction Reminder',
   INDUCTION_COMPLETE: 'Induction Complete',
+  SHIFT_BOOKED: 'Shift Booking Confirmation',
   SHIFT_REMINDER: 'Shift Reminder',
   SHIFT_CANCELLED: 'Shift Cancelled',
   MISSED_SHIFT_FOLLOWUP: 'Missed Shift Follow-Up',
