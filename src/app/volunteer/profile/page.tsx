@@ -2,6 +2,7 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import ProfileForm from './ProfileForm'
+import { OptOutSection } from '@/components/volunteer/OptOutSection'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,11 @@ export default async function ProfilePage() {
         </p>
       </div>
       <ProfileForm volunteer={volunteer} />
+
+      {/* Opt-out — shown below the main form */}
+      <div className="mt-8">
+        <OptOutSection />
+      </div>
     </div>
   )
 }

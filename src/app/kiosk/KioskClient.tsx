@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Image from 'next/image'
 import {
   LogIn,
   LogOut,
@@ -8,7 +9,6 @@ import {
   Search,
   ArrowLeft,
   CheckCircle2,
-  Heart,
   Loader2,
   ChevronRight,
 } from 'lucide-react'
@@ -600,13 +600,14 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
       {/* Top bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500">
-            <Heart className="h-5 w-5 text-white" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="font-bold text-orange-600 text-lg leading-none">Lighthouse Care</div>
-            <div className="text-xs text-gray-500 leading-none mt-0.5">Volunteer Kiosk</div>
-          </div>
+          <Image
+            src="/logo-inline-black.png"
+            alt="Lighthouse Care"
+            width={180}
+            height={44}
+            className="object-contain"
+            priority
+          />
         </div>
 
         <LiveClock />

@@ -6,6 +6,8 @@ import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { VolunteerFilters } from '@/components/admin/VolunteerFilters'
 import { ExportCSVButton } from '@/components/admin/ExportCSVButton'
+import { DeleteVolunteerButton } from '@/components/admin/DeleteVolunteerButton'
+import { ImportVolunteersModal } from '@/components/admin/ImportVolunteersModal'
 import { formatDate } from '@/lib/utils'
 import type { VolunteerStatus } from '@prisma/client'
 
@@ -22,6 +24,12 @@ export default async function VolunteersPage({
   const page = Math.max(1, Number(params.page) || 1)
   const skip = (page - 1) * PAGE_SIZE
 
+  // When no status is selected, hide REMOVED volunteers by default.
+  // Selecting "Removed" from the filter explicitly shows only removed.
+  const statusFilter: object = params.status
+    ? { status: params.status as VolunteerStatus }
+    : { status: { not: 'REMOVED' as VolunteerStatus } }
+
   const where = {
     ...(params.search
       ? {
@@ -33,11 +41,11 @@ export default async function VolunteersPage({
           ],
         }
       : {}),
-    ...(params.status ? { status: params.status as VolunteerStatus } : {}),
+    ...statusFilter,
     ...(params.location ? { preferredLocations: { has: params.location } } : {}),
   }
 
-  const [volunteers, total] = await Promise.all([
+  const [volunteers, total, removedCount] = await Promise.all([
     prisma.volunteerProfile.findMany({
       where,
       skip,
@@ -45,6 +53,10 @@ export default async function VolunteersPage({
       orderBy: { joinedAt: 'desc' },
     }),
     prisma.volunteerProfile.count({ where }),
+    // Only fetch this count when not already filtering by a status
+    !params.status
+      ? prisma.volunteerProfile.count({ where: { status: 'REMOVED' } })
+      : Promise.resolve(0),
   ])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -59,6 +71,15 @@ export default async function VolunteersPage({
     return `/admin/volunteers${qs ? `?${qs}` : ''}`
   }
 
+  // Build the "show removed" URL preserving other filters
+  function buildShowRemovedUrl() {
+    const sp = new URLSearchParams()
+    if (params.search) sp.set('search', params.search)
+    if (params.location) sp.set('location', params.location)
+    sp.set('status', 'REMOVED')
+    return `/admin/volunteers?${sp.toString()}`
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -71,6 +92,7 @@ export default async function VolunteersPage({
         </div>
         <div className="flex items-center gap-2">
           <ExportCSVButton />
+          <ImportVolunteersModal />
           <Button asChild size="sm">
             <Link href="/admin/volunteers/new">
               <UserPlus className="h-4 w-4" aria-hidden="true" />
@@ -82,6 +104,19 @@ export default async function VolunteersPage({
 
       {/* Filters */}
       <VolunteerFilters />
+
+      {/* Removed-volunteers hint */}
+      {!params.status && removedCount > 0 && (
+        <p className="text-sm text-gray-500">
+          {removedCount} removed volunteer{removedCount !== 1 ? 's' : ''} not shown.{' '}
+          <Link
+            href={buildShowRemovedUrl()}
+            className="font-medium text-orange-600 hover:text-orange-700 underline underline-offset-2"
+          >
+            Show removed
+          </Link>
+        </p>
+      )}
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -161,12 +196,25 @@ export default async function VolunteersPage({
                         : <span className="text-gray-400">Never</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/admin/volunteers/${v.id}`}
-                        className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      >
-                        View
-                      </Link>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/admin/volunteers/${v.id}`}
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        >
+                          View
+                        </Link>
+                        <Link
+                          href={`/admin/volunteers/${v.id}/edit`}
+                          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        >
+                          Edit
+                        </Link>
+                        <DeleteVolunteerButton
+                          volunteerId={v.id}
+                          volunteerName={`${v.firstName} ${v.lastName}`}
+                          variant="icon"
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

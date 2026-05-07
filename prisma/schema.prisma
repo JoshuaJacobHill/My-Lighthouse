@@ -86,10 +86,12 @@ model User {
 
 enum VolunteerStatus {
   PENDING_INDUCTION
-  INDUCTED
+  INDUCTED    // legacy — no longer assigned; kept for DB compat
   ACTIVE
   INACTIVE
-  PAUSED
+  ON_LEAVE    // replaces PAUSED — volunteer-requested break
+  PAUSED      // legacy — no longer assigned; kept for DB compat
+  SUSPENDED   // admin-imposed hold (conduct, blue card, etc.)
   REMOVED
 }
 

@@ -2,23 +2,27 @@ import * as React from 'react'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 
 /**
- * Matches the VolunteerStatus enum in the Prisma schema.
+ * All values the VolunteerStatus enum can hold (including legacy).
  */
 export type VolunteerStatus =
   | 'PENDING_INDUCTION'
-  | 'INDUCTED'
   | 'ACTIVE'
   | 'INACTIVE'
-  | 'PAUSED'
+  | 'ON_LEAVE'
+  | 'SUSPENDED'
   | 'REMOVED'
+  | 'INDUCTED'   // legacy
+  | 'PAUSED'     // legacy
 
 const STATUS_LABELS: Record<VolunteerStatus, string> = {
   PENDING_INDUCTION: 'Pending Induction',
-  INDUCTED: 'Inducted',
   ACTIVE: 'Active',
   INACTIVE: 'Inactive',
-  PAUSED: 'Paused',
+  ON_LEAVE: 'On Leave',
+  SUSPENDED: 'Suspended',
   REMOVED: 'Removed',
+  INDUCTED: 'Active',      // legacy — treat as active in display
+  PAUSED: 'On Leave',      // legacy — treat as on leave in display
 }
 
 interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {
@@ -26,8 +30,14 @@ interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {
 }
 
 export function StatusBadge({ status, ...props }: StatusBadgeProps) {
+  // Map legacy statuses to their visual equivalent
+  const displayVariant: BadgeProps['variant'] =
+    status === 'INDUCTED' ? 'ACTIVE'
+    : status === 'PAUSED' ? 'ON_LEAVE'
+    : status
+
   return (
-    <Badge variant={status} {...props}>
+    <Badge variant={displayVariant} {...props}>
       {STATUS_LABELS[status]}
     </Badge>
   )

@@ -164,7 +164,7 @@ export async function kioskSignInAction(
       where: { id: volunteerId },
       data: {
         lastActiveAt: new Date(),
-        // Upgrade status to ACTIVE if they're INDUCTED
+        // Legacy: upgrade INDUCTED → ACTIVE on first kiosk sign-in
         status: volunteer.status === 'INDUCTED' ? 'ACTIVE' : undefined,
       },
     })

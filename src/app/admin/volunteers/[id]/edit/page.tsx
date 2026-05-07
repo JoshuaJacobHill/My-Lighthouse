@@ -98,10 +98,10 @@ export default async function EditVolunteerPage({
 
   const STATUSES = [
     { value: 'PENDING_INDUCTION', label: 'Pending Induction' },
-    { value: 'INDUCTED', label: 'Inducted' },
     { value: 'ACTIVE', label: 'Active' },
     { value: 'INACTIVE', label: 'Inactive' },
-    { value: 'PAUSED', label: 'Paused' },
+    { value: 'ON_LEAVE', label: 'On Leave' },
+    { value: 'SUSPENDED', label: 'Suspended' },
     { value: 'REMOVED', label: 'Removed' },
   ]
 

@@ -40,10 +40,10 @@ export async function updateVolunteerStatusAction(
 
   const validStatuses: VolunteerStatus[] = [
     'PENDING_INDUCTION',
-    'INDUCTED',
     'ACTIVE',
     'INACTIVE',
-    'PAUSED',
+    'ON_LEAVE',
+    'SUSPENDED',
     'REMOVED',
   ]
 
@@ -52,12 +52,18 @@ export async function updateVolunteerStatusAction(
   }
 
   try {
+    // Fetch current status before updating so we know if this is a new removal
+    const current = await prisma.volunteerProfile.findUnique({
+      where: { id: volunteerId },
+      select: { status: true, firstName: true, lastName: true, email: true },
+    })
+
     const updated = await prisma.volunteerProfile.update({
       where: { id: volunteerId },
       data: {
         status: status as VolunteerStatus,
         deactivatedAt:
-          status === 'REMOVED' || status === 'INACTIVE' ? new Date() : undefined,
+          status === 'REMOVED' || status === 'INACTIVE' || status === 'SUSPENDED' ? new Date() : undefined,
       },
     })
 
@@ -71,11 +77,84 @@ export async function updateVolunteerStatusAction(
       },
     })
 
+    // ── Send farewell email when a volunteer is newly marked as REMOVED ───
+    if (status === 'REMOVED' && current?.status !== 'REMOVED' && current) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteer.lighthousecare.org.au'
+      const farewell = buildFarewellEmail(current.firstName, appUrl)
+      try {
+        await sendEmail({
+          to: current.email,
+          subject: farewell.subject,
+          html: farewell.html,
+          text: farewell.text,
+          templateType: 'CUSTOM',
+          volunteerId,
+        })
+      } catch (emailErr) {
+        // Don't fail the status update if the email fails
+        console.error('[updateVolunteerStatusAction] farewell email failed:', emailErr)
+      }
+    }
+
     return { success: true, data: { status: updated.status } }
   } catch (err) {
     console.error('[updateVolunteerStatusAction]', err)
     return { success: false, error: 'Failed to update volunteer status.' }
   }
+}
+
+// ─── Farewell email template ──────────────────────────────────────────────────
+
+function buildFarewellEmail(firstName: string, appUrl: string) {
+  const subject = `Thank you for everything, ${firstName} — from all of us at Lighthouse Care`
+  const contactEmail = 'volunteer@lighthousecare.org.au'
+
+  const html = `
+<html><body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 24px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <img src="${appUrl}/logo-inline-black.png" alt="Lighthouse Care" style="height: 48px; object-fit: contain;" />
+  </div>
+  <h2 style="color: #f97316; font-size: 22px;">We're sad to see you go, ${firstName}</h2>
+  <p>Hi ${firstName},</p>
+  <p>
+    We wanted to take a moment to say a heartfelt <strong>thank you</strong> for your time and dedication
+    as a volunteer with Lighthouse Care. Every hour you gave made a real difference to the families
+    and individuals in our community — and we are so grateful for your contribution.
+  </p>
+  <p>
+    You'll always be part of the Lighthouse Care story, and we wish you all the very best in
+    whatever comes next.
+  </p>
+  <p style="background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 4px; margin: 24px 0;">
+    <strong>Made a mistake?</strong> If this removal was made in error and you'd like to be
+    reinstated as a volunteer, please email us at
+    <a href="mailto:${contactEmail}" style="color: #f97316;">${contactEmail}</a>
+    and we'll get it sorted.
+  </p>
+  <p>With gratitude,<br><strong>The Lighthouse Care Team</strong></p>
+  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
+  <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+    Lighthouse Care — Making lives better so that together we can make the world better.<br />
+    ABN 87 637 110 948 · Logan, South East Queensland
+  </p>
+</body></html>`
+
+  const text = [
+    `Thank you for everything, ${firstName} — from all of us at Lighthouse Care`,
+    '',
+    `Hi ${firstName},`,
+    '',
+    'We wanted to take a moment to say a heartfelt thank you for your time and dedication as a volunteer with Lighthouse Care. Every hour you gave made a real difference to the families and individuals in our community — and we are so grateful for your contribution.',
+    '',
+    'You\'ll always be part of the Lighthouse Care story, and we wish you all the very best in whatever comes next.',
+    '',
+    `Made a mistake? If this removal was made in error and you'd like to be reinstated as a volunteer, please email us at ${contactEmail} and we'll get it sorted.`,
+    '',
+    'With gratitude,',
+    'The Lighthouse Care Team',
+  ].join('\n')
+
+  return { subject, html, text }
 }
 
 // ─── Admin notes ──────────────────────────────────────────────────────────────
@@ -133,11 +212,15 @@ export async function sendEmailToVolunteerAction(
   try {
     const volunteer = await prisma.volunteerProfile.findUnique({
       where: { id: volunteerId },
-      select: { email: true, firstName: true, lastName: true },
+      select: { email: true, firstName: true, lastName: true, status: true },
     })
 
     if (!volunteer) {
       return { success: false, error: 'Volunteer not found.' }
+    }
+
+    if (volunteer.status === 'REMOVED') {
+      return { success: false, error: 'Emails cannot be sent to removed volunteers.' }
     }
 
     const result = await sendEmail({

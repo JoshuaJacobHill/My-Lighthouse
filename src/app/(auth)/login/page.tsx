@@ -4,13 +4,16 @@ import * as React from 'react'
 import { useState, FormEvent, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Loader2, AlertCircle, Heart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { loginAction } from '@/lib/actions/auth.actions'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const goodbye = searchParams.get('goodbye') === '1'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -37,6 +40,20 @@ export default function LoginPage() {
 
   return (
     <div className="p-8">
+      {goodbye && (
+        <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50 px-4 py-4 text-center">
+          <Heart className="h-6 w-6 text-orange-400 mx-auto mb-2" aria-hidden="true" />
+          <p className="text-sm font-medium text-orange-800">Thank you for everything you&apos;ve done.</p>
+          <p className="text-xs text-orange-600 mt-1">
+            We&rsquo;ve sent you a farewell email. You&apos;re always welcome back —{' '}
+            <a href="mailto:volunteer@lighthousecare.org.au" className="underline font-medium">
+              get in touch
+            </a>{' '}
+            any time.
+          </p>
+        </div>
+      )}
+
       <div className="mb-6 text-center">
         <h1 className="text-2xl font-bold text-gray-900">Sign In</h1>
         <p className="mt-1 text-sm text-gray-600">

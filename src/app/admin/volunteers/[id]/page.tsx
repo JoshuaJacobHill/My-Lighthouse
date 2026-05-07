@@ -10,6 +10,7 @@ import { ChangeStatusModal } from '@/components/admin/ChangeStatusModal'
 import { AddNoteModal } from '@/components/admin/AddNoteModal'
 import { SendEmailModal } from '@/components/admin/SendEmailModal'
 import { OnboardingForm } from '@/components/admin/OnboardingForm'
+import { DeleteVolunteerButton } from '@/components/admin/DeleteVolunteerButton'
 import { formatDate, formatDateTime, formatDuration, getTimePeriodConfig } from '@/lib/utils'
 import { VOLUNTEER_STATUSES, SHIFT_ASSIGNMENT_STATUSES } from '@/lib/constants'
 import type { DayOfWeek, TimePeriod } from '@/components/volunteer/AvailabilityGrid'
@@ -403,6 +404,10 @@ export default async function VolunteerProfilePage({
             />
             <SendEmailModal volunteerId={volunteer.id} volunteerName={fullName} />
             <AddNoteModal volunteerId={volunteer.id} />
+            <DeleteVolunteerButton
+              volunteerId={volunteer.id}
+              volunteerName={fullName}
+            />
           </div>
         </div>
       </div>

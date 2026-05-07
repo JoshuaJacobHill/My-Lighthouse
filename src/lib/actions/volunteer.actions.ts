@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
+import { renderTemplate } from '@/lib/email-templates'
 import { profileUpdateSchema } from '@/lib/validations'
 
 interface ActionResult {
@@ -256,11 +257,32 @@ export async function submitQuizAnswersAction(
     const passed = correctCount === questions.length
 
     if (passed) {
-      // Update volunteer status to INDUCTED
-      await prisma.volunteerProfile.update({
+      // Promote directly to ACTIVE — no manual admin step needed
+      const updated = await prisma.volunteerProfile.update({
         where: { id: volunteerId },
-        data: { status: 'INDUCTED' },
+        data: { status: 'ACTIVE' },
+        select: { firstName: true, lastName: true, email: true },
       })
+
+      // Send INDUCTION_COMPLETE email
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteer.lighthousecare.org.au'
+        const template = await renderTemplate('INDUCTION_COMPLETE', {
+          first_name: updated.firstName,
+          last_name: updated.lastName,
+          portal_link: `${appUrl}/volunteer`,
+        })
+        await sendEmail({
+          to: updated.email,
+          subject: template.subject,
+          html: template.html,
+          text: template.text,
+          templateType: 'INDUCTION_COMPLETE',
+          volunteerId,
+        })
+      } catch (emailErr) {
+        console.error('[submitQuizAnswersAction] induction email failed:', emailErr)
+      }
     }
 
     return {
@@ -398,4 +420,117 @@ export async function submitMessageToAdminAction(message: string): Promise<Actio
     console.error('[submitMessageToAdminAction]', err)
     return { success: false, error: 'Failed to send message. Please try again.' }
   }
+}
+
+// ─── Volunteer self opt-out ───────────────────────────────────────────────────
+
+export async function optOutAction(): Promise<ActionResult> {
+  let volunteerId: string
+  let userId: string
+  try {
+    ;({ volunteerId, userId } = await requireVolunteerSession())
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    const volunteer = await prisma.volunteerProfile.findUnique({
+      where: { id: volunteerId },
+      select: { firstName: true, lastName: true, email: true, status: true },
+    })
+
+    if (!volunteer) {
+      return { success: false, error: 'Volunteer profile not found.' }
+    }
+
+    if (volunteer.status === 'REMOVED') {
+      return { success: false, error: 'Your account is already removed.' }
+    }
+
+    // Mark as removed
+    await prisma.volunteerProfile.update({
+      where: { id: volunteerId },
+      data: { status: 'REMOVED', deactivatedAt: new Date() },
+    })
+
+    // Add audit note
+    await prisma.adminNote.create({
+      data: {
+        volunteerId,
+        content: 'Volunteer opted out via the volunteer portal.',
+        isInternal: true,
+        createdById: userId,
+      },
+    })
+
+    // Send farewell email
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteer.lighthousecare.org.au'
+      const farewell = buildFarewellEmail(volunteer.firstName, appUrl)
+      await sendEmail({
+        to: volunteer.email,
+        subject: farewell.subject,
+        html: farewell.html,
+        text: farewell.text,
+        templateType: 'CUSTOM',
+        volunteerId,
+      })
+    } catch (emailErr) {
+      console.error('[optOutAction] farewell email failed:', emailErr)
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[optOutAction]', err)
+    return { success: false, error: 'Something went wrong. Please try again.' }
+  }
+}
+
+function buildFarewellEmail(firstName: string, appUrl: string) {
+  const subject = `Thank you for everything, ${firstName} — from all of us at Lighthouse Care`
+  const contactEmail = 'volunteer@lighthousecare.org.au'
+
+  const html = `
+<html><body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 24px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <img src="${appUrl}/logo-inline-black.png" alt="Lighthouse Care" style="height: 48px; object-fit: contain;" />
+  </div>
+  <h2 style="color: #f97316; font-size: 22px;">We're sad to see you go, ${firstName}</h2>
+  <p>Hi ${firstName},</p>
+  <p>
+    We wanted to take a moment to say a heartfelt <strong>thank you</strong> for your time and dedication
+    as a volunteer with Lighthouse Care. Every hour you gave made a real difference to the families
+    and individuals in our community — and we are so grateful for your contribution.
+  </p>
+  <p>
+    You'll always be part of the Lighthouse Care story, and we wish you all the very best in
+    whatever comes next.
+  </p>
+  <p style="background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 4px; margin: 24px 0;">
+    <strong>Changed your mind?</strong> If you'd like to return as a volunteer, please email us at
+    <a href="mailto:${contactEmail}" style="color: #f97316;">${contactEmail}</a>
+    and we'd love to have you back.
+  </p>
+  <p>With gratitude,<br><strong>The Lighthouse Care Team</strong></p>
+  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
+  <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+    Lighthouse Care — Making lives better so that together we can make the world better.<br />
+    ABN 87 637 110 948 · Logan, South East Queensland
+  </p>
+</body></html>`
+
+  const text = [
+    `Thank you for everything, ${firstName} — from all of us at Lighthouse Care`,
+    '',
+    `Hi ${firstName},`,
+    '',
+    'Thank you for your time and dedication as a volunteer with Lighthouse Care. Every hour you gave made a real difference to families in our community.',
+    '',
+    `Changed your mind? Email us at ${contactEmail} — we'd love to have you back.`,
+    '',
+    'With gratitude,',
+    'The Lighthouse Care Team',
+  ].join('\n')
+
+  return { subject, html, text }
 }

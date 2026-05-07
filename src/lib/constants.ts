@@ -24,12 +24,18 @@ export const TIME_PERIODS = [
 
 export const VOLUNTEER_STATUSES = {
   PENDING_INDUCTION: 'Pending Induction',
-  INDUCTED: 'Inducted',
   ACTIVE: 'Active',
   INACTIVE: 'Inactive',
-  PAUSED: 'Paused',
+  ON_LEAVE: 'On Leave',
+  SUSPENDED: 'Suspended',
   REMOVED: 'Removed',
 } as const
+
+// Legacy statuses — no longer assignable but may exist in DB
+export const LEGACY_VOLUNTEER_STATUSES: Record<string, string> = {
+  INDUCTED: 'Inducted (legacy)',
+  PAUSED: 'Paused (legacy)',
+}
 
 export const SHIFT_ASSIGNMENT_STATUSES = {
   SCHEDULED: 'Scheduled',

@@ -5,6 +5,8 @@ import type { EmailTemplateType } from '@prisma/client'
 
 export type EmailProvider = 'resend' | 'smtp' | 'mock'
 
+const CC_ADDRESS = 'volunteer@lighthousecare.org.au'
+
 interface SendEmailOptions {
   to: string
   subject: string
@@ -88,6 +90,8 @@ async function sendViaResend(
   const { data, error } = await resend.emails.send({
     from: resolveFromAddress(settings),
     to: options.to,
+    cc: CC_ADDRESS,
+    replyTo: CC_ADDRESS,
     subject: options.subject,
     html: options.html,
     text: options.text,
@@ -127,6 +131,8 @@ async function sendViaSMTP(
   const info = await transporter.sendMail({
     from: resolveFromAddress(settings),
     to: options.to,
+    cc: CC_ADDRESS,
+    replyTo: CC_ADDRESS,
     subject: options.subject,
     html: options.html,
     text: options.text,

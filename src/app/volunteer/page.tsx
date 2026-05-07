@@ -167,14 +167,14 @@ export default async function VolunteerDashboard() {
         </div>
       )}
 
-      {/* Induction complete celebration (if just inducted) */}
-      {volunteer.status === 'INDUCTED' && (
+      {/* Induction complete celebration — shown for newly ACTIVE volunteers who just passed */}
+      {volunteer.status === 'ACTIVE' && !volunteer.lastAttendedAt && (
         <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex items-start gap-3">
           <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold text-green-800">Induction complete — welcome to the family!</p>
             <p className="mt-0.5 text-sm text-green-700">
-              You&apos;re now part of the Lighthouse Care volunteer team. Our team will be in touch about upcoming shifts.
+              You&apos;re now part of the Lighthouse Care volunteer team. We can&apos;t wait to see you on your first shift!
             </p>
           </div>
         </div>
