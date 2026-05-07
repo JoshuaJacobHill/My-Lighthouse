@@ -20,8 +20,8 @@ export default async function RosterPage() {
   const fourWeeksOut = addDays(now, 28)
 
   // Fetch upcoming shifts that are active, within the next 4 weeks
-  // Only show store locations (Loganholme and Hillcrest) — not Warehouse, Home Delivery, etc.
-  const STORE_LOCATIONS = ['Loganholme', 'Hillcrest']
+  // Only show store locations — not Warehouse, Home Delivery, etc.
+  const STORE_LOCATIONS = ['Loganholme Store', 'Hillcrest Store']
 
   const [allShifts, volunteerAssignments] = await Promise.all([
     prisma.shift.findMany({
