@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getSession } from '@/lib/auth'
 
 // ─── QLD Public Holiday Calculator ───────────────────────────────────────────
 // Queensland does not observe daylight saving. All dates are local AEST.
@@ -153,12 +154,19 @@ function buildShiftTime(dateUTC: Date, aestHour: number, aestMinute: number): Da
 }
 
 export async function GET(request: NextRequest) {
-  // Protect endpoint — only Vercel cron (CRON_SECRET) or an admin token
+  // Allow: Vercel cron (CRON_SECRET bearer token) OR a logged-in admin/super-admin
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const hasValidSecret = cronSecret && authHeader === `Bearer ${cronSecret}`
+
+  if (!hasValidSecret) {
+    // Fall back to session-based admin check
+    const session = await getSession()
+    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN'
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    }
   }
 
   try {
