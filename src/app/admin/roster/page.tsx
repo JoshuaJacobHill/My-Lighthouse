@@ -557,7 +557,7 @@ export default async function RosterPage({ searchParams }: PageProps) {
                                   FILL_CHIP[chipStatus]
                                 }`}
                               >
-                                {format(new Date(shift.startTime), 'h:mma')}{' '}
+                                {formatShiftTime(shift.startTime)}{' '}
                                 {shift.location.name}
                               </div>
                               )

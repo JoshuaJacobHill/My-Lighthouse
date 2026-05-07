@@ -141,12 +141,14 @@ const SHIFT_CAPACITY = 5
 const WEEKS_AHEAD = 8
 
 /**
- * Build a UTC Date where the hour/minute values represent the AEST local time
- * (stored as "naive UTC" to match the existing frontend convention).
+ * Build a proper UTC Date from an AEST hour/minute.
+ * AEST = UTC+10 (Queensland never observes daylight saving).
+ * e.g. 9:00 AM AEST → 23:00 UTC the previous day.
+ * Date.UTC handles negative hours correctly (rolls to previous day).
  */
-function buildShiftTime(dateUTC: Date, hour: number, minute: number): Date {
+function buildShiftTime(dateUTC: Date, aestHour: number, aestMinute: number): Date {
   return new Date(
-    Date.UTC(dateUTC.getUTCFullYear(), dateUTC.getUTCMonth(), dateUTC.getUTCDate(), hour, minute, 0, 0)
+    Date.UTC(dateUTC.getUTCFullYear(), dateUTC.getUTCMonth(), dateUTC.getUTCDate(), aestHour - 10, aestMinute, 0, 0)
   )
 }
 
@@ -212,11 +214,13 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Build a quick-lookup Set: "locationId|YYYY-MM-DD|HH:MM"
+    // Build a quick-lookup Set: "locationId|YYYY-MM-DD|HH:MM" (hours in AEST)
+    // Convert stored UTC hours back to AEST (+10) for comparison against template hours.
     const existingKeys = new Set(
       existingShifts.map((s) => {
         const d = dateKey(s.date)
-        const h = String(s.startTime.getUTCHours()).padStart(2, '0')
+        const aestHour = (s.startTime.getUTCHours() + 10) % 24
+        const h = String(aestHour).padStart(2, '0')
         const m = String(s.startTime.getUTCMinutes()).padStart(2, '0')
         return `${s.locationId}|${d}|${h}:${m}`
       })
