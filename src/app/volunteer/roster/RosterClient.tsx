@@ -40,11 +40,14 @@ interface RosterClientProps {
   bookedShifts: BookedShift[]
 }
 
+const BRISBANE_TZ = 'Australia/Brisbane'
+
 function formatAusDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-AU', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    timeZone: BRISBANE_TZ,
   })
 }
 
@@ -53,6 +56,7 @@ function formatTime(dtStr: string) {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: BRISBANE_TZ,
   })
 }
 

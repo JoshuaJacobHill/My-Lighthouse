@@ -38,12 +38,15 @@ const SHIFT_STATUS_COLOURS: Record<string, string> = {
   ADMIN_CANCELLED: 'bg-gray-100 text-gray-600 border border-gray-200',
 }
 
+const BRISBANE_TZ = 'Australia/Brisbane'
+
 function formatAustralianDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString('en-AU', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: BRISBANE_TZ,
   })
 }
 
@@ -52,6 +55,7 @@ function formatTime(isoDate: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: BRISBANE_TZ,
   })
 }
 

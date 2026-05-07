@@ -78,8 +78,8 @@ export function AddShiftModal({ locations, departments, weekStart }: AddShiftMod
     try {
       const result = await createShiftAction({
         date: form.date,
-        startTime: `${form.date}T${form.startTime}:00`,
-        endTime: `${form.date}T${form.endTime}:00`,
+        startTime: `${form.date}T${form.startTime}:00+10:00`,
+        endTime: `${form.date}T${form.endTime}:00+10:00`,
         locationId: form.locationId,
         departmentId: form.departmentId || undefined,
         title: form.title || undefined,

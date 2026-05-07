@@ -71,7 +71,7 @@ export default function AvailabilityEditorClient({ initialAvailability, timePeri
             {savedAt && (
               <span className="ml-3 inline-flex items-center gap-1 text-green-600 text-xs">
                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                Saved {savedAt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+                Saved {savedAt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', timeZone: 'Australia/Brisbane' })}
               </span>
             )}
           </div>

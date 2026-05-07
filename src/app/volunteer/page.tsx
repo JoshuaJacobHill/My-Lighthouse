@@ -13,17 +13,25 @@ export const metadata: Metadata = {
   title: 'My Dashboard',
 }
 
+const BRISBANE_TZ = 'Australia/Brisbane'
+
 function formatAustralianDate(date: Date): string {
   return date.toLocaleDateString('en-AU', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: BRISBANE_TZ,
   })
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
+  return date.toLocaleTimeString('en-AU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: BRISBANE_TZ,
+  })
 }
 
 const SHIFT_STATUS_LABELS: Record<string, string> = {

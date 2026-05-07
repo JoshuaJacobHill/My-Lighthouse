@@ -22,7 +22,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/volunteer/dashboard', label: 'My Dashboard', icon: LayoutDashboard },
+  { href: '/volunteer', label: 'My Dashboard', icon: LayoutDashboard },
   { href: '/volunteer/profile', label: 'My Profile', icon: User },
   { href: '/volunteer/availability', label: 'My Availability', icon: Clock },
   { href: '/volunteer/shifts', label: 'My Shifts', icon: Calendar },
@@ -42,7 +42,8 @@ export function VolunteerLayout({ children, userName, userId: _userId }: Volunte
 
   const displayName = userName || 'Volunteer'
 
-  const isActive = (href: string) => pathname.startsWith(href)
+  const isActive = (href: string) =>
+    href === '/volunteer' ? pathname === '/volunteer' : pathname.startsWith(href)
 
   const handleSignOut = async () => {
     await fetch('/api/auth/signout', { method: 'POST' })

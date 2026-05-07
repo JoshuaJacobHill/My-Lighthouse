@@ -3,7 +3,15 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil, X, Loader2, Save } from 'lucide-react'
-import { format } from 'date-fns'
+// AEST is UTC+10 with no daylight saving in Queensland — offset is always fixed.
+function toAESTDate(dt: string | Date): string {
+  const ms = typeof dt === 'string' ? new Date(dt).getTime() : dt.getTime()
+  return new Date(ms + 10 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+function toAESTTime(dt: string | Date): string {
+  const ms = typeof dt === 'string' ? new Date(dt).getTime() : dt.getTime()
+  return new Date(ms + 10 * 60 * 60 * 1000).toISOString().slice(11, 16)
+}
 
 interface Location {
   id: string
@@ -40,9 +48,9 @@ export function EditShiftModal({ shift, locations, departments }: EditShiftModal
   const [error, setError] = React.useState<string | null>(null)
 
   const [form, setForm] = React.useState(() => ({
-    date: format(new Date(shift.date), 'yyyy-MM-dd'),
-    startTime: format(new Date(shift.startTime), 'HH:mm'),
-    endTime: format(new Date(shift.endTime), 'HH:mm'),
+    date: toAESTDate(shift.date),
+    startTime: toAESTTime(shift.startTime),
+    endTime: toAESTTime(shift.endTime),
     locationId: shift.locationId,
     departmentId: shift.departmentId ?? '',
     title: shift.title ?? '',
@@ -70,8 +78,8 @@ export function EditShiftModal({ shift, locations, departments }: EditShiftModal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: form.date,
-          startTime: `${form.date}T${form.startTime}:00`,
-          endTime: `${form.date}T${form.endTime}:00`,
+          startTime: `${form.date}T${form.startTime}:00+10:00`,
+          endTime: `${form.date}T${form.endTime}:00+10:00`,
           locationId: form.locationId,
           departmentId: form.departmentId || null,
           title: form.title || null,

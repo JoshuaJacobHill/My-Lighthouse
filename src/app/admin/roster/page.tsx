@@ -28,6 +28,16 @@ export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Roster | Lighthouse Care Admin' }
 
+// QLD is always UTC+10 — no daylight saving.
+function formatShiftTime(dt: Date | string): string {
+  return new Date(dt).toLocaleTimeString('en-AU', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Australia/Brisbane',
+  })
+}
+
 interface PageProps {
   searchParams: Promise<{
     week?: string
@@ -188,8 +198,8 @@ export default async function RosterPage({ searchParams }: PageProps) {
             {/* Shift info */}
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className="font-semibold text-gray-900">
-                {format(new Date(shift.startTime), 'h:mm a')} —{' '}
-                {format(new Date(shift.endTime), 'h:mm a')}
+                {formatShiftTime(shift.startTime)} —{' '}
+                {formatShiftTime(shift.endTime)}
               </span>
               {shift.title && (
                 <span className="text-gray-600 text-sm">· {shift.title}</span>

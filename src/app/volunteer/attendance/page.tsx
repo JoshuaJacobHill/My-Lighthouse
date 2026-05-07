@@ -10,16 +10,24 @@ export const metadata: Metadata = {
   title: 'My Attendance',
 }
 
+const BRISBANE_TZ = 'Australia/Brisbane'
+
 function formatAustralianDate(date: Date): string {
   return date.toLocaleDateString('en-AU', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: BRISBANE_TZ,
   })
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
+  return date.toLocaleTimeString('en-AU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: BRISBANE_TZ,
+  })
 }
 
 function formatDuration(mins: number | null): string {
