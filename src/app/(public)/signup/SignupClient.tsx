@@ -356,13 +356,11 @@ function Step3({
   onChange,
   errors,
   timePeriods,
-  firstVisitPeriods,
 }: {
   data: FormData
   onChange: (patch: Partial<FormData>) => void
   errors: Record<string, string>
   timePeriods: TimePeriodItem[]
-  firstVisitPeriods: TimePeriodItem[]
 }) {
   // Calculate tomorrow and max date (60 days from now) for the date picker
   const today = new Date()
@@ -381,7 +379,7 @@ function Step3({
           Your first visit
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          When would you like to come in for your first visit?
+          When would you like to come in for your first visit? Our volunteer coordinator will meet with you to get you settled in.
         </p>
 
         <div className="space-y-4">
@@ -404,31 +402,19 @@ function Step3({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Time period *
+              Preferred arrival time *
             </label>
             <p className="text-xs text-gray-500 mb-2">
-              Our coordinator is available Mon–Sat, 9 am – 5 pm.
+              Our coordinator is available Mon–Sat, 9 am – 5 pm. Choose a time that suits you.
             </p>
-            <div className="flex flex-wrap gap-2">
-              {firstVisitPeriods.map((tp) => {
-                const selected = data.firstVisitPeriod === tp.key
-                return (
-                  <button
-                    key={tp.key}
-                    type="button"
-                    onClick={() => onChange({ firstVisitPeriod: tp.key })}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors border-2 ${
-                      selected
-                        ? 'bg-orange-500 border-orange-500 text-white'
-                        : 'bg-white border-gray-200 text-gray-700 hover:border-orange-300 hover:bg-orange-50'
-                    }`}
-                  >
-                    <span className="block">{tp.label}</span>
-                    <span className="block text-xs opacity-75">{tp.hours}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <input
+              type="time"
+              min="09:00"
+              max="17:00"
+              value={data.firstVisitPeriod}
+              onChange={(e) => onChange({ firstVisitPeriod: e.target.value })}
+              className="block rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            />
             {errors.firstVisitPeriod && (
               <p className="mt-1 text-xs text-red-600" role="alert">{errors.firstVisitPeriod}</p>
             )}
@@ -647,10 +633,9 @@ function Step4({
 
 interface SignupClientProps {
   timePeriods: TimePeriodItem[]
-  firstVisitPeriods: TimePeriodItem[]
 }
 
-export default function SignupClient({ timePeriods, firstVisitPeriods }: SignupClientProps) {
+export default function SignupClient({ timePeriods }: SignupClientProps) {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -687,7 +672,11 @@ export default function SignupClient({ timePeriods, firstVisitPeriods }: SignupC
 
     if (s === 3) {
       if (!formData.firstVisitDate) errs.firstVisitDate = 'Please select your first visit date'
-      if (!formData.firstVisitPeriod) errs.firstVisitPeriod = 'Please select a time period'
+      if (!formData.firstVisitPeriod) {
+        errs.firstVisitPeriod = 'Please enter your preferred arrival time'
+      } else if (formData.firstVisitPeriod < '09:00' || formData.firstVisitPeriod > '17:00') {
+        errs.firstVisitPeriod = 'Please choose a time between 9:00 am and 5:00 pm'
+      }
     }
 
     if (s === 4) {
@@ -860,7 +849,7 @@ export default function SignupClient({ timePeriods, firstVisitPeriods }: SignupC
             <form onSubmit={handleSubmit} noValidate>
               {step === 1 && <Step1 data={formData} onChange={patch} errors={errors} />}
               {step === 2 && <Step2 data={formData} onChange={patch} errors={errors} />}
-              {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} timePeriods={timePeriods} firstVisitPeriods={firstVisitPeriods} />}
+              {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} timePeriods={timePeriods} />}
               {step === 4 && <Step4 data={formData} onChange={patch} errors={errors} />}
 
               {globalError && (

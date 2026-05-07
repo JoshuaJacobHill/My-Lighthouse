@@ -132,8 +132,8 @@ interface ShiftTemplate {
 }
 
 const SHIFT_TEMPLATES: ShiftTemplate[] = [
-  { title: 'Morning Shift', startHour: 6, startMinute: 0, endHour: 9, endMinute: 0 },
-  { title: 'Mid Shift', startHour: 9, startMinute: 0, endHour: 12, endMinute: 0 },
+  { title: 'Pre-Open Shift',  startHour: 6,  startMinute: 0, endHour: 9,  endMinute: 0 },
+  { title: 'Morning Shift',   startHour: 9,  startMinute: 0, endHour: 12, endMinute: 0 },
   { title: 'Afternoon Shift', startHour: 12, startMinute: 0, endHour: 17, endMinute: 0 },
 ]
 
