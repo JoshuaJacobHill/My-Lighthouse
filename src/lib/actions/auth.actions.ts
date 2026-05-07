@@ -448,6 +448,7 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         html: coordinatorHtml,
         text: coordinatorText,
         attachments: icsAttachment ? [icsAttachment] : undefined,
+        ccAdmin: true,
       })
     } catch (emailErr) {
       console.error('[registerVolunteerAction] email error:', emailErr)

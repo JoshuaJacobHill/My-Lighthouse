@@ -15,6 +15,8 @@ interface SendEmailOptions {
   templateType?: EmailTemplateType
   volunteerId?: string
   attachments?: { filename: string; content: string; contentType: string }[]
+  /** Pass true to CC volunteer@lighthousecare.org.au — admin/coordinator emails only */
+  ccAdmin?: boolean
 }
 
 interface SendEmailResult {
@@ -90,8 +92,7 @@ async function sendViaResend(
   const { data, error } = await resend.emails.send({
     from: resolveFromAddress(settings),
     to: options.to,
-    cc: CC_ADDRESS,
-    replyTo: CC_ADDRESS,
+    ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
     html: options.html,
     text: options.text,
@@ -131,8 +132,7 @@ async function sendViaSMTP(
   const info = await transporter.sendMail({
     from: resolveFromAddress(settings),
     to: options.to,
-    cc: CC_ADDRESS,
-    replyTo: CC_ADDRESS,
+    ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
     html: options.html,
     text: options.text,
