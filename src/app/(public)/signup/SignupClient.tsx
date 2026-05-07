@@ -356,11 +356,13 @@ function Step3({
   onChange,
   errors,
   timePeriods,
+  firstVisitPeriods,
 }: {
   data: FormData
   onChange: (patch: Partial<FormData>) => void
   errors: Record<string, string>
   timePeriods: TimePeriodItem[]
+  firstVisitPeriods: TimePeriodItem[]
 }) {
   // Calculate tomorrow and max date (60 days from now) for the date picker
   const today = new Date()
@@ -401,11 +403,14 @@ function Step3({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Time period *
             </label>
+            <p className="text-xs text-gray-500 mb-2">
+              Our coordinator is available Mon–Sat, 9 am – 5 pm.
+            </p>
             <div className="flex flex-wrap gap-2">
-              {timePeriods.map((tp) => {
+              {firstVisitPeriods.map((tp) => {
                 const selected = data.firstVisitPeriod === tp.key
                 return (
                   <button
@@ -642,9 +647,10 @@ function Step4({
 
 interface SignupClientProps {
   timePeriods: TimePeriodItem[]
+  firstVisitPeriods: TimePeriodItem[]
 }
 
-export default function SignupClient({ timePeriods }: SignupClientProps) {
+export default function SignupClient({ timePeriods, firstVisitPeriods }: SignupClientProps) {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -854,7 +860,7 @@ export default function SignupClient({ timePeriods }: SignupClientProps) {
             <form onSubmit={handleSubmit} noValidate>
               {step === 1 && <Step1 data={formData} onChange={patch} errors={errors} />}
               {step === 2 && <Step2 data={formData} onChange={patch} errors={errors} />}
-              {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} timePeriods={timePeriods} />}
+              {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} timePeriods={timePeriods} firstVisitPeriods={firstVisitPeriods} />}
               {step === 4 && <Step4 data={formData} onChange={patch} errors={errors} />}
 
               {globalError && (
