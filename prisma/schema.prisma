@@ -159,6 +159,7 @@ model VolunteerProfile {
   availability      VolunteerAvailability[]
   inductionProgress InductionProgress[]
   shiftAssignments  ShiftAssignment[]
+  recurringBookings RecurringBooking[]
   attendanceRecords AttendanceRecord[]
   adminNotes        AdminNote[]
   emailLogs         EmailLog[]
@@ -212,9 +213,10 @@ model Location {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  shifts          Shift[]
-  attendance      AttendanceRecord[]
-  guestAttendance GuestAttendanceRecord[]
+  shifts            Shift[]
+  attendance        AttendanceRecord[]
+  guestAttendance   GuestAttendanceRecord[]
+  recurringBookings RecurringBooking[]
 }
 
 model Department {
@@ -298,6 +300,12 @@ model InductionQuizAnswer {
 
 // ─── Shifts & Rostering ───────────────────────────────────────────────────────
 
+enum RecurringFrequency {
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+}
+
 enum ShiftAssignmentStatus {
   SCHEDULED
   CONFIRMED
@@ -350,6 +358,28 @@ model ShiftAssignment {
 
   @@unique([shiftId, volunteerId])
   @@index([status])
+}
+
+// A volunteer's standing/recurring shift preference.
+// When the cron generates new shifts it auto-books any active RecurringBookings
+// that match the new shift's location, title and day of week.
+model RecurringBooking {
+  id          String             @id @default(cuid())
+  volunteerId String
+  locationId  String
+  shiftTitle  String             // e.g. "Morning Shift"
+  dayOfWeek   Int                // 1=Mon … 6=Sat (UTC day of the anchor shift)
+  anchorDate  DateTime           // Date of the first booked shift — used to calculate fortnightly/monthly cadence
+  frequency   RecurringFrequency
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  location  Location         @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([volunteerId])
+  @@index([isActive])
 }
 
 // ─── Attendance ───────────────────────────────────────────────────────────────

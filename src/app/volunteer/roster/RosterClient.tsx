@@ -2,9 +2,9 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { bookShiftAction, cancelShiftAction } from '@/lib/actions/shift.actions'
+import { bookShiftAction, cancelShiftAction, type RecurringFrequency } from '@/lib/actions/shift.actions'
 import { useToast } from '@/components/ui/toast'
-import { Loader2, Calendar, MapPin, Clock, Users } from 'lucide-react'
+import { Loader2, Calendar, MapPin, Clock, Users, Repeat } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface ShiftSlot {
@@ -60,61 +60,89 @@ function formatTime(dtStr: string) {
   })
 }
 
+const FREQUENCY_OPTIONS: { value: RecurringFrequency; label: string; hint: string }[] = [
+  { value: 'ONE_OFF',     label: 'One-off',     hint: 'Just this shift' },
+  { value: 'WEEKLY',      label: 'Weekly',      hint: 'Every week' },
+  { value: 'FORTNIGHTLY', label: 'Fortnightly', hint: 'Every 2 weeks' },
+  { value: 'MONTHLY',     label: 'Monthly',     hint: 'Every 4 weeks' },
+]
+
 function ShiftCard({
   shift,
   onBook,
   pending,
 }: {
   shift: ShiftSlot
-  onBook: (id: string) => void
+  onBook: (id: string, frequency: RecurringFrequency) => void
   pending: boolean
 }) {
+  const [frequency, setFrequency] = React.useState<RecurringFrequency>('ONE_OFF')
   const spotsLeft = shift.capacity - shift.filledCount
-  const isFull = spotsLeft <= 0
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-            <Calendar className="h-4 w-4 text-orange-500 shrink-0" aria-hidden="true" />
-            {formatAusDate(shift.date)}
-          </div>
-          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-            <Clock className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
-            {formatTime(shift.startTime)} – {formatTime(shift.endTime)}
-          </div>
-          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-            <MapPin className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
-            {shift.location}
-            {shift.title && <span className="text-gray-400">· {shift.title}</span>}
-          </div>
-          <div className="flex items-center gap-1.5 text-sm text-gray-500">
-            <Users className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
-            {isFull ? (
-              <span className="text-red-600 font-medium">Full</span>
-            ) : (
+      <div className="flex flex-col gap-3">
+        {/* Shift details */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+              <Calendar className="h-4 w-4 text-orange-500 shrink-0" aria-hidden="true" />
+              {formatAusDate(shift.date)}
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <Clock className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
+              {formatTime(shift.startTime)} – {formatTime(shift.endTime)}
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <MapPin className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
+              {shift.location}
+              {shift.title && <span className="text-gray-400"> · {shift.title}</span>}
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <Users className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
               <span>
                 {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} available
                 <span className="text-gray-400 ml-1">({shift.filledCount}/{shift.capacity} filled)</span>
               </span>
+            </div>
+            {shift.notes && (
+              <p className="text-xs text-gray-500 mt-1 italic">{shift.notes}</p>
             )}
           </div>
-          {shift.notes && (
-            <p className="text-xs text-gray-500 mt-1 italic">{shift.notes}</p>
-          )}
         </div>
-        <div className="shrink-0">
+
+        {/* Frequency + book */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1 border-t border-gray-100">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
+            <Repeat className="h-3.5 w-3.5" aria-hidden="true" />
+            Repeat:
+          </div>
+          <div className="flex flex-wrap gap-1.5 flex-1">
+            {FREQUENCY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFrequency(opt.value)}
+                title={opt.hint}
+                className={[
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors border',
+                  frequency === opt.value
+                    ? 'bg-orange-500 border-orange-500 text-white'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
-            onClick={() => onBook(shift.id)}
-            disabled={isFull || pending}
-            className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+            onClick={() => onBook(shift.id, frequency)}
+            disabled={pending}
+            className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 shrink-0"
           >
-            {pending ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : null}
-            {isFull ? 'Full' : 'Book this shift'}
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+            Book{frequency !== 'ONE_OFF' ? ' & Repeat' : ' Shift'}
           </button>
         </div>
       </div>
@@ -180,13 +208,21 @@ export default function RosterClient({ availableWeeks, bookedShifts }: RosterCli
   const [isPending, startTransition] = useTransition()
   const [pendingShiftId, setPendingShiftId] = React.useState<string | null>(null)
 
-  function handleBook(shiftId: string) {
+  function handleBook(shiftId: string, frequency: RecurringFrequency) {
     setPendingShiftId(shiftId)
     startTransition(async () => {
-      const result = await bookShiftAction(shiftId)
+      const result = await bookShiftAction(shiftId, frequency)
       setPendingShiftId(null)
       if (result.success) {
-        toast.success('Shift booked!', 'You\'re all set. We\'ll see you then.')
+        if (frequency === 'ONE_OFF') {
+          toast.success('Shift booked!', "You're all set. We'll see you then.")
+        } else {
+          const count = result.bookedCount ?? 1
+          toast.success(
+            'Standing shift saved!',
+            `Booked ${count} shift${count !== 1 ? 's' : ''} — we'll automatically add new ones as they're rostered.`
+          )
+        }
         router.refresh()
       } else {
         toast.error('Could not book shift', result.error ?? 'Please try again.')
@@ -253,7 +289,7 @@ export default function RosterClient({ availableWeeks, bookedShifts }: RosterCli
                         shift={shift}
                         onBook={handleBook}
                         pending={isPending && pendingShiftId === shift.id}
-                      />
+                    />
                     ))}
                   </div>
                 </div>

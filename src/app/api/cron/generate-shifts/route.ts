@@ -277,15 +277,81 @@ export async function GET(request: NextRequest) {
     // Batch-insert in chunks to avoid overwhelming the DB
     const CHUNK = 100
     let created = 0
+    const createdShifts: { id: string; locationId: string; title: string | null; date: Date }[] = []
+
     for (let i = 0; i < shiftsToCreate.length; i += CHUNK) {
       const chunk = shiftsToCreate.slice(i, i + CHUNK)
       const result = await prisma.shift.createMany({ data: chunk, skipDuplicates: true })
       created += result.count
     }
 
+    // ── Auto-book recurring preferences onto the newly created shifts ──────────
+    let autoBooked = 0
+    if (created > 0) {
+      // Fetch the shifts we just created
+      const newShifts = await prisma.shift.findMany({
+        where: {
+          date: { gte: todayUTC, lte: endUTC },
+          isActive: true,
+          isRecurring: true,
+        },
+        select: { id: true, locationId: true, title: true, date: true },
+      })
+
+      // Fetch all active recurring preferences
+      const recurringPrefs = await prisma.recurringBooking.findMany({
+        where: { isActive: true },
+        select: {
+          volunteerId: true,
+          locationId: true,
+          shiftTitle: true,
+          dayOfWeek: true,
+          anchorDate: true,
+          frequency: true,
+        },
+      })
+
+      if (recurringPrefs.length > 0) {
+        // For each pref, find newly created shifts that match
+        type AssignRow = { shiftId: string; volunteerId: string; status: 'SCHEDULED' }
+        const toAssign: AssignRow[] = []
+
+        for (const pref of recurringPrefs) {
+          const matching = newShifts.filter(s =>
+            s.locationId === pref.locationId &&
+            s.title === pref.shiftTitle &&
+            s.date.getUTCDay() === pref.dayOfWeek
+          )
+          for (const s of matching) {
+            // Check cadence
+            const anchorMs = Date.UTC(pref.anchorDate.getUTCFullYear(), pref.anchorDate.getUTCMonth(), pref.anchorDate.getUTCDate())
+            const shiftMs  = Date.UTC(s.date.getUTCFullYear(), s.date.getUTCMonth(), s.date.getUTCDate())
+            const diffDays = Math.round((shiftMs - anchorMs) / 86_400_000)
+            if (diffDays < 0) continue
+            let matches = false
+            if (pref.frequency === 'WEEKLY')      matches = diffDays % 7  === 0
+            if (pref.frequency === 'FORTNIGHTLY') matches = diffDays % 14 === 0
+            if (pref.frequency === 'MONTHLY')     matches = diffDays % 28 === 0
+            if (!matches) continue
+            toAssign.push({ shiftId: s.id, volunteerId: pref.volunteerId, status: 'SCHEDULED' })
+          }
+        }
+
+        if (toAssign.length > 0) {
+          const result = await prisma.shiftAssignment.createMany({
+            data: toAssign,
+            skipDuplicates: true,
+          })
+          autoBooked = result.count
+        }
+      }
+    }
+    // ── End auto-book ──────────────────────────────────────────────────────────
+
     return NextResponse.json({
-      message: `Generated ${created} new shift${created === 1 ? '' : 's'}.`,
+      message: `Generated ${created} new shift${created === 1 ? '' : 's'}${autoBooked > 0 ? `, auto-booked ${autoBooked} recurring assignment${autoBooked === 1 ? '' : 's'}` : ''}.`,
       created,
+      autoBooked,
       locations: locations.length,
       eligibleDays: eligibleDates.length,
       weeksAhead: WEEKS_AHEAD,
