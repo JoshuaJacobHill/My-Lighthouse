@@ -107,6 +107,22 @@ function getMonthStart(monthParam?: string): Date {
   return startOfMonth(new Date())
 }
 
+// ─── Time-period grouping ─────────────────────────────────────────────────────
+
+function shiftTimePeriod(startTime: Date): 'PRE_OPEN' | 'MORNING' | 'AFTERNOON' {
+  const brisbane = new Date(startTime.getTime() + 10 * 60 * 60 * 1000)
+  const totalMins = brisbane.getUTCHours() * 60 + brisbane.getUTCMinutes()
+  if (totalMins < 540) return 'PRE_OPEN'
+  if (totalMins < 750) return 'MORNING'
+  return 'AFTERNOON'
+}
+
+const TIME_PERIOD_CONFIG = [
+  { key: 'PRE_OPEN' as const,  label: 'Pre-open',  sub: 'before 9am',      headerCls: 'bg-purple-50 text-purple-700' },
+  { key: 'MORNING' as const,   label: 'Morning',   sub: '9am – 12:30pm',   headerCls: 'bg-blue-50 text-blue-700' },
+  { key: 'AFTERNOON' as const, label: 'Afternoon', sub: '12:30pm onwards',  headerCls: 'bg-orange-50 text-orange-700' },
+] as const
+
 // Fill-status colours — used consistently across all views
 function fillStatus(assigned: number, capacity: number): 'empty' | 'partial' | 'full' {
   if (assigned === 0) return 'empty'
@@ -380,9 +396,19 @@ export default async function RosterPage({ searchParams }: PageProps) {
                     </span>
                   </div>
                   <div className="divide-y divide-gray-100">
-                    {dayShifts.map((shift) => (
-                      <ShiftCard key={shift.id} shift={shift} />
-                    ))}
+                    {TIME_PERIOD_CONFIG.map(({ key, label, sub, headerCls }) => {
+                      const periodShifts = dayShifts.filter(s => shiftTimePeriod(s.startTime) === key)
+                      if (periodShifts.length === 0) return null
+                      return (
+                        <React.Fragment key={key}>
+                          <div className={`px-5 py-1.5 border-b border-gray-100 flex items-center gap-2 ${headerCls}`}>
+                            <span className="text-xs font-semibold">{label}</span>
+                            <span className="text-xs opacity-60">· {sub}</span>
+                          </div>
+                          {periodShifts.map((shift) => <ShiftCard key={shift.id} shift={shift} />)}
+                        </React.Fragment>
+                      )
+                    })}
                   </div>
                 </div>
               ))
@@ -448,9 +474,19 @@ export default async function RosterPage({ searchParams }: PageProps) {
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
-                    {dayShifts.map((shift) => (
-                      <ShiftCard key={shift.id} shift={shift} />
-                    ))}
+                    {TIME_PERIOD_CONFIG.map(({ key, label, sub, headerCls }) => {
+                      const periodShifts = dayShifts.filter(s => shiftTimePeriod(s.startTime) === key)
+                      if (periodShifts.length === 0) return null
+                      return (
+                        <React.Fragment key={key}>
+                          <div className={`px-5 py-1.5 border-b border-gray-100 flex items-center gap-2 ${headerCls}`}>
+                            <span className="text-xs font-semibold">{label}</span>
+                            <span className="text-xs opacity-60">· {sub}</span>
+                          </div>
+                          {periodShifts.map((shift) => <ShiftCard key={shift.id} shift={shift} />)}
+                        </React.Fragment>
+                      )
+                    })}
                   </div>
                 )}
               </div>

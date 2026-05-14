@@ -2,22 +2,10 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { bookShiftAction, cancelShiftAction, type RecurringFrequency } from '@/lib/actions/shift.actions'
+import { bookCustomShiftAction, cancelShiftAction, type RecurringFrequency } from '@/lib/actions/shift.actions'
 import { useToast } from '@/components/ui/toast'
-import { Loader2, Calendar, MapPin, Clock, Users, Repeat } from 'lucide-react'
+import { Loader2, Calendar, MapPin, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-
-interface ShiftSlot {
-  id: string
-  date: string
-  startTime: string
-  endTime: string
-  location: string
-  title: string | null
-  notes: string | null
-  capacity: number
-  filledCount: number
-}
 
 interface BookedShift {
   assignmentId: string
@@ -30,13 +18,8 @@ interface BookedShift {
   status: string
 }
 
-interface WeekGroup {
-  weekLabel: string
-  shifts: ShiftSlot[]
-}
-
 interface RosterClientProps {
-  availableWeeks: WeekGroup[]
+  locations: { id: string; name: string }[]
   bookedShifts: BookedShift[]
 }
 
@@ -60,94 +43,32 @@ function formatTime(dtStr: string) {
   })
 }
 
-const FREQUENCY_OPTIONS: { value: RecurringFrequency; label: string; hint: string }[] = [
-  { value: 'ONE_OFF',     label: 'One-off',     hint: 'Just this shift' },
-  { value: 'WEEKLY',      label: 'Weekly',      hint: 'Every week' },
-  { value: 'FORTNIGHTLY', label: 'Fortnightly', hint: 'Every 2 weeks' },
-  { value: 'MONTHLY',     label: 'Monthly',     hint: 'Every 4 weeks' },
+// Generate time options 06:00–21:00 in 30-min steps
+const TIME_OPTIONS: { value: string; label: string }[] = []
+for (let h = 6; h < 21; h++) {
+  for (const m of [0, 30]) {
+    const hh = String(h).padStart(2, '0')
+    const mm = String(m).padStart(2, '0')
+    const period = h < 12 ? 'am' : 'pm'
+    const dh = h === 0 ? 12 : h > 12 ? h - 12 : h
+    TIME_OPTIONS.push({ value: `${hh}:${mm}`, label: `${dh}:${mm} ${period}` })
+  }
+}
+// add 21:00 endpoint
+TIME_OPTIONS.push({ value: '21:00', label: '9:00 pm' })
+
+const FREQUENCY_OPTIONS: { value: RecurringFrequency; label: string }[] = [
+  { value: 'ONE_OFF',     label: 'One-off' },
+  { value: 'WEEKLY',      label: 'Weekly' },
+  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
+  { value: 'MONTHLY',     label: 'Monthly' },
 ]
 
-function ShiftCard({
-  shift,
-  onBook,
-  pending,
-}: {
-  shift: ShiftSlot
-  onBook: (id: string, frequency: RecurringFrequency) => void
-  pending: boolean
-}) {
-  const [frequency, setFrequency] = React.useState<RecurringFrequency>('ONE_OFF')
-  const spotsLeft = shift.capacity - shift.filledCount
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3">
-        {/* Shift details */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-              <Calendar className="h-4 w-4 text-orange-500 shrink-0" aria-hidden="true" />
-              {formatAusDate(shift.date)}
-            </div>
-            <div className="flex items-center gap-1.5 text-sm text-gray-600">
-              <Clock className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
-              {formatTime(shift.startTime)} – {formatTime(shift.endTime)}
-            </div>
-            <div className="flex items-center gap-1.5 text-sm text-gray-600">
-              <MapPin className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
-              {shift.location}
-              {shift.title && <span className="text-gray-400"> · {shift.title}</span>}
-            </div>
-            <div className="flex items-center gap-1.5 text-sm text-gray-500">
-              <Users className="h-4 w-4 text-gray-400 shrink-0" aria-hidden="true" />
-              <span>
-                {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} available
-                <span className="text-gray-400 ml-1">({shift.filledCount}/{shift.capacity} filled)</span>
-              </span>
-            </div>
-            {shift.notes && (
-              <p className="text-xs text-gray-500 mt-1 italic">{shift.notes}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Frequency + book */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1 border-t border-gray-100">
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
-            <Repeat className="h-3.5 w-3.5" aria-hidden="true" />
-            Repeat:
-          </div>
-          <div className="flex flex-wrap gap-1.5 flex-1">
-            {FREQUENCY_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setFrequency(opt.value)}
-                title={opt.hint}
-                className={[
-                  'rounded-full px-3 py-1 text-xs font-medium transition-colors border',
-                  frequency === opt.value
-                    ? 'bg-orange-500 border-orange-500 text-white'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600',
-                ].join(' ')}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => onBook(shift.id, frequency)}
-            disabled={pending}
-            className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 shrink-0"
-          >
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-            Book{frequency !== 'ONE_OFF' ? ' & Repeat' : ' Shift'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+function getTodayStr(): string {
+  const now = new Date()
+  // Use Brisbane date (UTC+10)
+  const brisbane = new Date(now.getTime() + 10 * 60 * 60 * 1000)
+  return brisbane.toISOString().slice(0, 10)
 }
 
 function BookedShiftCard({
@@ -202,33 +123,32 @@ function BookedShiftCard({
   )
 }
 
-export default function RosterClient({ availableWeeks, bookedShifts }: RosterClientProps) {
+export default function RosterClient({ locations, bookedShifts }: RosterClientProps) {
   const { toast } = useToast()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [pendingShiftId, setPendingShiftId] = React.useState<string | null>(null)
 
-  function handleBook(shiftId: string, frequency: RecurringFrequency) {
-    setPendingShiftId(shiftId)
-    startTransition(async () => {
-      const result = await bookShiftAction(shiftId, frequency)
-      setPendingShiftId(null)
-      if (result.success) {
-        if (frequency === 'ONE_OFF') {
-          toast.success('Shift booked!', "You're all set. We'll see you then.")
-        } else {
-          const count = result.bookedCount ?? 1
-          toast.success(
-            'Standing shift saved!',
-            `Booked ${count} shift${count !== 1 ? 's' : ''} — we'll automatically add new ones as they're rostered.`
-          )
-        }
-        router.refresh()
-      } else {
-        toast.error('Could not book shift', result.error ?? 'Please try again.')
-      }
-    })
-  }
+  // Form state
+  const [locationId, setLocationId] = React.useState(locations[0]?.id ?? '')
+  const todayStr = getTodayStr()
+  const [date, setDate] = React.useState(todayStr)
+  const [startTime, setStartTime] = React.useState('09:00')
+  const [endTime, setEndTime] = React.useState('12:00')
+  const [frequency, setFrequency] = React.useState<RecurringFrequency>('ONE_OFF')
+  const [formError, setFormError] = React.useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+  // End time options: must be later than startTime (30-min increments ensure >= 30 min gap)
+  const endOptions = TIME_OPTIONS.filter((o) => o.value > startTime)
+
+  // If current endTime is no longer valid, reset it
+  React.useEffect(() => {
+    if (endTime <= startTime) {
+      const first = endOptions[0]
+      if (first) setEndTime(first.value)
+    }
+  }, [startTime, endTime, endOptions])
 
   function handleCancel(shiftId: string) {
     setPendingShiftId(shiftId)
@@ -244,11 +164,164 @@ export default function RosterClient({ availableWeeks, bookedShifts }: RosterCli
     })
   }
 
-  const hasAvailable = availableWeeks.some((w) => w.shifts.length > 0)
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError(null)
+
+    // Sunday check (UTC day matches calendar date when using YYYY-MM-DD)
+    if (new Date(date).getUTCDay() === 0) {
+      setFormError("We're closed on Sundays — please choose another day.")
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const result = await bookCustomShiftAction({ locationId, date, startTime, endTime, frequency })
+      if (result.success) {
+        if (frequency === 'ONE_OFF') {
+          toast.success('Shift booked!', "You're all set. We'll see you then.")
+        } else {
+          const count = result.bookedCount ?? 1
+          toast.success(
+            'Standing shift saved!',
+            `Booked ${count} shift${count !== 1 ? 's' : ''}.`
+          )
+        }
+        router.refresh()
+      } else {
+        setFormError(result.error ?? 'Could not book shift. Please try again.')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="space-y-8">
-      {/* Booked shifts */}
+      {/* Booking form */}
+      <section>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Book a Shift</h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Location */}
+            <div>
+              <label htmlFor="locationId" className="block text-sm font-medium text-gray-700 mb-1">
+                Location
+              </label>
+              <select
+                id="locationId"
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                required
+                className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              >
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date */}
+            <div>
+              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
+                Date
+              </label>
+              <input
+                id="date"
+                type="date"
+                value={date}
+                min={todayStr}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+            </div>
+
+            {/* From / To times */}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 mb-1">
+                  From
+                </label>
+                <select
+                  id="startTime"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  required
+                  className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  {TIME_OPTIONS.filter((o) => o.value < '21:00').map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 mb-1">
+                  To
+                </label>
+                <select
+                  id="endTime"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  required
+                  className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  {endOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Repeat */}
+            <div>
+              <span className="block text-sm font-medium text-gray-700 mb-2">Repeat</span>
+              <div className="flex flex-wrap gap-2">
+                {FREQUENCY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFrequency(opt.value)}
+                    className={[
+                      'rounded-full px-3 py-1 text-xs font-medium transition-colors border',
+                      frequency === opt.value
+                        ? 'bg-orange-500 border-orange-500 text-white'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600',
+                    ].join(' ')}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Error */}
+            {formError && (
+              <p className="text-sm text-red-600 rounded-md bg-red-50 border border-red-200 px-3 py-2">
+                {formError}
+              </p>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isSubmitting || isPending}
+              className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+              {frequency !== 'ONE_OFF' ? 'Book & Repeat' : 'Book Shift'}
+            </button>
+          </form>
+        </div>
+      </section>
+
+      {/* Upcoming bookings */}
       {bookedShifts.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Your Upcoming Bookings</h2>
@@ -264,40 +337,6 @@ export default function RosterClient({ availableWeeks, bookedShifts }: RosterCli
           </div>
         </section>
       )}
-
-      {/* Available shifts */}
-      <section>
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Available Shifts</h2>
-        {!hasAvailable ? (
-          <div className="rounded-lg border border-dashed border-gray-200 py-12 text-center">
-            <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" aria-hidden="true" />
-            <p className="text-sm font-medium text-gray-600">No upcoming shifts available right now</p>
-            <p className="text-sm text-gray-400 mt-1">Check back soon — our team adds new shifts regularly.</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {availableWeeks.map((week) =>
-              week.shifts.length === 0 ? null : (
-                <div key={week.weekLabel}>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
-                    {week.weekLabel}
-                  </h3>
-                  <div className="space-y-3">
-                    {week.shifts.map((shift) => (
-                      <ShiftCard
-                        key={shift.id}
-                        shift={shift}
-                        onBook={handleBook}
-                        pending={isPending && pendingShiftId === shift.id}
-                    />
-                    ))}
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        )}
-      </section>
     </div>
   )
 }
