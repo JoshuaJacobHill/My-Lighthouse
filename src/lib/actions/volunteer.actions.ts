@@ -14,8 +14,9 @@ interface ActionResult {
 
 interface AvailabilityItem {
   dayOfWeek: string
-  startTime: string  // "HH:MM" 24-hour
-  endTime: string    // "HH:MM" 24-hour
+  timePeriod: string  // 'PRE_OPEN' | 'MORNING' | 'AFTERNOON'
+  startTime: string   // canonical "HH:MM" for the period
+  endTime: string     // canonical "HH:MM" for the period
 }
 
 interface AvailabilityData {
@@ -149,7 +150,7 @@ export async function updateAvailabilityAction(data: AvailabilityData): Promise<
           data: data.availability.map((a) => ({
             volunteerId,
             dayOfWeek: toDayEnum(a.dayOfWeek) as never,
-            timePeriod: computeTimePeriod(a.startTime) as never,
+            timePeriod: a.timePeriod as never,
             startTime: a.startTime,
             endTime: a.endTime,
           })),

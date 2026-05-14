@@ -4,7 +4,7 @@ import { ArrowLeft, Mail, Phone, MapPin, Calendar, User, AlertCircle } from 'luc
 import prisma from '@/lib/prisma'
 import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
-import { AvailabilityGrid, type AvailabilityRanges, type DayOfWeek } from '@/components/volunteer/AvailabilityGrid'
+import { AvailabilityCheckboxGrid, type AvailabilityPeriodMap, type DayOfWeek, type AvailabilityPeriodKey } from '@/components/volunteer/AvailabilityCheckboxGrid'
 import { VolunteerTabs } from '@/components/admin/VolunteerTabs'
 import { ChangeStatusModal } from '@/components/admin/ChangeStatusModal'
 import { AddNoteModal } from '@/components/admin/AddNoteModal'
@@ -55,12 +55,16 @@ export default async function VolunteerProfilePage({
 
   const fullName = `${volunteer.firstName} ${volunteer.lastName}`
 
-  // Build availability ranges from DB records
-  const availabilityRanges: AvailabilityRanges = {}
+  // Build availability period map from DB records
+  const availabilityPeriods: AvailabilityPeriodMap = {}
   for (const a of volunteer.availability) {
     const day = a.dayOfWeek as DayOfWeek
-    if (!availabilityRanges[day]) availabilityRanges[day] = []
-    availabilityRanges[day]!.push({ startTime: a.startTime, endTime: a.endTime })
+    const period = a.timePeriod as AvailabilityPeriodKey
+    if (!['PRE_OPEN', 'MORNING', 'AFTERNOON'].includes(period)) continue
+    if (!availabilityPeriods[day]) availabilityPeriods[day] = []
+    if (!availabilityPeriods[day]!.includes(period)) {
+      availabilityPeriods[day]!.push(period)
+    }
   }
 
   // Induction progress
@@ -152,7 +156,7 @@ export default async function VolunteerProfilePage({
   )
 
   const availabilityTab = (
-    <AvailabilityGrid value={availabilityRanges} readOnly />
+    <AvailabilityCheckboxGrid value={availabilityPeriods} readOnly />
   )
 
   const shiftsTab = (

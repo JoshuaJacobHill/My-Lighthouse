@@ -2,7 +2,12 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { AvailabilityGrid, type AvailabilityRanges } from '@/components/volunteer/AvailabilityGrid'
+import {
+  AvailabilityCheckboxGrid,
+  PERIODS,
+  type AvailabilityPeriodMap,
+  type AvailabilityPeriodKey,
+} from '@/components/volunteer/AvailabilityCheckboxGrid'
 import { updateAvailabilityAction } from '@/lib/actions/volunteer.actions'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
@@ -10,23 +15,30 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 
 interface AvailabilityEditorClientProps {
-  initialAvailability: AvailabilityRanges
+  initialAvailability: AvailabilityPeriodMap
 }
 
 export default function AvailabilityEditorClient({ initialAvailability }: AvailabilityEditorClientProps) {
-  const [availability, setAvailability] = React.useState<AvailabilityRanges>(initialAvailability)
+  const [availability, setAvailability] = React.useState<AvailabilityPeriodMap>(initialAvailability)
   const [isPending, startTransition] = useTransition()
   const [savedAt, setSavedAt] = React.useState<Date | null>(null)
   const { toast } = useToast()
 
   function handleSave() {
-    // Flatten AvailabilityRanges to the array format the action expects
-    const slots: Array<{ dayOfWeek: string; startTime: string; endTime: string }> = []
+    // Flatten AvailabilityPeriodMap → array of {dayOfWeek, timePeriod} items
+    const slots: Array<{ dayOfWeek: string; timePeriod: string; startTime: string; endTime: string }> = []
 
-    for (const [day, ranges] of Object.entries(availability)) {
-      if (!ranges) continue
-      for (const range of ranges) {
-        slots.push({ dayOfWeek: day, startTime: range.startTime, endTime: range.endTime })
+    for (const [day, periods] of Object.entries(availability)) {
+      if (!periods) continue
+      for (const periodKey of periods as AvailabilityPeriodKey[]) {
+        const period = PERIODS.find((p) => p.key === periodKey)
+        if (!period) continue
+        slots.push({
+          dayOfWeek: day,
+          timePeriod: periodKey,
+          startTime: period.startTime,
+          endTime: period.endTime,
+        })
       }
     }
 
@@ -41,24 +53,24 @@ export default function AvailabilityEditorClient({ initialAvailability }: Availa
     })
   }
 
-  const totalRanges = Object.values(availability).reduce((n, r) => n + (r?.length ?? 0), 0)
+  const totalSelected = Object.values(availability).reduce((n, p) => n + (p?.length ?? 0), 0)
 
   return (
     <Card>
       <CardContent className="pt-6 space-y-6">
-        <AvailabilityGrid
+        <AvailabilityCheckboxGrid
           value={availability}
           onChange={setAvailability}
         />
 
         <div className="flex items-center justify-between border-t border-gray-100 pt-4">
           <div className="text-sm text-gray-500">
-            {totalRanges === 0 ? (
-              'No availability set'
+            {totalSelected === 0 ? (
+              'No availability set — tick the times you&apos;re generally free'
             ) : (
               <span>
-                <span className="font-semibold text-orange-600">{totalRanges}</span>{' '}
-                {totalRanges === 1 ? 'time range' : 'time ranges'} across the week
+                <span className="font-semibold text-orange-600">{totalSelected}</span>{' '}
+                {totalSelected === 1 ? 'session' : 'sessions'} selected
               </span>
             )}
             {savedAt && (
