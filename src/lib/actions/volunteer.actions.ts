@@ -14,7 +14,8 @@ interface ActionResult {
 
 interface AvailabilityItem {
   dayOfWeek: string
-  timePeriod: string
+  startTime: string  // "HH:MM" 24-hour
+  endTime: string    // "HH:MM" 24-hour
 }
 
 interface AvailabilityData {
@@ -37,16 +38,17 @@ async function requireVolunteerSession(): Promise<{
   return { userId: session.userId, volunteerId: session.volunteerId }
 }
 
-// ─── Map availability string to enum values ───────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function toDayEnum(day: string): string {
   return day.toUpperCase()
 }
 
-function toPeriodEnum(period: string): string {
-  if (period.toLowerCase().includes('morning')) return 'MORNING'
-  if (period.toLowerCase().includes('afternoon')) return 'AFTERNOON'
-  return 'EVENING'
+/** Derive TimePeriod enum value from a 24-hour startTime string */
+function computeTimePeriod(startTime: string): string {
+  if (startTime < '09:00') return 'PRE_OPEN'
+  if (startTime < '12:30') return 'MORNING'
+  return 'AFTERNOON'
 }
 
 // ─── Profile update ───────────────────────────────────────────────────────────
@@ -147,7 +149,9 @@ export async function updateAvailabilityAction(data: AvailabilityData): Promise<
           data: data.availability.map((a) => ({
             volunteerId,
             dayOfWeek: toDayEnum(a.dayOfWeek) as never,
-            timePeriod: toPeriodEnum(a.timePeriod) as never,
+            timePeriod: computeTimePeriod(a.startTime) as never,
+            startTime: a.startTime,
+            endTime: a.endTime,
           })),
           skipDuplicates: true,
         })

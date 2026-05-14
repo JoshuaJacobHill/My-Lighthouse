@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { AvailabilityGrid, type AvailabilityMap, type TimePeriodConfig } from '@/components/volunteer/AvailabilityGrid'
+import { AvailabilityGrid, type AvailabilityRanges } from '@/components/volunteer/AvailabilityGrid'
 import { updateAvailabilityAction } from '@/lib/actions/volunteer.actions'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
@@ -10,26 +10,23 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 
 interface AvailabilityEditorClientProps {
-  initialAvailability: AvailabilityMap
-  timePeriods?: TimePeriodConfig[]
+  initialAvailability: AvailabilityRanges
 }
 
-export default function AvailabilityEditorClient({ initialAvailability, timePeriods }: AvailabilityEditorClientProps) {
-  const [availability, setAvailability] = React.useState<AvailabilityMap>(initialAvailability)
+export default function AvailabilityEditorClient({ initialAvailability }: AvailabilityEditorClientProps) {
+  const [availability, setAvailability] = React.useState<AvailabilityRanges>(initialAvailability)
   const [isPending, startTransition] = useTransition()
   const [savedAt, setSavedAt] = React.useState<Date | null>(null)
   const { toast } = useToast()
 
   function handleSave() {
-    // Convert AvailabilityMap to the flat array format the action expects
-    const slots: Array<{ dayOfWeek: string; timePeriod: string }> = []
+    // Flatten AvailabilityRanges to the array format the action expects
+    const slots: Array<{ dayOfWeek: string; startTime: string; endTime: string }> = []
 
-    for (const [day, periods] of Object.entries(availability)) {
-      if (!periods) continue
-      for (const [period, available] of Object.entries(periods)) {
-        if (available) {
-          slots.push({ dayOfWeek: day, timePeriod: period })
-        }
+    for (const [day, ranges] of Object.entries(availability)) {
+      if (!ranges) continue
+      for (const range of ranges) {
+        slots.push({ dayOfWeek: day, startTime: range.startTime, endTime: range.endTime })
       }
     }
 
@@ -44,10 +41,7 @@ export default function AvailabilityEditorClient({ initialAvailability, timePeri
     })
   }
 
-  const selectedCount = Object.values(availability).reduce((total, periods) => {
-    if (!periods) return total
-    return total + Object.values(periods).filter(Boolean).length
-  }, 0)
+  const totalRanges = Object.values(availability).reduce((n, r) => n + (r?.length ?? 0), 0)
 
   return (
     <Card>
@@ -55,17 +49,16 @@ export default function AvailabilityEditorClient({ initialAvailability, timePeri
         <AvailabilityGrid
           value={availability}
           onChange={setAvailability}
-          timePeriods={timePeriods}
         />
 
         <div className="flex items-center justify-between border-t border-gray-100 pt-4">
           <div className="text-sm text-gray-500">
-            {selectedCount === 0 ? (
-              'No availability selected'
+            {totalRanges === 0 ? (
+              'No availability set'
             ) : (
               <span>
-                <span className="font-semibold text-orange-600">{selectedCount}</span>{' '}
-                {selectedCount === 1 ? 'slot' : 'slots'} selected
+                <span className="font-semibold text-orange-600">{totalRanges}</span>{' '}
+                {totalRanges === 1 ? 'time range' : 'time ranges'} across the week
               </span>
             )}
             {savedAt && (

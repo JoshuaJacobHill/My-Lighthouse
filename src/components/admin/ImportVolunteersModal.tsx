@@ -200,9 +200,9 @@ export function ImportVolunteersModal() {
   }
 
   function downloadResults() {
-    const headers = ['row', 'name', 'email', 'status', 'temp_password', 'reason']
+    const headers = ['row', 'name', 'email', 'status', 'email_sent', 'reason']
     const csvRows = results.map((r) =>
-      [r.row, `"${r.name}"`, r.email, r.status, r.tempPassword ?? '', `"${r.reason ?? ''}"`].join(',')
+      [r.row, `"${r.name}"`, r.email, r.status, r.emailSent != null ? (r.emailSent ? 'yes' : 'no') : '', `"${r.reason ?? ''}"`].join(',')
     )
     const csv = [headers.join(','), ...csvRows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -286,7 +286,7 @@ export function ImportVolunteersModal() {
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       All other columns are optional. Volunteers with an already-registered email will be skipped.
-                      A temporary password is generated for each new volunteer — download the results after import to retrieve them.
+                      Each new volunteer will receive a welcome email with a link to set their own password.
                     </p>
                   </div>
 
@@ -388,8 +388,8 @@ export function ImportVolunteersModal() {
 
                   {importedCount > 0 && (
                     <p className="text-sm text-gray-600">
-                      Temporary passwords have been generated for each imported volunteer.
-                      <strong> Download the results CSV</strong> to retrieve them and share login details.
+                      Each imported volunteer has been sent a welcome email with a link to set their own password.
+                      The link is valid for <strong>7 days</strong>.
                     </p>
                   )}
 
@@ -401,7 +401,7 @@ export function ImportVolunteersModal() {
                           <th className="px-3 py-2 text-left font-semibold text-gray-500">Name</th>
                           <th className="px-3 py-2 text-left font-semibold text-gray-500">Email</th>
                           <th className="px-3 py-2 text-left font-semibold text-gray-500">Result</th>
-                          <th className="px-3 py-2 text-left font-semibold text-gray-500">Temp Password</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-500">Welcome Email</th>
                           <th className="px-3 py-2 text-left font-semibold text-gray-500">Note</th>
                         </tr>
                       </thead>
@@ -413,9 +413,17 @@ export function ImportVolunteersModal() {
                             <td className="px-3 py-2 text-gray-600">{r.email}</td>
                             <td className="px-3 py-2"><StatusChip status={r.status} /></td>
                             <td className="px-3 py-2">
-                              {r.tempPassword
-                                ? <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-gray-800">{r.tempPassword}</code>
-                                : <span className="text-gray-400">—</span>}
+                              {r.emailSent === true && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                  <CheckCircle2 className="h-3 w-3" /> Sent
+                                </span>
+                              )}
+                              {r.emailSent === false && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                  <AlertCircle className="h-3 w-3" /> Failed
+                                </span>
+                              )}
+                              {r.emailSent == null && <span className="text-gray-400">—</span>}
                             </td>
                             <td className="px-3 py-2 text-gray-500">{r.reason ?? ''}</td>
                           </tr>

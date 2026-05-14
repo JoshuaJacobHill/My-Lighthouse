@@ -17,8 +17,6 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type TimePeriodItem = { key: string; label: string; hours: string }
-
 type FormData = {
   // Step 1
   firstName: string
@@ -44,7 +42,7 @@ type FormData = {
   // Step 3
   firstVisitDate: string
   firstVisitPeriod: string
-  availability: { day: string; period: string }[]
+  availability: { day: string; startTime: string; endTime: string }[]
   notes: string
   // Account
   password: string
@@ -101,15 +99,12 @@ const BLUE_CARD_OPTIONS = ['Not Applicable', 'Pending', 'Current', 'Expired']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toggleAvailability(
-  current: { day: string; period: string }[],
-  day: string,
-  period: string
-): { day: string; period: string }[] {
-  const exists = current.some((a) => a.day === day && a.period === period)
-  return exists
-    ? current.filter((a) => !(a.day === day && a.period === period))
-    : [...current, { day, period }]
+/** Format "HH:MM" → "9:00 am" for display */
+function formatTimeLabel(t: string): string {
+  const [h, m] = t.split(':').map(Number)
+  const ampm = h < 12 ? 'am' : 'pm'
+  const hour = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
 // ─── Subform components ───────────────────────────────────────────────────────
@@ -355,20 +350,52 @@ function Step3({
   data,
   onChange,
   errors,
-  timePeriods,
 }: {
   data: FormData
   onChange: (patch: Partial<FormData>) => void
   errors: Record<string, string>
-  timePeriods: TimePeriodItem[]
 }) {
+  // ── Time range availability helpers ──────────────────────────────────────────
+  const DAYS_FULL = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  ]
+  const TIME_OPTIONS: string[] = []
+  for (let h = 6; h <= 20; h++) {
+    TIME_OPTIONS.push(`${String(h).padStart(2, '0')}:00`)
+    if (h < 20) TIME_OPTIONS.push(`${String(h).padStart(2, '0')}:30`)
+  }
+  TIME_OPTIONS.push('20:30')
+
+  function toMins(t: string) {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+
+  function getRangesForDay(day: string) {
+    return data.availability.filter((a) => a.day === day)
+  }
+
+  function removeRange(day: string, startTime: string) {
+    onChange({ availability: data.availability.filter((a) => !(a.day === day && a.startTime === startTime)) })
+  }
+
+  function addRange(day: string, startTime: string, endTime: string) {
+    const updated = [
+      ...data.availability,
+      { day, startTime, endTime },
+    ].sort((a, b) => {
+      if (a.day !== b.day) return DAYS_FULL.indexOf(a.day) - DAYS_FULL.indexOf(b.day)
+      return toMins(a.startTime) - toMins(b.startTime)
+    })
+    onChange({ availability: updated })
+  }
+
   // Calculate tomorrow and max date (60 days from now) for the date picker
   const today = new Date()
   const tomorrow = new Date(today)
   tomorrow.setDate(today.getDate() + 1)
   const maxDate = new Date(today)
   maxDate.setDate(today.getDate() + 60)
-
   const toInputDate = (d: Date) => d.toISOString().split('T')[0]
 
   return (
@@ -384,9 +411,7 @@ function Step3({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
             <input
               type="date"
               min={toInputDate(tomorrow)}
@@ -434,60 +459,29 @@ function Step3({
         </ul>
       </div>
 
-      {/* Availability grid */}
+      {/* Availability time ranges */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-1">
           General availability
         </h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Tick the times you&apos;re generally available. This helps us match you with the right shifts.
+        <p className="text-sm text-gray-600 mb-1">
+          Add the times you&apos;re generally available each week. Even a 30-minute slot helps — add as many ranges as you like.
         </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr>
-                <th className="text-left py-2 pr-4 font-medium text-gray-600 w-36"></th>
-                {DAYS_OF_WEEK.map((day) => (
-                  <th key={day} className="text-center py-2 px-1 font-medium text-gray-600 text-xs">
-                    {day.slice(0, 3)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {timePeriods.map((tp) => {
-                const periodLabel = `${tp.label} (${tp.hours})`
-                return (
-                  <tr key={tp.key} className="border-t border-gray-100">
-                    <td className="py-3 pr-4 text-xs text-gray-600 font-medium leading-snug">
-                      <span className="block">{tp.label}</span>
-                      <span className="block text-gray-400">{tp.hours}</span>
-                    </td>
-                    {DAYS_OF_WEEK.map((day) => {
-                      const checked = data.availability.some(
-                        (a) => a.day === day && a.period === periodLabel
-                      )
-                      return (
-                        <td key={day} className="text-center py-3 px-1">
-                          <input
-                            type="checkbox"
-                            aria-label={`${day} ${tp.label}`}
-                            checked={checked}
-                            onChange={() =>
-                              onChange({
-                                availability: toggleAvailability(data.availability, day, periodLabel),
-                              })
-                            }
-                            className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500 cursor-pointer"
-                          />
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <p className="text-xs text-gray-400 mb-4">
+          You can update this any time from your volunteer dashboard.
+        </p>
+
+        <div className="space-y-1 divide-y divide-gray-100">
+          {DAYS_FULL.map((day) => (
+            <DayAvailabilityRow
+              key={day}
+              day={day}
+              ranges={getRangesForDay(day)}
+              timeOptions={TIME_OPTIONS}
+              onAdd={addRange}
+              onRemove={removeRange}
+            />
+          ))}
         </div>
       </div>
 
@@ -503,6 +497,90 @@ function Step3({
           value={data.notes}
           onChange={(e) => onChange({ notes: e.target.value })}
         />
+      </div>
+    </div>
+  )
+}
+
+// ─── Inline day availability row for signup form ──────────────────────────────
+
+function DayAvailabilityRow({
+  day,
+  ranges,
+  timeOptions,
+  onAdd,
+  onRemove,
+}: {
+  day: string
+  ranges: { day: string; startTime: string; endTime: string }[]
+  timeOptions: string[]
+  onAdd: (day: string, start: string, end: string) => void
+  onRemove: (day: string, start: string) => void
+}) {
+  const [adding, setAdding] = React.useState(false)
+  const [start, setStart] = React.useState('09:00')
+  const [end, setEnd] = React.useState('12:00')
+  const [err, setErr] = React.useState('')
+
+  function toMins(t: string) {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+
+  const endOptions = timeOptions.filter((t) => toMins(t) >= toMins(start) + 30)
+
+  React.useEffect(() => {
+    if (toMins(end) < toMins(start) + 30) {
+      const valid = endOptions[0]
+      if (valid) setEnd(valid)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start])
+
+  function handleAdd() {
+    setErr('')
+    if (toMins(end) - toMins(start) < 30) { setErr('Minimum 30 minutes.'); return }
+    const overlap = ranges.some((r) => toMins(start) < toMins(r.endTime) && toMins(end) > toMins(r.startTime))
+    if (overlap) { setErr('Overlaps with an existing range.'); return }
+    onAdd(day, start, end)
+    setAdding(false)
+    setStart('09:00')
+    setEnd('12:00')
+  }
+
+  return (
+    <div className="py-2.5 flex items-start gap-3">
+      <span className="w-24 shrink-0 pt-1 text-sm font-medium text-gray-700">{day}</span>
+      <div className="flex-1 flex flex-wrap items-center gap-2">
+        {ranges.map((r) => (
+          <span key={r.startTime} className="inline-flex items-center gap-1 rounded-full bg-orange-100 text-orange-800 px-2.5 py-1 text-xs font-medium">
+            {formatTimeLabel(r.startTime)} – {formatTimeLabel(r.endTime)}
+            <button type="button" onClick={() => onRemove(day, r.startTime)} className="ml-0.5 text-orange-500 hover:text-red-600 transition-colors" aria-label="Remove">×</button>
+          </span>
+        ))}
+
+        {adding ? (
+          <div className="flex flex-wrap items-end gap-2 mt-1">
+            <select value={start} onChange={(e) => setStart(e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-sm bg-white focus:border-orange-500 focus:outline-none">
+              {timeOptions.filter((t) => t < '20:00').map((t) => <option key={t} value={t}>{formatTimeLabel(t)}</option>)}
+            </select>
+            <span className="text-gray-400 text-sm">→</span>
+            <select value={end} onChange={(e) => setEnd(e.target.value)} className="rounded border border-gray-300 px-2 py-1 text-sm bg-white focus:border-orange-500 focus:outline-none">
+              {endOptions.map((t) => <option key={t} value={t}>{formatTimeLabel(t)}</option>)}
+            </select>
+            <button type="button" onClick={handleAdd} className="rounded bg-orange-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-orange-600 transition-colors">Add</button>
+            <button type="button" onClick={() => { setAdding(false); setErr('') }} className="rounded border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+            {err && <p className="w-full text-xs text-red-600">{err}</p>}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="text-xs text-orange-500 hover:text-orange-700 font-medium transition-colors"
+          >
+            + Add
+          </button>
+        )}
       </div>
     </div>
   )
@@ -631,11 +709,7 @@ function Step4({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-interface SignupClientProps {
-  timePeriods: TimePeriodItem[]
-}
-
-export default function SignupClient({ timePeriods }: SignupClientProps) {
+export default function SignupClient() {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -736,7 +810,8 @@ export default function SignupClient({ timePeriods }: SignupClientProps) {
       // Map availability to what the server action expects: dayOfWeek + timePeriod
       const mappedAvailability = formData.availability.map((a) => ({
         dayOfWeek: a.day,
-        timePeriod: a.period,
+        startTime: a.startTime,
+        endTime: a.endTime,
       }))
       fd.append('availability', JSON.stringify(mappedAvailability))
       fd.append('firstVisitDate', formData.firstVisitDate)
@@ -849,7 +924,7 @@ export default function SignupClient({ timePeriods }: SignupClientProps) {
             <form onSubmit={handleSubmit} noValidate>
               {step === 1 && <Step1 data={formData} onChange={patch} errors={errors} />}
               {step === 2 && <Step2 data={formData} onChange={patch} errors={errors} />}
-              {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} timePeriods={timePeriods} />}
+              {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} />}
               {step === 4 && <Step4 data={formData} onChange={patch} errors={errors} />}
 
               {globalError && (

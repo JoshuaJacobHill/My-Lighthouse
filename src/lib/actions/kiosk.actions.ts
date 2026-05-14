@@ -2,6 +2,13 @@
 
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { sendEmail } from '@/lib/email'
+import { wrapEmailHtml } from '@/lib/email-html'
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+const ORANGE = '#f97316'
+const P = `margin:0 0 18px 0;line-height:1.7;color:#374151;font-size:15px;`
+const BTN = `background:${ORANGE};color:#ffffff;padding:13px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;font-size:14px;`
 
 interface ActionResult {
   success: boolean
@@ -14,7 +21,6 @@ interface GuestSignInData {
   lastName: string
   mobile?: string
   email?: string
-  volunteerArea?: string
   emergencyContact?: string
   safetyAcknowledged: boolean
   locationId?: string
@@ -272,7 +278,7 @@ export async function guestSignInAction(data: GuestSignInData): Promise<
         lastName: data.lastName.trim(),
         mobile: data.mobile?.trim() ?? null,
         email: data.email?.trim() ?? null,
-        volunteerArea: data.volunteerArea?.trim() ?? null,
+        volunteerArea: null,
         emergencyContact: data.emergencyContact?.trim() ?? null,
         safetyAcknowledged: data.safetyAcknowledged,
         locationId: data.locationId ?? null,
@@ -280,6 +286,36 @@ export async function guestSignInAction(data: GuestSignInData): Promise<
         signInAt: new Date(),
       },
     })
+
+    // Send follow-up email if email was provided — fire and forget
+    if (data.email?.trim()) {
+      const firstName = data.firstName.trim()
+      const signUpLink = `${APP_URL}/signup`
+      const html = wrapEmailHtml(`
+        <p style="${P}">Hi ${firstName},</p>
+        <p style="${P}">Thanks so much for volunteering with Lighthouse Care today — we really appreciate you giving your time to help our community!</p>
+        <p style="${P}">As a guest volunteer, you&rsquo;re always welcome to come back. But if you&rsquo;d like to become an official member of the team, it&rsquo;s easy to sign up. As a registered volunteer you&rsquo;ll get access to:</p>
+        <ul style="margin:0 0 18px 0;padding-left:20px;color:#374151;font-size:15px;line-height:2;">
+          <li>Your own volunteer account and shift history</li>
+          <li>The ability to book shifts that suit your schedule</li>
+          <li>Our online induction and training materials</li>
+          <li>Updates and news from the team</li>
+        </ul>
+        <p style="${P}">It only takes a few minutes to get started:</p>
+        <p style="margin:24px 0;"><a href="${signUpLink}" style="${BTN}">Join the Volunteer Team &rarr;</a></p>
+        <p style="${P}">We hope to see you again soon — and thank you again for making a difference today.</p>
+        <p style="${P};margin-bottom:0;">Warm regards,<br>The Lighthouse Care Team</p>
+      `, APP_URL)
+
+      const text = `Hi ${firstName},\n\nThanks so much for volunteering with Lighthouse Care today!\n\nIf you'd like to become an official member of our volunteer team, it's easy to sign up at: ${signUpLink}\n\nAs a registered volunteer you'll be able to book shifts, track your hours, complete your online induction, and stay in the loop.\n\nWe hope to see you again soon!\n\nWarm regards,\nThe Lighthouse Care Team`
+
+      sendEmail({
+        to: data.email.trim(),
+        subject: `Thanks for volunteering today, ${firstName}!`,
+        html,
+        text,
+      }).catch((err) => console.error('[guestSignInAction] email error:', err))
+    }
 
     return { success: true, attendanceId: record.id }
   } catch (err) {

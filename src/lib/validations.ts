@@ -18,7 +18,8 @@ const LOCATIONS_ENUM = [...LOCATIONS] as [string, ...string[]]
 
 const availabilityItemSchema = z.object({
   dayOfWeek: z.enum(DAYS_ENUM),
-  timePeriod: z.string().min(1),
+  startTime: z.string().min(1),
+  endTime: z.string().min(1),
 })
 
 export const volunteerSignupSchema = z.object({

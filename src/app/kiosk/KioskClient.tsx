@@ -46,15 +46,7 @@ interface KioskClientProps {
   defaultLocationId?: string
 }
 
-const VOLUNTEER_AREAS = [
-  'Store',
-  'Packing',
-  'Warehouse',
-  'Delivery',
-  'Events',
-  'Admin',
-  'Other',
-] as const
+const SAFETY_INFO_URL = 'https://www.lighthousecare.org.au/volunteer-safety'
 
 // ─── Countdown helper ─────────────────────────────────────────────────────────
 
@@ -132,7 +124,6 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
     lastName: '',
     mobile: '',
     email: '',
-    volunteerArea: '',
     emergencyContact: '',
     safetyAcknowledged: false,
   })
@@ -157,7 +148,6 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
       lastName: '',
       mobile: '',
       email: '',
-      volunteerArea: '',
       emergencyContact: '',
       safetyAcknowledged: false,
     })
@@ -262,7 +252,6 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
       lastName: guestForm.lastName.trim(),
       mobile: guestForm.mobile.trim() || undefined,
       email: guestForm.email.trim() || undefined,
-      volunteerArea: guestForm.volunteerArea || undefined,
       emergencyContact: guestForm.emergencyContact.trim() || undefined,
       safetyAcknowledged: guestForm.safetyAcknowledged,
       locationId: selectedLocationId || undefined,
@@ -502,8 +491,12 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
 
             <div>
               <label className="block text-base font-semibold text-gray-700 mb-2">
-                Email Address <span className="text-gray-400 font-normal">(optional)</span>
+                Email Address{' '}
+                <span className="text-amber-600 font-normal text-sm">(recommended)</span>
               </label>
+              <p className="text-sm text-gray-500 mb-2">
+                We&apos;ll send you info about joining our volunteer team.
+              </p>
               <input
                 type="email"
                 value={guestForm.email}
@@ -511,24 +504,6 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
                 className="w-full rounded-xl border-2 border-gray-300 px-4 py-4 text-lg text-gray-900 focus:border-amber-500 focus:outline-none"
                 placeholder="sarah@example.com"
               />
-            </div>
-
-            <div>
-              <label className="block text-base font-semibold text-gray-700 mb-2">
-                Volunteer Area
-              </label>
-              <select
-                value={guestForm.volunteerArea}
-                onChange={(e) => setGuestForm((p) => ({ ...p, volunteerArea: e.target.value }))}
-                className="w-full rounded-xl border-2 border-gray-300 px-4 py-4 text-lg text-gray-900 focus:border-amber-500 focus:outline-none bg-white"
-              >
-                <option value="">Select an area…</option>
-                {VOLUNTEER_AREAS.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div>
@@ -548,6 +523,18 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
 
             {/* Safety acknowledgement */}
             <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-5">
+              <p className="text-sm font-semibold text-amber-800 mb-3">
+                Before signing in, please read our{' '}
+                <a
+                  href={SAFETY_INFO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-amber-700 hover:text-amber-900"
+                >
+                  Volunteer Safety Information
+                </a>
+                .
+              </p>
               <label className="flex items-start gap-4 cursor-pointer">
                 <input
                   type="checkbox"
@@ -558,8 +545,9 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
                   className="mt-1 h-6 w-6 rounded border-2 border-amber-400 text-amber-500 focus:ring-amber-500 cursor-pointer shrink-0"
                 />
                 <span className="text-gray-700 text-base leading-relaxed">
-                  <strong>Safety acknowledgement:</strong> I understand the basic safety requirements
-                  for volunteering at Lighthouse Care and will follow staff instructions at all times.
+                  <strong>I confirm</strong> that I have read and understand the Lighthouse Care
+                  Volunteer Safety Information and will follow all safety instructions and staff
+                  directions at all times.
                 </span>
               </label>
             </div>

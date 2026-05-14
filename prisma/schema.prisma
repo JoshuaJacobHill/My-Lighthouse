@@ -75,11 +75,12 @@ model User {
   updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
 
-  accounts         Account[]
-  sessions         UserSession[]
-  volunteerProfile VolunteerProfile?
-  adminNotes       AdminNote[]       @relation("NoteCreatedBy")
-  emailLogs        EmailLog[]        @relation("EmailSentBy")
+  accounts              Account[]
+  sessions              UserSession[]
+  volunteerProfile      VolunteerProfile?
+  adminNotes            AdminNote[]            @relation("NoteCreatedBy")
+  emailLogs             EmailLog[]             @relation("EmailSentBy")
+  passwordResetTokens   PasswordResetToken[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -183,23 +184,27 @@ enum DayOfWeek {
 }
 
 enum TimePeriod {
-  MORNING
-  AFTERNOON
-  EVENING
+  PRE_OPEN   // before 9:00 am
+  MORNING    // 9:00 am – 12:30 pm
+  AFTERNOON  // 12:30 pm onwards
+  EVENING    // kept for legacy compat
 }
 
 model VolunteerAvailability {
   id          String     @id @default(cuid())
   volunteerId String
   dayOfWeek   DayOfWeek
-  timePeriod  TimePeriod
+  timePeriod  TimePeriod // computed from startTime for display grouping
+  startTime   String     @default("09:00") // HH:MM 24-hour, e.g. "09:00"
+  endTime     String     @default("12:00") // HH:MM 24-hour, e.g. "12:00"
   notes       String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
 
-  @@unique([volunteerId, dayOfWeek, timePeriod])
+  @@unique([volunteerId, dayOfWeek, startTime])
+  @@index([volunteerId])
 }
 
 // ─── Locations & Departments ──────────────────────────────────────────────────
@@ -452,6 +457,7 @@ enum EmailTemplateType {
   INDUCTION_REMINDER
   INDUCTION_COMPLETE
   SHIFT_BOOKED
+  VOLUNTEER_WELCOME
   SHIFT_REMINDER
   SHIFT_CANCELLED
   MISSED_SHIFT_FOLLOWUP
@@ -498,6 +504,21 @@ model EmailLog {
 
   @@index([volunteerId])
   @@index([sentAt])
+}
+
+// ─── Password Reset ───────────────────────────────────────────────────────────
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ─── App Settings ─────────────────────────────────────────────────────────────

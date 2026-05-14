@@ -4,16 +4,15 @@ import { ArrowLeft, Mail, Phone, MapPin, Calendar, User, AlertCircle } from 'luc
 import prisma from '@/lib/prisma'
 import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
-import { AvailabilityGrid, type AvailabilityMap } from '@/components/volunteer/AvailabilityGrid'
+import { AvailabilityGrid, type AvailabilityRanges, type DayOfWeek } from '@/components/volunteer/AvailabilityGrid'
 import { VolunteerTabs } from '@/components/admin/VolunteerTabs'
 import { ChangeStatusModal } from '@/components/admin/ChangeStatusModal'
 import { AddNoteModal } from '@/components/admin/AddNoteModal'
 import { SendEmailModal } from '@/components/admin/SendEmailModal'
 import { OnboardingForm } from '@/components/admin/OnboardingForm'
 import { DeleteVolunteerButton } from '@/components/admin/DeleteVolunteerButton'
-import { formatDate, formatDateTime, formatDuration, getTimePeriodConfig } from '@/lib/utils'
+import { formatDate, formatDateTime, formatDuration } from '@/lib/utils'
 import { VOLUNTEER_STATUSES, SHIFT_ASSIGNMENT_STATUSES } from '@/lib/constants'
-import type { DayOfWeek, TimePeriod } from '@/components/volunteer/AvailabilityGrid'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,54 +23,45 @@ export default async function VolunteerProfilePage({
 }) {
   const { id } = await params
 
-  const [volunteer, availabilitySettings] = await Promise.all([
-    prisma.volunteerProfile.findUnique({
-      where: { id },
-      include: {
-        user: true,
-        availability: true,
-        inductionProgress: { include: { section: true } },
-        shiftAssignments: {
-          include: { shift: { include: { location: true, department: true } } },
-          orderBy: { shift: { date: 'desc' } },
-          take: 20,
-        },
-        attendanceRecords: {
-          include: { location: true },
-          orderBy: { signInAt: 'desc' },
-          take: 20,
-        },
-        adminNotes: {
-          include: { createdBy: true },
-          orderBy: { createdAt: 'desc' },
-        },
-        emailLogs: {
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        },
-        quizAnswers: true,
+  const volunteer = await prisma.volunteerProfile.findUnique({
+    where: { id },
+    include: {
+      user: true,
+      availability: { orderBy: { startTime: 'asc' } },
+      inductionProgress: { include: { section: true } },
+      shiftAssignments: {
+        include: { shift: { include: { location: true, department: true } } },
+        orderBy: { shift: { date: 'desc' } },
+        take: 20,
       },
-    }),
-    prisma.appSetting.findMany({
-      where: { key: { startsWith: 'availability_' } },
-    }),
-  ])
+      attendanceRecords: {
+        include: { location: true },
+        orderBy: { signInAt: 'desc' },
+        take: 20,
+      },
+      adminNotes: {
+        include: { createdBy: true },
+        orderBy: { createdAt: 'desc' },
+      },
+      emailLogs: {
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      },
+      quizAnswers: true,
+    },
+  })
 
   if (!volunteer) notFound()
 
   const fullName = `${volunteer.firstName} ${volunteer.lastName}`
 
-  // Build availability map from DB records
-  const availabilityMap: AvailabilityMap = {}
+  // Build availability ranges from DB records
+  const availabilityRanges: AvailabilityRanges = {}
   for (const a of volunteer.availability) {
     const day = a.dayOfWeek as DayOfWeek
-    const period = a.timePeriod as TimePeriod
-    if (!availabilityMap[day]) availabilityMap[day] = {}
-    availabilityMap[day]![period] = true
+    if (!availabilityRanges[day]) availabilityRanges[day] = []
+    availabilityRanges[day]!.push({ startTime: a.startTime, endTime: a.endTime })
   }
-
-  const availabilitySettingsMap = Object.fromEntries(availabilitySettings.map((s) => [s.key, s.value]))
-  const timePeriods = getTimePeriodConfig(availabilitySettingsMap)
 
   // Induction progress
   const totalSections = volunteer.inductionProgress.length
@@ -162,7 +152,7 @@ export default async function VolunteerProfilePage({
   )
 
   const availabilityTab = (
-    <AvailabilityGrid value={availabilityMap} readOnly timePeriods={timePeriods} />
+    <AvailabilityGrid value={availabilityRanges} readOnly />
   )
 
   const shiftsTab = (

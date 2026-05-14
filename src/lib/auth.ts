@@ -126,3 +126,33 @@ export async function clearSessionCookie(): Promise<void> {
     maxAge: 0,
   })
 }
+
+// ─── Password reset tokens ────────────────────────────────────────────────────
+
+export async function createPasswordResetToken(userId: string, expiresInHours = 48): Promise<string> {
+  const token = crypto.randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
+  // Delete any existing unused tokens for this user first
+  await prisma.passwordResetToken.deleteMany({
+    where: { userId, usedAt: null },
+  })
+  await prisma.passwordResetToken.create({
+    data: { userId, token, expiresAt },
+  })
+  return token
+}
+
+export async function validatePasswordResetToken(token: string): Promise<{ userId: string } | null> {
+  const record = await prisma.passwordResetToken.findUnique({ where: { token } })
+  if (!record) return null
+  if (record.usedAt) return null
+  if (record.expiresAt < new Date()) return null
+  return { userId: record.userId }
+}
+
+export async function consumePasswordResetToken(token: string): Promise<void> {
+  await prisma.passwordResetToken.update({
+    where: { token },
+    data: { usedAt: new Date() },
+  })
+}

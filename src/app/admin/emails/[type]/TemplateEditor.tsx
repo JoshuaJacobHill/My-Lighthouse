@@ -41,6 +41,7 @@ const AVAILABLE_VARS = [
   { key: '{{location}}', desc: 'Location name' },
   { key: '{{portal_link}}', desc: 'Volunteer portal URL' },
   { key: '{{organisation_name}}', desc: 'Organisation name' },
+  { key: '{{set_password_link}}', desc: 'Password setup link (import welcome)' },
 ]
 
 function replaceSampleVars(text: string): string {

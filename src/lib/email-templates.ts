@@ -42,19 +42,19 @@ export const defaultTemplates: Record<
   { subject: string; html: string; text: string }
 > = {
   SIGNUP_CONFIRMATION: {
-    subject: 'Welcome to Lighthouse Care Volunteers, {{first_name}}!',
+    subject: 'Thank you for signing up, {{first_name}} — your visit is confirmed!',
     html: wrap(`
       <p style="${P}">Hi {{first_name}},</p>
-      <p style="${P}">Thank you for registering as a volunteer with Lighthouse Care. We&rsquo;re so glad you&rsquo;ve decided to join our community — your time and care genuinely makes a difference to families across South East Queensland.</p>
-      <p style="${P}">Your first visit is booked for:</p>
+      <p style="${P}">Thank you so much for signing up to volunteer with Lighthouse Care! We&rsquo;re really glad you&rsquo;re joining us — your time genuinely makes a difference to families doing it tough across South East Queensland.</p>
+      <p style="${P}">Your appointment to meet with our volunteer coordinator is confirmed for:</p>
       ${shiftTable()}
-      <p style="${P}">We&rsquo;ve attached a calendar invite so you don&rsquo;t forget. Our coordinator will be there to meet you and get you settled in.</p>
-      <p style="${P}">In the meantime, please complete your induction by visiting the volunteer portal. It only takes a short while and covers everything you need to know before you start.</p>
+      <p style="${P}">We&rsquo;ve attached a calendar invite to help you remember. If this time doesn&rsquo;t suit you, our volunteer coordinator will be in touch to arrange a revised time — so no need to worry if something comes up.</p>
+      <p style="${P}">In the meantime, you can get a head start by completing your online induction through the volunteer portal. It only takes 15–20 minutes and covers everything you need to know before your first shift.</p>
       ${btn('{{portal_link}}', 'Start My Induction &rarr;')}
-      <p style="${P}">If you have any questions, don&rsquo;t hesitate to reach out — we&rsquo;re here to help.</p>
-      <p style="${P};margin-bottom:0;">Warm regards,<br>The {{organisation_name}} Team</p>
+      <p style="${P}">If you have any questions at all, don&rsquo;t hesitate to reach out — we&rsquo;re here to help.</p>
+      <p style="${P};margin-bottom:0;">We look forward to meeting you!<br><br>Warm regards,<br>The {{organisation_name}} Team</p>
     `),
-    text: `Welcome to Lighthouse Care Volunteers, {{first_name}}!\n\nThank you for registering as a volunteer. We're so glad you've decided to join our community.\n\nYour first visit is booked for:\nDate: {{shift_date}}\nTime: {{shift_time}}\nLocation: {{location}}\n\nWe've attached a calendar invite so you don't forget.\n\nTo get started, please complete your induction at: {{portal_link}}\n\nWarm regards,\nThe {{organisation_name}} Team`,
+    text: `Hi {{first_name}},\n\nThank you so much for signing up to volunteer with Lighthouse Care! We're really glad you're joining us.\n\nYour appointment to meet with our volunteer coordinator is confirmed for:\nDate: {{shift_date}}\nTime: {{shift_time}}\nLocation: {{location}}\n\nWe've attached a calendar invite to help you remember. If this time doesn't suit you, our volunteer coordinator will be in touch to arrange a revised time.\n\nIn the meantime, you can complete your online induction at: {{portal_link}}\n\nWe look forward to meeting you!\n\nWarm regards,\nThe {{organisation_name}} Team`,
   },
 
   INDUCTION_REMINDER: {
@@ -81,6 +81,26 @@ export const defaultTemplates: Record<
       <p style="${P};margin-bottom:0;">Warm regards,<br>The {{organisation_name}} Team</p>
     `),
     text: `Hi {{first_name}},\n\nCongratulations — you've completed your induction and are now officially part of the Lighthouse Care volunteer family!\n\nHead to the portal to browse and book upcoming shifts: {{portal_link}}\n\nThank you for giving your time — it means the world.\n\nWarm regards,\nThe {{organisation_name}} Team`,
+  },
+
+  VOLUNTEER_WELCOME: {
+    subject: 'Your Lighthouse Care volunteer account is ready, {{first_name}}!',
+    html: wrap(`
+      <p style="${P}">Hi {{first_name}},</p>
+      <p style="${P}">We&rsquo;re excited to let you know that Lighthouse Care has launched a brand new volunteer portal — and we&rsquo;ve already set up an account for you!</p>
+      <p style="${P}">The portal is your one-stop place to manage your volunteering with us. Here&rsquo;s what you can do:</p>
+      <ul style="margin:0 0 18px 0;padding-left:20px;color:#374151;font-size:15px;line-height:2;">
+        <li>Browse and book upcoming volunteer shifts</li>
+        <li>Track your volunteer hours</li>
+        <li>Complete your online induction and training</li>
+        <li>Stay in the loop with updates from the team</li>
+      </ul>
+      <p style="${P}">To get started, just tap the button below to create your password and activate your account. This link is valid for <strong>7 days</strong>.</p>
+      ${btn('{{set_password_link}}', 'Activate My Account &rarr;')}
+      <p style="${P}">If you have any questions or need a hand getting set up, don&rsquo;t hesitate to reach out — we&rsquo;re always happy to help.</p>
+      <p style="${P};margin-bottom:0;">Warm regards,<br>The {{organisation_name}} Team</p>
+    `),
+    text: `Hi {{first_name}},\n\nWe're excited to let you know that Lighthouse Care has launched a brand new volunteer portal — and we've already set up an account for you!\n\nThe portal is your one-stop place to manage your volunteering with us:\n- Browse and book upcoming volunteer shifts\n- Track your volunteer hours\n- Complete your online induction and training\n- Stay in the loop with updates from the team\n\nTo get started, create your password here to activate your account (link valid for 7 days):\n{{set_password_link}}\n\nIf you have any questions or need a hand getting set up, don't hesitate to reach out.\n\nWarm regards,\nThe {{organisation_name}} Team`,
   },
 
   SHIFT_BOOKED: {

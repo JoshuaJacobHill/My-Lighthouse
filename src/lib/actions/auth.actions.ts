@@ -277,13 +277,11 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
               agreedAt: new Date(),
               status: 'PENDING_INDUCTION',
               availability: {
-                create: (data.availability ?? []).map((a) => ({
+                create: (data.availability ?? []).map((a: { dayOfWeek: string; startTime: string; endTime: string }) => ({
                   dayOfWeek: a.dayOfWeek.toUpperCase().replace(/\s+/g, '_') as never,
-                  timePeriod: a.timePeriod.includes('Morning')
-                    ? 'MORNING'
-                    : a.timePeriod.includes('Afternoon')
-                      ? 'AFTERNOON'
-                      : 'EVENING',
+                  startTime: a.startTime,
+                  endTime: a.endTime,
+                  timePeriod: (a.startTime < '09:00' ? 'PRE_OPEN' : a.startTime < '12:30' ? 'MORNING' : 'AFTERNOON') as never,
                 })),
               },
             },

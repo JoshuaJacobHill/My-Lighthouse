@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 import prisma from '@/lib/prisma'
-import { getSession, hashPassword } from '@/lib/auth'
+import { getSession, hashPassword, createPasswordResetToken } from '@/lib/auth'
+import { renderTemplate } from '@/lib/email-templates'
+import { sendEmail } from '@/lib/email'
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,16 +35,11 @@ export interface ImportResult {
   name: string
   email: string
   status: 'imported' | 'skipped' | 'error'
-  tempPassword?: string
+  emailSent?: boolean
   reason?: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function generateTempPassword(): string {
-  // e.g. "Lc4mR9aB" — readable enough to share verbally or in email
-  return crypto.randomBytes(6).toString('base64url').slice(0, 8)
-}
 
 const VALID_STATUSES = new Set([
   'PENDING_INDUCTION',
@@ -112,20 +110,24 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Create user + profile
+    // Create user + profile, then send welcome email
     try {
-      const tempPassword = generateTempPassword()
-      const passwordHash = await hashPassword(tempPassword)
+      // Create a placeholder password hash — volunteer must set their own via the welcome link
+      const placeholderHash = await hashPassword(crypto.randomUUID())
+
+      let userId: string
 
       await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
             email,
-            passwordHash,
+            passwordHash: placeholderHash,
             name,
             role: 'VOLUNTEER',
           },
         })
+
+        userId = user.id
 
         await tx.volunteerProfile.create({
           data: {
@@ -155,7 +157,33 @@ export async function POST(req: NextRequest) {
         })
       })
 
-      results.push({ row: rowNum, name, email, status: 'imported', tempPassword })
+      // Generate a 7-day set-password token and send welcome email
+      let emailSent = false
+      try {
+        const token = await createPasswordResetToken(userId!, 168)
+        const set_password_link = `${APP_URL}/set-password?token=${token}`
+
+        const rendered = await renderTemplate('VOLUNTEER_WELCOME', {
+          first_name: row.first_name.trim(),
+          last_name: row.last_name.trim(),
+          set_password_link,
+        })
+
+        const result = await sendEmail({
+          to: email,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+          templateType: 'VOLUNTEER_WELCOME' as never,
+        })
+
+        emailSent = result.success
+      } catch {
+        // Don't fail the import if email sending fails
+        emailSent = false
+      }
+
+      results.push({ row: rowNum, name, email, status: 'imported', emailSent })
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
       results.push({ row: rowNum, name, email, status: 'error', reason: msg })

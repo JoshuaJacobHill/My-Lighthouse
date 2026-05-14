@@ -109,17 +109,20 @@ export default function LoginPage() {
             'Sign In'
           )}
         </Button>
+
+        <div className="text-center">
+          <Link href="/forgot-password" className="text-sm text-orange-500 hover:underline">
+            Forgot your password?
+          </Link>
+        </div>
       </form>
 
-      <div className="mt-6 space-y-3 text-center text-sm text-gray-600">
+      <div className="mt-6 text-center text-sm text-gray-600">
         <p>
           New volunteer?{' '}
           <Link href="/signup" className="font-medium text-orange-500 hover:underline">
             Sign up here &rarr;
           </Link>
-        </p>
-        <p className="text-xs text-gray-400">
-          Forgotten your password? Contact your volunteer coordinator or admin for assistance.
         </p>
       </div>
     </div>
