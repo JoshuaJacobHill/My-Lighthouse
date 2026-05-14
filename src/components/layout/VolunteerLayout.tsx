@@ -26,7 +26,6 @@ const navItems: NavItem[] = [
   { href: '/volunteer/profile', label: 'My Profile', icon: User },
   { href: '/volunteer/availability', label: 'My Availability', icon: Clock },
   { href: '/volunteer/shifts', label: 'My Shifts', icon: Calendar },
-  { href: '/volunteer/roster', label: 'Book a Shift', icon: Calendar },
 ]
 
 interface VolunteerLayoutProps {

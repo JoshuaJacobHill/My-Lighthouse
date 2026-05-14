@@ -217,6 +217,30 @@ export async function bookShiftAction(
   }
 }
 
+// ─── Module-level helper: find or create a shift record ──────────────────────
+
+async function findOrCreateShiftRecord(
+  locationId: string,
+  dateStr: string,
+  startTime: string,
+  endTime: string,
+): Promise<string> {
+  const startDt = new Date(`${dateStr}T${startTime}:00+10:00`)
+  const endDt   = new Date(`${dateStr}T${endTime}:00+10:00`)
+  const dateDt  = new Date(dateStr)
+
+  const existing = await prisma.shift.findFirst({
+    where: { locationId, isActive: true, date: dateDt, startTime: startDt, endTime: endDt },
+    select: { id: true },
+  })
+  if (existing) return existing.id
+
+  const created = await prisma.shift.create({
+    data: { locationId, date: dateDt, startTime: startDt, endTime: endDt, capacity: 99, isActive: true },
+  })
+  return created.id
+}
+
 // ─── Book a custom shift (volunteer-created time slot) ───────────────────────
 
 export async function bookCustomShiftAction(input: {
@@ -244,37 +268,6 @@ export async function bookCustomShiftAction(input: {
     if (!location) return { success: false, error: 'Location not found.' }
     if (!volunteer) return { success: false, error: 'Volunteer profile not found.' }
 
-    // ── Helper: find or create a matching shift for a given date string ────────
-    async function findOrCreateShift(dateStr: string): Promise<string> {
-      const startDt = new Date(`${dateStr}T${startTime}:00+10:00`)
-      const endDt   = new Date(`${dateStr}T${endTime}:00+10:00`)
-      const dateDt  = new Date(dateStr)
-
-      const existing = await prisma.shift.findFirst({
-        where: {
-          locationId,
-          isActive: true,
-          date: dateDt,
-          startTime: startDt,
-          endTime: endDt,
-        },
-        select: { id: true },
-      })
-      if (existing) return existing.id
-
-      const created = await prisma.shift.create({
-        data: {
-          locationId,
-          date: dateDt,
-          startTime: startDt,
-          endTime: endDt,
-          capacity: 99,
-          isActive: true,
-        },
-      })
-      return created.id
-    }
-
     // ── Helper: upsert assignment; returns false if already active ─────────────
     async function bookAssignment(shiftId: string): Promise<boolean> {
       const existing = await prisma.shiftAssignment.findUnique({
@@ -297,7 +290,7 @@ export async function bookCustomShiftAction(input: {
     }
 
     // ── Book anchor shift ──────────────────────────────────────────────────────
-    const anchorShiftId = await findOrCreateShift(date)
+    const anchorShiftId = await findOrCreateShiftRecord(locationId, date, startTime, endTime)
     const anchorBooked = await bookAssignment(anchorShiftId)
     if (!anchorBooked) {
       return { success: false, error: 'You are already booked for this shift.' }
@@ -322,7 +315,7 @@ export async function bookCustomShiftAction(input: {
         // Skip Sundays
         if (futureDate.getUTCDay() === 0) continue
         const futureDateStr = futureDate.toISOString().slice(0, 10)
-        const futureShiftId = await findOrCreateShift(futureDateStr)
+        const futureShiftId = await findOrCreateShiftRecord(locationId, futureDateStr, startTime, endTime)
         const booked = await bookAssignment(futureShiftId)
         if (booked) bookedCount++
       }
@@ -498,5 +491,78 @@ export async function cancelShiftAction(shiftId: string): Promise<ActionResult> 
   } catch (err) {
     console.error('[cancelShiftAction]', err)
     return { success: false, error: 'Failed to cancel shift. Please try again.' }
+  }
+}
+
+// ─── Edit an existing shift booking ──────────────────────────────────────────
+
+export async function editShiftBookingAction(
+  assignmentId: string,
+  data: { locationId: string; date: string; startTime: string; endTime: string },
+): Promise<ActionResult> {
+  const session = await getSession()
+  if (!session?.volunteerId) return { success: false, error: 'Not authenticated' }
+  const volunteerId = session.volunteerId
+
+  try {
+    const assignment = await prisma.shiftAssignment.findFirst({
+      where: {
+        id: assignmentId,
+        volunteerId,
+        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+      },
+      include: { shift: { include: { location: true } } },
+    })
+
+    if (!assignment) return { success: false, error: 'Booking not found.' }
+
+    const newShiftId = await findOrCreateShiftRecord(data.locationId, data.date, data.startTime, data.endTime)
+
+    if (newShiftId === assignment.shiftId) return { success: false, error: 'No changes made.' }
+
+    await prisma.shiftAssignment.update({
+      where: { id: assignmentId },
+      data: { status: 'CANCELLED_BY_VOLUNTEER', cancelledAt: new Date() },
+    })
+
+    await prisma.shiftAssignment.create({
+      data: { shiftId: newShiftId, volunteerId, status: 'SCHEDULED' },
+    })
+
+    // Admin notification
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL
+    if (adminEmail) {
+      const volunteer = await prisma.volunteerProfile.findUnique({
+        where: { id: volunteerId },
+        select: { firstName: true, lastName: true },
+      })
+      const shiftDate = format(new Date(data.date), 'EEEE d MMMM yyyy')
+      const shiftTime = `${data.startTime}–${data.endTime}`
+      const location = await prisma.location.findUnique({ where: { id: data.locationId }, select: { name: true } })
+      await sendEmail({
+        to: adminEmail,
+        subject: `Shift booking updated: ${volunteer?.firstName ?? ''} ${volunteer?.lastName ?? ''}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Volunteer Shift Booking Updated</h2>
+            <p><strong>${volunteer?.firstName ?? ''} ${volunteer?.lastName ?? ''}</strong> has changed their shift booking.</p>
+            <ul>
+              <li><strong>New Date:</strong> ${shiftDate}</li>
+              <li><strong>New Time:</strong> ${shiftTime}</li>
+              <li><strong>Location:</strong> ${location?.name ?? data.locationId}</li>
+            </ul>
+            <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/volunteers/${volunteerId}">View volunteer profile</a></p>
+          </div>
+        `,
+        text: `${volunteer?.firstName ?? ''} ${volunteer?.lastName ?? ''} has updated their shift booking to ${shiftDate} at ${shiftTime} — ${location?.name ?? data.locationId}.`,
+        volunteerId,
+        ccAdmin: true,
+      })
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[editShiftBookingAction]', err)
+    return { success: false, error: 'Failed to update booking. Please try again.' }
   }
 }
