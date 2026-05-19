@@ -1,3 +1,5 @@
+import { getSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import KioskClient from './KioskClient'
 
@@ -8,6 +10,9 @@ export const metadata = {
 }
 
 export default async function KioskPage() {
+  const session = await getSession()
+  if (!session) redirect('/kiosk/login')
+
   const locations = await prisma.location.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },

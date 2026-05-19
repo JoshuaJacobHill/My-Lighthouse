@@ -1,13 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { loginAction } from '@/lib/actions/auth.actions'
 import { Button } from '@/components/ui/button'
 import { Heart, Loader2 } from 'lucide-react'
 
 export default function KioskLoginPage() {
-  const router = useRouter()
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
 
@@ -21,14 +19,15 @@ export default function KioskLoginPage() {
     try {
       const result = await loginAction(formData)
       if (result.success) {
-        router.push('/kiosk')
-        router.refresh()
+        // Hard redirect so iOS Safari picks up the new session cookie
+        // before the next server render runs the auth check
+        window.location.href = '/kiosk'
       } else {
         setError(result.error ?? 'Sign in failed. Please try again.')
+        setLoading(false)
       }
     } catch {
       setError('Something went wrong. Please try again.')
-    } finally {
       setLoading(false)
     }
   }
