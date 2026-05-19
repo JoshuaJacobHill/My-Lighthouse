@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Loader2,
   ChevronRight,
+  ExternalLink,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import {
@@ -18,7 +19,13 @@ import {
   kioskSignInAction,
   kioskSignOutAction,
   guestSignInAction,
+  kioskGetOnSiteGuestsAction,
+  kioskGuestSignOutAction,
+  type OnSiteGuest,
 } from '@/lib/actions/kiosk.actions'
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+const SAFETY_INFO_URL = 'https://www.lighthousecare.org.au/volunteer-safety'
 
 type Screen =
   | 'home'
@@ -46,7 +53,30 @@ interface KioskClientProps {
   defaultLocationId?: string
 }
 
-const SAFETY_INFO_URL = 'https://www.lighthousecare.org.au/volunteer-safety'
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Mask an email for privacy: sarah.jones@gmail.com → s***s@gmail.com */
+function maskEmail(email: string): string {
+  const at = email.indexOf('@')
+  if (at < 0) return email
+  const local = email.slice(0, at)
+  const domain = email.slice(at) // includes @
+  if (local.length <= 2) return '*'.repeat(local.length) + domain
+  return local[0] + '·'.repeat(Math.min(local.length - 2, 5)) + local[local.length - 1] + domain
+}
+
+/** Format duration since sign-in */
+function signedInFor(isoStr: string): string {
+  try {
+    const diff = Math.round((Date.now() - new Date(isoStr).getTime()) / 60000)
+    if (diff < 60) return `${diff}m`
+    const h = Math.floor(diff / 60)
+    const m = diff % 60
+    return m === 0 ? `${h}h` : `${h}h ${m}m`
+  } catch {
+    return '—'
+  }
+}
 
 // ─── Countdown helper ─────────────────────────────────────────────────────────
 
@@ -95,6 +125,79 @@ function LiveClock() {
   )
 }
 
+// ─── On-site guests table ─────────────────────────────────────────────────────
+
+function OnSiteGuestsTable({
+  guests,
+  signingOut,
+  onSignOut,
+}: {
+  guests: OnSiteGuest[]
+  signingOut: string | null
+  onSignOut: (id: string, name: string) => void
+}) {
+  // Tick every minute to update durations
+  const [, tick] = React.useReducer((n: number) => n + 1, 0)
+  React.useEffect(() => {
+    const interval = setInterval(tick, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (guests.length === 0) return null
+
+  return (
+    <div className="w-full mt-10">
+      <h2 className="text-xl font-bold text-gray-800 mb-3">
+        Guest volunteers on site ({guests.length})
+      </h2>
+      <div className="rounded-2xl border-2 border-gray-200 overflow-hidden">
+        <table className="w-full text-base">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-5 py-3 font-semibold text-gray-600 text-sm uppercase tracking-wide">Name</th>
+              <th className="text-left px-5 py-3 font-semibold text-gray-600 text-sm uppercase tracking-wide hidden sm:table-cell">Signed in</th>
+              <th className="text-left px-5 py-3 font-semibold text-gray-600 text-sm uppercase tracking-wide">Duration</th>
+              <th className="px-5 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {guests.map((g) => (
+              <tr key={g.id} className="bg-white hover:bg-gray-50 transition-colors">
+                <td className="px-5 py-4 font-semibold text-gray-900">
+                  {g.firstName} {g.lastName}
+                  {g.mobile && (
+                    <div className="text-sm text-gray-400 font-normal mt-0.5">{g.mobile}</div>
+                  )}
+                </td>
+                <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">
+                  {format(new Date(g.signInAt), 'h:mm a')}
+                </td>
+                <td className="px-5 py-4 font-semibold text-green-600">
+                  {signedInFor(g.signInAt)}
+                </td>
+                <td className="px-5 py-4 text-right">
+                  <button
+                    onClick={() => onSignOut(g.id, `${g.firstName} ${g.lastName}`)}
+                    disabled={signingOut === g.id}
+                    className="flex items-center gap-2 rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-50 px-4 py-2.5 text-white font-semibold text-sm transition-colors ml-auto"
+                  >
+                    {signingOut === g.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogOut className="h-4 w-4" />
+                    )}
+                    Sign Out
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function KioskClient({ locations, defaultLocationId }: KioskClientProps) {
@@ -130,6 +233,10 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
   const [guestError, setGuestError] = React.useState<string | null>(null)
   const [guestLoading, setGuestLoading] = React.useState(false)
 
+  // On-site guests (for sign-out screen)
+  const [onSiteGuests, setOnSiteGuests] = React.useState<OnSiteGuest[]>([])
+  const [guestSigningOut, setGuestSigningOut] = React.useState<string | null>(null)
+
   const currentLocation = locations.find((l) => l.id === selectedLocationId)
 
   function resetLookup() {
@@ -152,6 +259,14 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
       safetyAcknowledged: false,
     })
     setGuestError(null)
+    setOnSiteGuests([])
+  }
+
+  async function loadOnSiteGuests() {
+    const result = await kioskGetOnSiteGuestsAction()
+    if (result.success && result.guests) {
+      setOnSiteGuests(result.guests)
+    }
   }
 
   async function handleLookup() {
@@ -198,16 +313,6 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
     setActionLoading(true)
     setActionError(null)
 
-    // Find their current open attendance record by doing a sign-in lookup
-    // We need to find the open record — look it up via the sign-out action passing volunteerId
-    // The kioskSignOutAction takes an attendanceRecordId so we need a lookup
-    // We'll use a separate lookup approach: find the open record via lookup then sign out
-    // For now, call with a special pattern — we need the attendanceId
-    // Since we don't have it here, we need to fetch it. Let's do a fresh lookup via an API route
-    // or we can store it. The cleanest solution: after finding volunteer, fetch open record.
-
-    // For MVP: pass volunteerId to a wrapper — since kiosk actions only expose attendanceRecordId,
-    // we need to query the open record. We'll do this inline.
     const response = await fetch(`/api/kiosk/open-attendance?volunteerId=${volunteer.id}`)
     const data = await response.json()
     setActionLoading(false)
@@ -229,6 +334,21 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
     setConfirmedName(`${volunteer.firstName} ${volunteer.lastName}`)
     setConfirmedDuration(result.durationLabel ?? '')
     resetLookup()
+    setScreen('signout-confirm')
+  }
+
+  async function handleGuestSignOut(guestId: string, guestName: string) {
+    setGuestSigningOut(guestId)
+    const result = await kioskGuestSignOutAction(guestId)
+    setGuestSigningOut(null)
+
+    if (!result.success) {
+      setActionError(result.error ?? 'Sign-out failed.')
+      return
+    }
+
+    setConfirmedName(guestName)
+    setConfirmedDuration(result.durationLabel ?? '')
     setScreen('signout-confirm')
   }
 
@@ -296,141 +416,14 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
     )
   }
 
-  if (screen === 'lookup-signin' || screen === 'lookup-signout') {
-    const isSignIn = screen === 'lookup-signin'
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
-        <div className="bg-orange-500 px-6 py-5 flex items-center gap-4">
-          <button
-            onClick={goHome}
-            className="flex items-center gap-2 text-orange-100 hover:text-white transition-colors rounded-lg p-2 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-6 w-6" />
-            <span className="text-lg font-medium">Back</span>
-          </button>
-          <div className="flex-1 text-center">
-            <h1 className="text-2xl font-bold text-white">
-              {isSignIn ? 'Volunteer Sign In' : 'Volunteer Sign Out'}
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col items-center px-6 py-10 max-w-2xl mx-auto w-full">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-            Find your name
-          </h2>
-          <p className="text-gray-500 text-center mb-8 text-lg">
-            Enter your email address or mobile number
-          </p>
-
-          {/* Search input */}
-          <div className="w-full mb-4">
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value)
-                  setLookupResults(null)
-                  setLookupError(null)
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
-                placeholder="Email or mobile number…"
-                autoFocus
-                className="flex-1 rounded-xl border-2 border-gray-300 px-5 py-4 text-xl text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-0"
-              />
-              <button
-                onClick={handleLookup}
-                disabled={!query.trim() || lookupLoading}
-                className="flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-4 text-white text-xl font-semibold hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {lookupLoading ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : (
-                  <Search className="h-6 w-6" />
-                )}
-                Search
-              </button>
-            </div>
-          </div>
-
-          {/* Error */}
-          {lookupError && (
-            <div className="w-full rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-red-700 text-lg mb-4">
-              {lookupError}
-            </div>
-          )}
-
-          {/* Action error */}
-          {actionError && (
-            <div className="w-full rounded-xl bg-orange-50 border border-orange-200 px-5 py-4 text-orange-700 text-lg mb-4">
-              {actionError}
-            </div>
-          )}
-
-          {/* Results */}
-          {lookupResults !== null && (
-            <div className="w-full">
-              {lookupResults.length === 0 ? (
-                <div className="text-center py-10">
-                  <p className="text-gray-500 text-xl">
-                    No volunteers found matching that search.
-                  </p>
-                  <p className="text-gray-400 mt-2">
-                    Please check your details or see a staff member.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-gray-600 font-medium mb-4 text-lg">
-                    {lookupResults.length === 1
-                      ? '1 volunteer found — is this you?'
-                      : `${lookupResults.length} volunteers found — select your name:`}
-                  </p>
-                  {lookupResults.map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => {
-                        setSelectedVolunteer(v)
-                        if (isSignIn) {
-                          handleSignIn(v)
-                        } else {
-                          handleSignOut(v)
-                        }
-                      }}
-                      disabled={actionLoading}
-                      className="w-full flex items-center justify-between rounded-xl border-2 border-gray-200 bg-white px-6 py-5 text-left hover:border-orange-400 hover:bg-orange-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                    >
-                      <div>
-                        <div className="text-xl font-semibold text-gray-900">
-                          {v.firstName} {v.lastName}
-                        </div>
-                        <div className="text-gray-500 text-sm mt-0.5">{v.email}</div>
-                      </div>
-                      {actionLoading && selectedVolunteer?.id === v.id ? (
-                        <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
-                      ) : (
-                        <ChevronRight className="h-6 w-6 text-gray-400 group-hover:text-orange-500 transition-colors" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
+  // ─── Guest sign-in screen ──────────────────────────────────────────────────
 
   if (screen === 'guest-signin') {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
         <div className="bg-amber-500 px-6 py-5 flex items-center gap-4">
           <button
-            onClick={goHome}
+            onClick={() => setScreen('lookup-signin')}
             className="flex items-center gap-2 text-amber-100 hover:text-white transition-colors rounded-lg p-2 hover:bg-white/10"
           >
             <ArrowLeft className="h-6 w-6" />
@@ -581,6 +574,177 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
     )
   }
 
+  // ─── Sign in / Sign out lookup screen ─────────────────────────────────────
+
+  if (screen === 'lookup-signin' || screen === 'lookup-signout') {
+    const isSignIn = screen === 'lookup-signin'
+
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        {/* Header */}
+        <div className="bg-orange-500 px-6 py-5 flex items-center gap-4">
+          <button
+            onClick={goHome}
+            className="flex items-center gap-2 text-orange-100 hover:text-white transition-colors rounded-lg p-2 hover:bg-white/10"
+          >
+            <ArrowLeft className="h-6 w-6" />
+            <span className="text-lg font-medium">Back</span>
+          </button>
+          <div className="flex-1 text-center">
+            <h1 className="text-2xl font-bold text-white">
+              {isSignIn ? 'Volunteer Sign In' : 'Volunteer Sign Out'}
+            </h1>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center px-6 py-10 max-w-2xl mx-auto w-full">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+            Find your name
+          </h2>
+          <p className="text-gray-500 text-center mb-8 text-lg">
+            Enter your name, email address or mobile number
+          </p>
+
+          {/* Search input */}
+          <div className="w-full mb-4">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  setLookupResults(null)
+                  setLookupError(null)
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
+                placeholder="Name, email or mobile number…"
+                autoFocus
+                className="flex-1 rounded-xl border-2 border-gray-300 px-5 py-4 text-xl text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-0"
+              />
+              <button
+                onClick={handleLookup}
+                disabled={!query.trim() || lookupLoading}
+                className="flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-4 text-white text-xl font-semibold hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {lookupLoading ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <Search className="h-6 w-6" />
+                )}
+                Search
+              </button>
+            </div>
+          </div>
+
+          {/* Errors */}
+          {lookupError && (
+            <div className="w-full rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-red-700 text-lg mb-4">
+              {lookupError}
+            </div>
+          )}
+          {actionError && (
+            <div className="w-full rounded-xl bg-orange-50 border border-orange-200 px-5 py-4 text-orange-700 text-lg mb-4">
+              {actionError}
+            </div>
+          )}
+
+          {/* Search results */}
+          {lookupResults !== null && (
+            <div className="w-full">
+              {lookupResults.length === 0 ? (
+                /* No results — prompt to sign up (sign-in only) or see staff */
+                <div className="text-center py-8">
+                  <p className="text-gray-600 text-xl font-semibold mb-2">
+                    No volunteers found.
+                  </p>
+                  {isSignIn ? (
+                    <>
+                      <p className="text-gray-400 mb-6">
+                        Check your spelling, or ask a staff member for help.
+                      </p>
+                      <a
+                        href={`${APP_URL}/signup`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl border-2 border-orange-300 bg-orange-50 px-6 py-4 text-orange-700 font-semibold text-lg hover:bg-orange-100 transition-colors"
+                      >
+                        <ExternalLink className="h-5 w-5" />
+                        Not registered yet? Sign up here
+                      </a>
+                    </>
+                  ) : (
+                    <p className="text-gray-400">
+                      Please check your details or see a staff member.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-gray-600 font-medium mb-4 text-lg">
+                    {lookupResults.length === 1
+                      ? '1 volunteer found — is this you?'
+                      : `${lookupResults.length} volunteers found — select your name:`}
+                  </p>
+                  {lookupResults.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        setSelectedVolunteer(v)
+                        if (isSignIn) {
+                          handleSignIn(v)
+                        } else {
+                          handleSignOut(v)
+                        }
+                      }}
+                      disabled={actionLoading}
+                      className="w-full flex items-center justify-between rounded-xl border-2 border-gray-200 bg-white px-6 py-5 text-left hover:border-orange-400 hover:bg-orange-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                    >
+                      <div>
+                        <div className="text-xl font-semibold text-gray-900">
+                          {v.firstName} {v.lastName}
+                        </div>
+                        {/* Masked email for privacy */}
+                        <div className="text-gray-400 text-sm mt-0.5">{maskEmail(v.email)}</div>
+                      </div>
+                      {actionLoading && selectedVolunteer?.id === v.id ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+                      ) : (
+                        <ChevronRight className="h-6 w-6 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Guest sign-in link (sign-in screen only) */}
+          {isSignIn && (
+            <div className="w-full mt-8 pt-8 border-t border-gray-200 text-center">
+              <p className="text-gray-500 mb-3">First time here?</p>
+              <button
+                onClick={() => setScreen('guest-signin')}
+                className="inline-flex items-center gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 px-6 py-4 text-amber-800 font-semibold text-lg hover:bg-amber-100 transition-colors"
+              >
+                <UserPlus className="h-5 w-5" />
+                Sign in as a guest volunteer
+              </button>
+            </div>
+          )}
+
+          {/* On-site guests table (sign-out screen only) */}
+          {!isSignIn && (
+            <OnSiteGuestsTable
+              guests={onSiteGuests}
+              signingOut={guestSigningOut}
+              onSignOut={handleGuestSignOut}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // ─── Home screen ──────────────────────────────────────────────────────────
 
   return (
@@ -597,7 +761,6 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
             priority
           />
         </div>
-
         <LiveClock />
       </div>
 
@@ -631,8 +794,8 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
             {currentLocation ? `Signing in at ${currentLocation.name}` : 'Select your action below'}
           </p>
 
-          {/* Primary actions */}
-          <div className="space-y-4 mb-6">
+          <div className="space-y-4">
+            {/* Sign In */}
             <button
               onClick={() => {
                 resetLookup()
@@ -647,10 +810,12 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
               <LogIn className="h-12 w-12 text-orange-200 shrink-0" aria-hidden="true" />
             </button>
 
+            {/* Sign Out */}
             <button
               onClick={() => {
                 resetLookup()
                 setScreen('lookup-signout')
+                loadOnSiteGuests()
               }}
               className="w-full flex items-center justify-between rounded-2xl bg-white border-2 border-gray-200 px-8 py-7 text-gray-900 hover:border-orange-300 hover:bg-orange-50 active:scale-[0.99] transition-all shadow-sm"
             >
@@ -661,18 +826,6 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
               <LogOut className="h-12 w-12 text-gray-400 shrink-0" aria-hidden="true" />
             </button>
           </div>
-
-          {/* Guest sign in */}
-          <button
-            onClick={() => setScreen('guest-signin')}
-            className="w-full flex items-center justify-between rounded-2xl bg-amber-50 border-2 border-amber-200 px-8 py-5 text-amber-800 hover:bg-amber-100 hover:border-amber-300 active:scale-[0.99] transition-all"
-          >
-            <div className="text-left">
-              <div className="text-xl font-bold">Guest Sign In</div>
-              <div className="text-amber-600 mt-0.5">First time? Sign in as a guest volunteer</div>
-            </div>
-            <UserPlus className="h-9 w-9 text-amber-500 shrink-0" aria-hidden="true" />
-          </button>
         </div>
       </div>
 
@@ -711,7 +864,7 @@ function ConfirmScreen({
             Welcome, {name}!
           </h1>
           <p className="text-orange-200 text-2xl">
-            You&apos;re signed in at {location}
+            {location ? `You're signed in at ${location}` : "You're signed in"}
           </p>
           {time && (
             <p className="text-orange-300 text-xl mt-2">

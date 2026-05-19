@@ -323,3 +323,80 @@ export async function guestSignInAction(data: GuestSignInData): Promise<
     return { success: false, error: 'Guest sign-in failed. Please try again.' }
   }
 }
+
+// ─── On-site guests (kiosk) ───────────────────────────────────────────────────
+
+export interface OnSiteGuest {
+  id: string
+  firstName: string
+  lastName: string
+  mobile: string | null
+  signInAt: string // ISO string
+}
+
+export async function kioskGetOnSiteGuestsAction(): Promise<
+  ActionResult & { guests?: OnSiteGuest[] }
+> {
+  try {
+    await requireKioskSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    const records = await prisma.guestAttendanceRecord.findMany({
+      where: { signOutAt: null },
+      select: { id: true, firstName: true, lastName: true, mobile: true, signInAt: true },
+      orderBy: { signInAt: 'asc' },
+    })
+
+    return {
+      success: true,
+      guests: records.map((r) => ({
+        ...r,
+        signInAt: r.signInAt.toISOString(),
+      })),
+    }
+  } catch (err) {
+    console.error('[kioskGetOnSiteGuestsAction]', err)
+    return { success: false, error: 'Failed to fetch on-site guests.' }
+  }
+}
+
+// ─── Guest sign-out (kiosk) ───────────────────────────────────────────────────
+
+export async function kioskGuestSignOutAction(
+  guestId: string
+): Promise<ActionResult & { durationLabel?: string }> {
+  try {
+    await requireKioskSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    const record = await prisma.guestAttendanceRecord.findUnique({ where: { id: guestId } })
+    if (!record) return { success: false, error: 'Guest record not found.' }
+    if (record.signOutAt) return { success: false, error: 'Guest has already been signed out.' }
+
+    const signOutAt = new Date()
+    const durationMins = Math.round(
+      (signOutAt.getTime() - record.signInAt.getTime()) / 1000 / 60
+    )
+
+    await prisma.guestAttendanceRecord.update({
+      where: { id: guestId },
+      data: { signOutAt, durationMins },
+    })
+
+    const hours = Math.floor(durationMins / 60)
+    const mins = durationMins % 60
+    const durationLabel =
+      hours === 0 ? `${mins}m` : mins === 0 ? `${hours}h` : `${hours}h ${mins}m`
+
+    return { success: true, durationLabel }
+  } catch (err) {
+    console.error('[kioskGuestSignOutAction]', err)
+    return { success: false, error: 'Failed to sign out guest.' }
+  }
+}
