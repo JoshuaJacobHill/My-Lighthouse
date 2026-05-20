@@ -581,6 +581,44 @@ export async function deleteQuizQuestionAction(id: string): Promise<ActionResult
   }
 }
 
+// ─── Admin availability update ───────────────────────────────────────────────
+
+export async function adminUpdateAvailabilityAction(
+  volunteerId: string,
+  data: { availability: Array<{ dayOfWeek: string; timePeriod: string; startTime: string; endTime: string }> }
+): Promise<ActionResult> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.$transaction(async (tx: any) => {
+      await tx.volunteerAvailability.deleteMany({ where: { volunteerId } })
+
+      if (data.availability.length > 0) {
+        await tx.volunteerAvailability.createMany({
+          data: data.availability.map((a) => ({
+            volunteerId,
+            dayOfWeek: a.dayOfWeek as never,
+            timePeriod: a.timePeriod as never,
+            startTime: a.startTime,
+            endTime: a.endTime,
+          })),
+          skipDuplicates: true,
+        })
+      }
+    })
+
+    return { success: true }
+  } catch (err) {
+    console.error('[adminUpdateAvailabilityAction]', err)
+    return { success: false, error: 'Failed to update availability. Please try again.' }
+  }
+}
+
 // ─── Export volunteers CSV ────────────────────────────────────────────────────
 
 export async function exportVolunteersCSVAction(): Promise<{

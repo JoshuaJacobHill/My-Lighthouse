@@ -4,7 +4,9 @@ import { ArrowLeft, Mail, Phone, MapPin, Calendar, User, AlertCircle } from 'luc
 import prisma from '@/lib/prisma'
 import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
-import { AvailabilityCheckboxGrid, type AvailabilityPeriodMap, type DayOfWeek, type AvailabilityPeriodKey } from '@/components/volunteer/AvailabilityCheckboxGrid'
+import { type AvailabilityPeriodMap, type DayOfWeek, type AvailabilityPeriodKey } from '@/components/volunteer/AvailabilityCheckboxGrid'
+import { AdminAvailabilityEditor } from '@/components/admin/AdminAvailabilityEditor'
+import { AdminShiftsTab } from '@/components/admin/AdminShiftsTab'
 import { VolunteerTabs } from '@/components/admin/VolunteerTabs'
 import { ChangeStatusModal } from '@/components/admin/ChangeStatusModal'
 import { AddNoteModal } from '@/components/admin/AddNoteModal'
@@ -12,7 +14,6 @@ import { SendEmailModal } from '@/components/admin/SendEmailModal'
 import { OnboardingForm } from '@/components/admin/OnboardingForm'
 import { DeleteVolunteerButton } from '@/components/admin/DeleteVolunteerButton'
 import { formatDate, formatDateTime, formatDuration } from '@/lib/utils'
-import { VOLUNTEER_STATUSES, SHIFT_ASSIGNMENT_STATUSES } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +53,12 @@ export default async function VolunteerProfilePage({
   })
 
   if (!volunteer) notFound()
+
+  const locations = await prisma.location.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, name: true },
+  })
 
   const fullName = `${volunteer.firstName} ${volunteer.lastName}`
 
@@ -156,40 +163,30 @@ export default async function VolunteerProfilePage({
   )
 
   const availabilityTab = (
-    <AvailabilityCheckboxGrid value={availabilityPeriods} readOnly />
+    <AdminAvailabilityEditor
+      volunteerId={volunteer.id}
+      initialAvailability={availabilityPeriods}
+    />
   )
 
+  const serialisedAssignments = volunteer.shiftAssignments.map((a) => ({
+    id: a.id,
+    status: a.status,
+    shift: {
+      date: a.shift.date.toISOString(),
+      startTime: a.shift.startTime.toISOString(),
+      endTime: a.shift.endTime.toISOString(),
+      location: { name: a.shift.location.name },
+      department: a.shift.department ? { name: a.shift.department.name } : null,
+    },
+  }))
+
   const shiftsTab = (
-    volunteer.shiftAssignments.length === 0 ? (
-      <EmptyState message="No shift assignments recorded yet." />
-    ) : (
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Location</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 hidden md:table-cell">Department</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {volunteer.shiftAssignments.map((a) => (
-              <tr key={a.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-900">{formatDate(a.shift.date)}</td>
-                <td className="px-4 py-3 text-gray-600">{a.shift.location.name}</td>
-                <td className="px-4 py-3 text-gray-600 hidden md:table-cell">
-                  {a.shift.department?.name ?? '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <ShiftStatusBadge status={a.status} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )
+    <AdminShiftsTab
+      volunteerId={volunteer.id}
+      initialAssignments={serialisedAssignments}
+      locations={locations}
+    />
   )
 
   const attendanceTab = (
@@ -446,22 +443,6 @@ function EmptyState({ message }: { message: string }) {
   )
 }
 
-function ShiftStatusBadge({ status }: { status: string }) {
-  const colours: Record<string, string> = {
-    SCHEDULED: 'bg-blue-100 text-blue-800',
-    CONFIRMED: 'bg-green-100 text-green-800',
-    CANCELLED_BY_VOLUNTEER: 'bg-gray-100 text-gray-700',
-    ATTENDED: 'bg-orange-100 text-orange-700',
-    NO_SHOW: 'bg-red-100 text-red-800',
-    ADMIN_CANCELLED: 'bg-orange-100 text-orange-800',
-  }
-  const labels: Record<string, string> = SHIFT_ASSIGNMENT_STATUSES
-  return (
-    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${colours[status] ?? 'bg-gray-100 text-gray-700'}`}>
-      {labels[status] ?? status}
-    </span>
-  )
-}
 
 function EmailStatusBadge({ status }: { status: string }) {
   const colours: Record<string, string> = {

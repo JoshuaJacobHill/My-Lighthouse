@@ -21,6 +21,8 @@ interface GuestSignInData {
   lastName: string
   mobile?: string
   email?: string
+  organisation?: string
+  isCorporateDay?: boolean
   emergencyContact?: string
   safetyAcknowledged: boolean
   locationId?: string
@@ -278,6 +280,8 @@ export async function guestSignInAction(data: GuestSignInData): Promise<
         lastName: data.lastName.trim(),
         mobile: data.mobile?.trim() ?? null,
         email: data.email?.trim() ?? null,
+        organisation: data.organisation?.trim() ?? null,
+        isCorporateDay: data.isCorporateDay ?? false,
         volunteerArea: null,
         emergencyContact: data.emergencyContact?.trim() ?? null,
         safetyAcknowledged: data.safetyAcknowledged,

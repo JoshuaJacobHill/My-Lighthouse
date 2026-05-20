@@ -419,6 +419,8 @@ model GuestAttendanceRecord {
   mobile             String?
   email              String?
   volunteerArea      String?
+  organisation       String?
+  isCorporateDay     Boolean   @default(false)
   emergencyContact   String?
   safetyAcknowledged Boolean   @default(false)
   locationId         String?

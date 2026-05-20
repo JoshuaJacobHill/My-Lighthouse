@@ -566,3 +566,118 @@ export async function editShiftBookingAction(
     return { success: false, error: 'Failed to update booking. Please try again.' }
   }
 }
+
+// ─── Admin: book a shift for a volunteer ─────────────────────────────────────
+
+async function requireAdminSessionForShifts(): Promise<void> {
+  const session = await getSession()
+  if (!session) throw new Error('Not authenticated')
+  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') throw new Error('Insufficient permissions')
+}
+
+export async function adminBookShiftForVolunteerAction(
+  volunteerId: string,
+  input: { locationId: string; date: string; startTime: string; endTime: string; frequency: 'ONCE' | 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY' }
+): Promise<ActionResult> {
+  try {
+    await requireAdminSessionForShifts()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  const { locationId, date, startTime, endTime, frequency } = input
+  // Map from admin frequency values to internal values
+  const internalFreq: RecurringFrequency = frequency === 'ONCE' ? 'ONE_OFF' : frequency
+
+  try {
+    const location = await prisma.location.findUnique({ where: { id: locationId } })
+    if (!location) return { success: false, error: 'Location not found.' }
+
+    const volunteer = await prisma.volunteerProfile.findUnique({
+      where: { id: volunteerId },
+      select: { id: true },
+    })
+    if (!volunteer) return { success: false, error: 'Volunteer not found.' }
+
+    async function bookAssignment(shiftId: string): Promise<boolean> {
+      const existing = await prisma.shiftAssignment.findUnique({
+        where: { shiftId_volunteerId: { shiftId, volunteerId } },
+      })
+      if (existing) {
+        if (existing.status !== 'CANCELLED_BY_VOLUNTEER' && existing.status !== 'ADMIN_CANCELLED') {
+          return false
+        }
+        await prisma.shiftAssignment.update({
+          where: { id: existing.id },
+          data: { status: 'SCHEDULED', cancelledAt: null, cancelReason: null },
+        })
+        return true
+      }
+      await prisma.shiftAssignment.create({
+        data: { shiftId, volunteerId, status: 'SCHEDULED' },
+      })
+      return true
+    }
+
+    const anchorShiftId = await findOrCreateShiftRecord(locationId, date, startTime, endTime)
+    const anchorBooked = await bookAssignment(anchorShiftId)
+    if (!anchorBooked) {
+      return { success: false, error: 'Volunteer is already booked for this shift.' }
+    }
+
+    let bookedCount = 1
+
+    if (internalFreq !== 'ONE_OFF') {
+      const FREQ_DAYS: Record<Exclude<RecurringFrequency, 'ONE_OFF'>, number> = {
+        WEEKLY: 7,
+        FORTNIGHTLY: 14,
+        MONTHLY: 28,
+      }
+      const freqDays = FREQ_DAYS[internalFreq]
+      const anchorMs = new Date(date).getTime()
+
+      for (let i = 1; i <= 12; i++) {
+        const futureMs = anchorMs + i * freqDays * 86_400_000
+        const futureDate = new Date(futureMs)
+        if (futureDate.getUTCDay() === 0) continue
+        const futureDateStr = futureDate.toISOString().slice(0, 10)
+        const futureShiftId = await findOrCreateShiftRecord(locationId, futureDateStr, startTime, endTime)
+        const booked = await bookAssignment(futureShiftId)
+        if (booked) bookedCount++
+      }
+    }
+
+    return { success: true, bookedCount }
+  } catch (err) {
+    console.error('[adminBookShiftForVolunteerAction]', err)
+    return { success: false, error: 'Failed to book shift. Please try again.' }
+  }
+}
+
+// ─── Admin: cancel a shift assignment ────────────────────────────────────────
+
+export async function adminCancelShiftAssignmentAction(assignmentId: string): Promise<ActionResult> {
+  try {
+    await requireAdminSessionForShifts()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    const assignment = await prisma.shiftAssignment.findUnique({
+      where: { id: assignmentId },
+    })
+
+    if (!assignment) return { success: false, error: 'Assignment not found.' }
+
+    await prisma.shiftAssignment.update({
+      where: { id: assignmentId },
+      data: { status: 'ADMIN_CANCELLED', cancelledAt: new Date() },
+    })
+
+    return { success: true }
+  } catch (err) {
+    console.error('[adminCancelShiftAssignmentAction]', err)
+    return { success: false, error: 'Failed to cancel assignment. Please try again.' }
+  }
+}

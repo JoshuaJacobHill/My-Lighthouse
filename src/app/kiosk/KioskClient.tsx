@@ -227,6 +227,8 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
     lastName: '',
     mobile: '',
     email: '',
+    organisation: '',
+    isCorporateDay: false,
     emergencyContact: '',
     safetyAcknowledged: false,
   })
@@ -255,6 +257,8 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
       lastName: '',
       mobile: '',
       email: '',
+      organisation: '',
+      isCorporateDay: false,
       emergencyContact: '',
       safetyAcknowledged: false,
     })
@@ -372,6 +376,8 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
       lastName: guestForm.lastName.trim(),
       mobile: guestForm.mobile.trim() || undefined,
       email: guestForm.email.trim() || undefined,
+      organisation: guestForm.organisation.trim() || undefined,
+      isCorporateDay: guestForm.isCorporateDay,
       emergencyContact: guestForm.emergencyContact.trim() || undefined,
       safetyAcknowledged: guestForm.safetyAcknowledged,
       locationId: selectedLocationId || undefined,
@@ -498,6 +504,33 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
                 placeholder="sarah@example.com"
               />
             </div>
+
+            <div>
+              <label className="block text-base font-semibold text-gray-700 mb-2">
+                Organisation <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={guestForm.organisation}
+                onChange={(e) => setGuestForm((p) => ({ ...p, organisation: e.target.value }))}
+                className="w-full rounded-xl border-2 border-gray-300 px-4 py-4 text-lg text-gray-900 focus:border-amber-500 focus:outline-none"
+                placeholder="e.g. Acme Corp, Brisbane City Council"
+              />
+            </div>
+
+            {/* Corporate volunteer day */}
+            <label className="flex items-start gap-4 cursor-pointer rounded-xl border-2 border-gray-200 bg-white px-5 py-4 hover:border-amber-300 transition-colors">
+              <input
+                type="checkbox"
+                checked={guestForm.isCorporateDay}
+                onChange={(e) => setGuestForm((p) => ({ ...p, isCorporateDay: e.target.checked }))}
+                className="mt-1 h-6 w-6 rounded border-2 border-gray-300 text-amber-500 focus:ring-amber-500 cursor-pointer shrink-0"
+              />
+              <div>
+                <span className="text-base font-semibold text-gray-800">Corporate volunteer day</span>
+                <p className="text-sm text-gray-500 mt-0.5">Tick this if you&apos;re here as part of a corporate or community group volunteer day.</p>
+              </div>
+            </label>
 
             <div>
               <label className="block text-base font-semibold text-gray-700 mb-2">
@@ -829,8 +862,19 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
         </div>
       </div>
 
-      <div className="py-4 text-center text-xs text-gray-400">
-        Making lives better so that together we can make the world better.
+      <div className="py-4 text-center text-xs text-gray-400 space-y-1">
+        <p>Making lives better so that together we can make the world better.</p>
+        <p>
+          New volunteer?{' '}
+          <a
+            href={`${APP_URL}/signup`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-orange-400 hover:text-orange-600 underline"
+          >
+            Sign up here
+          </a>
+        </p>
       </div>
     </div>
   )
