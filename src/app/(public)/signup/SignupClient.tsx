@@ -148,12 +148,12 @@ function Step1({
         autoComplete="email"
       />
       <Input
-        label="Mobile number *"
+        label="Phone number *"
         type="tel"
         value={data.mobile}
         onChange={(e) => onChange({ mobile: e.target.value })}
-        placeholder="04XX XXX XXX"
-        hint="Australian mobile number (e.g. 0412 345 678)"
+        placeholder="04XX XXX XXX or 07 xxxx xxxx"
+        hint="Australian mobile or landline (e.g. 0412 345 678 or 07 3123 4567)"
         error={errors.mobile}
         autoComplete="tel"
       />
@@ -731,9 +731,9 @@ export default function SignupClient() {
       if (!formData.lastName.trim()) errs.lastName = 'Last name is required'
       if (!formData.email.trim()) errs.email = 'Email address is required'
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Please enter a valid email address'
-      if (!formData.mobile.trim()) errs.mobile = 'Mobile number is required'
-      else if (!/^(\+61|0)[4-5]\d{8}$/.test(formData.mobile.replace(/\s/g, '')))
-        errs.mobile = 'Please enter a valid Australian mobile number'
+      if (!formData.mobile.trim()) errs.mobile = 'Phone number is required'
+      else if (!/^(\+61|0)[234578]\d{8}$/.test(formData.mobile.replace(/\s/g, '')))
+        errs.mobile = 'Please enter a valid Australian phone number (mobile or landline)'
       if (!formData.preferredStore) errs.preferredStore = 'Please select your preferred store'
       if (formData.postcode && !/^\d{4}$/.test(formData.postcode))
         errs.postcode = 'Postcode must be 4 digits'

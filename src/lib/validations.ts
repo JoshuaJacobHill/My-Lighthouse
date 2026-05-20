@@ -29,9 +29,9 @@ export const volunteerSignupSchema = z.object({
   email: z.email('Please enter a valid email address'),
   mobile: z
     .string()
-    .min(10, 'Please enter a valid Australian mobile number')
+    .min(10, 'Please enter a valid Australian phone number')
     .max(15)
-    .regex(/^(\+61|0)[4-5]\d{8}$/, 'Please enter a valid Australian mobile number'),
+    .regex(/^(\+61|0)[234578]\d{8}$/, 'Please enter a valid Australian phone number (mobile or landline)'),
   dateOfBirth: z.string().optional(),
 
   // Address
@@ -92,9 +92,9 @@ export const profileUpdateSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(100),
   mobile: z
     .string()
-    .min(10, 'Please enter a valid Australian mobile number')
+    .min(10, 'Please enter a valid Australian phone number')
     .max(15)
-    .regex(/^(\+61|0)[4-5]\d{8}$/, 'Please enter a valid Australian mobile number'),
+    .regex(/^(\+61|0)[234578]\d{8}$/, 'Please enter a valid Australian phone number (mobile or landline)'),
   dateOfBirth: z.string().optional(),
 
   // Address

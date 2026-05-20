@@ -167,7 +167,7 @@ export default async function EditVolunteerPage({
 
           <div>
             <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-1">
-              Mobile <span className="text-red-500">*</span>
+              Phone <span className="text-red-500">*</span>
             </label>
             <input
               id="mobile"
@@ -175,7 +175,7 @@ export default async function EditVolunteerPage({
               type="tel"
               required
               defaultValue={volunteer.mobile}
-              placeholder="04xx xxx xxx"
+              placeholder="04xx xxx xxx or 07 xxxx xxxx"
               className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
             />
           </div>

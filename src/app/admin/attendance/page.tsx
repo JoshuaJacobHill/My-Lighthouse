@@ -3,6 +3,7 @@ import { startOfWeek, startOfMonth, subDays } from 'date-fns'
 import prisma from '@/lib/prisma'
 import { formatDate, formatDateTime, formatDuration } from '@/lib/utils'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
+import { AttendanceTableClient, type AttendanceRow } from '@/components/admin/AttendanceTableClient'
 import { clsx } from 'clsx'
 
 export const dynamic = 'force-dynamic'
@@ -112,7 +113,7 @@ export default async function AttendancePage({
     signOutAt: Date | null
     durationMins: number | null
     volunteer: { firstName: string; lastName: string; id: string }
-    location: { name: string } | null
+    location: { id: string; name: string } | null
   }> = []
 
   // ── No-shows ────────────────────────────────────────────────────────────────
@@ -150,15 +151,20 @@ export default async function AttendancePage({
     location: { name: string } | null
   }> = []
 
+  const locations = await prisma.location.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, name: true },
+  })
+
   if (activeTab === 'all') {
     allAttendance = await prisma.attendanceRecord.findMany({
       where: {
         ...(dateFilter ? { signInAt: dateFilter } : {}),
-        signOutAt: { not: null },
       },
       include: {
         volunteer: { select: { id: true, firstName: true, lastName: true } },
-        location: { select: { name: true } },
+        location: { select: { id: true, name: true } },
       },
       orderBy: { signInAt: 'desc' },
       take: 200,
@@ -243,7 +249,18 @@ export default async function AttendancePage({
 
       {/* Content */}
       {activeTab === 'all' && (
-        <AttendanceTable records={allAttendance} />
+        <AttendanceTableClient
+          records={allAttendance.map((r): AttendanceRow => ({
+            id: r.id,
+            signInAt: r.signInAt.toISOString(),
+            signOutAt: r.signOutAt?.toISOString() ?? null,
+            durationMins: r.durationMins,
+            volunteer: r.volunteer,
+            location: r.location,
+          }))}
+          locations={locations}
+          totalMins={allAttendance.reduce((s, r) => s + (r.durationMins ?? 0), 0)}
+        />
       )}
       {activeTab === 'no-shows' && (
         <NoShowsTable records={noShows} />
@@ -268,74 +285,6 @@ function EmptyState({ message }: { message: string }) {
   )
 }
 
-function AttendanceTable({
-  records,
-}: {
-  records: Array<{
-    id: string
-    signInAt: Date
-    signOutAt: Date | null
-    durationMins: number | null
-    volunteer: { id: string; firstName: string; lastName: string }
-    location: { name: string } | null
-  }>
-}) {
-  if (records.length === 0) {
-    return <EmptyState message="No completed attendance records in this period." />
-  }
-
-  const totalMins = records.reduce((sum, r) => sum + (r.durationMins ?? 0), 0)
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-gray-600">
-        {records.length} record{records.length !== 1 ? 's' : ''} &mdash; total hours:{' '}
-        <strong>{formatDuration(totalMins)}</strong>
-      </p>
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Volunteer</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 hidden md:table-cell">Sign In</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 hidden md:table-cell">Sign Out</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 hidden lg:table-cell">Location</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {records.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/volunteers/${r.volunteer.id}`}
-                      className="font-medium text-orange-600 hover:text-orange-700"
-                    >
-                      {r.volunteer.firstName} {r.volunteer.lastName}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{formatDate(r.signInAt)}</td>
-                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{formatDateTime(r.signInAt)}</td>
-                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell">
-                    {r.signOutAt ? formatDateTime(r.signOutAt) : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-900">
-                    {r.durationMins != null ? formatDuration(r.durationMins) : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">
-                    {r.location?.name ?? '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function NoShowsTable({
   records,
