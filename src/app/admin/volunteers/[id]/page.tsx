@@ -7,13 +7,14 @@ import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { type AvailabilityPeriodMap, type DayOfWeek, type AvailabilityPeriodKey } from '@/components/volunteer/AvailabilityCheckboxGrid'
 import { AdminAvailabilityEditor } from '@/components/admin/AdminAvailabilityEditor'
 import { AdminShiftsTab } from '@/components/admin/AdminShiftsTab'
+import { AdminAttendanceTab } from '@/components/admin/AdminAttendanceTab'
 import { VolunteerTabs } from '@/components/admin/VolunteerTabs'
 import { ChangeStatusModal } from '@/components/admin/ChangeStatusModal'
 import { AddNoteModal } from '@/components/admin/AddNoteModal'
 import { SendEmailModal } from '@/components/admin/SendEmailModal'
 import { OnboardingForm } from '@/components/admin/OnboardingForm'
 import { DeleteVolunteerButton } from '@/components/admin/DeleteVolunteerButton'
-import { formatDate, formatDateTime, formatDuration } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,51 +191,18 @@ export default async function VolunteerProfilePage({
   )
 
   const attendanceTab = (
-    <div className="space-y-4">
-      <p className="text-sm font-medium text-gray-700">
-        Total volunteer hours:{' '}
-        <span className="font-bold text-orange-600">{formatDuration(totalMins)}</span>
-      </p>
-      {volunteer.attendanceRecords.length === 0 ? (
-        <EmptyState message="No attendance records found." />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Sign In</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Sign Out</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 hidden md:table-cell">Duration</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 hidden lg:table-cell">Location</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {volunteer.attendanceRecords.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-900">{formatDate(r.signInAt)}</td>
-                  <td className="px-4 py-3 text-gray-600">{formatDateTime(r.signInAt)}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {r.signOutAt ? formatDateTime(r.signOutAt) : (
-                      <span className="inline-flex items-center gap-1 text-green-700">
-                        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                        On site
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 hidden md:table-cell">
-                    {r.durationMins != null ? formatDuration(r.durationMins) : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">
-                    {r.location?.name ?? '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+    <AdminAttendanceTab
+      volunteerId={volunteer.id}
+      totalMins={totalMins}
+      locations={locations}
+      initialRecords={volunteer.attendanceRecords.map((r) => ({
+        id: r.id,
+        signInAt: r.signInAt.toISOString(),
+        signOutAt: r.signOutAt?.toISOString() ?? null,
+        durationMins: r.durationMins,
+        location: r.location ? { id: r.location.id, name: r.location.name } : null,
+      }))}
+    />
   )
 
   const notesTab = (

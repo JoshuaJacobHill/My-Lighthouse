@@ -720,3 +720,116 @@ export async function exportVolunteersCSVAction(): Promise<{
     return { success: false, error: 'Failed to export volunteers.' }
   }
 }
+
+// ─── Manual attendance management ─────────────────────────────────────────────
+
+/** Parse a "YYYY-MM-DDTHH:MM" datetime-local string as Brisbane time (UTC+10) */
+function parseBrisbaneDateTime(value: string): Date {
+  return new Date(`${value}:00+10:00`)
+}
+
+export async function adminCreateAttendanceAction(
+  volunteerId: string,
+  data: {
+    signInAt: string    // "YYYY-MM-DDTHH:MM" Brisbane local
+    signOutAt?: string  // "YYYY-MM-DDTHH:MM" Brisbane local, optional
+    locationId?: string
+  }
+): Promise<ActionResult> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    const volunteer = await prisma.volunteerProfile.findUnique({ where: { id: volunteerId } })
+    if (!volunteer) return { success: false, error: 'Volunteer not found.' }
+
+    const signInAt = parseBrisbaneDateTime(data.signInAt)
+    if (isNaN(signInAt.getTime())) return { success: false, error: 'Invalid sign-in time.' }
+
+    let signOutAt: Date | null = null
+    let durationMins: number | null = null
+
+    if (data.signOutAt) {
+      signOutAt = parseBrisbaneDateTime(data.signOutAt)
+      if (isNaN(signOutAt.getTime())) return { success: false, error: 'Invalid sign-out time.' }
+      if (signOutAt <= signInAt) return { success: false, error: 'Sign-out must be after sign-in.' }
+      durationMins = Math.round((signOutAt.getTime() - signInAt.getTime()) / 60000)
+    }
+
+    await prisma.attendanceRecord.create({
+      data: {
+        volunteerId,
+        signInAt,
+        signOutAt,
+        durationMins,
+        locationId: data.locationId ?? null,
+        kioskName: 'Manual (admin)',
+      },
+    })
+
+    // Keep volunteer timestamps in sync
+    await prisma.volunteerProfile.update({
+      where: { id: volunteerId },
+      data: {
+        lastActiveAt: signOutAt ?? signInAt,
+        ...(signOutAt ? { lastAttendedAt: signOutAt } : {}),
+      },
+    })
+
+    return { success: true }
+  } catch (err) {
+    console.error('[adminCreateAttendanceAction]', err)
+    return { success: false, error: 'Failed to create attendance record.' }
+  }
+}
+
+export async function adminEditAttendanceAction(
+  recordId: string,
+  data: {
+    signInAt: string    // "YYYY-MM-DDTHH:MM" Brisbane local
+    signOutAt?: string  // "YYYY-MM-DDTHH:MM" Brisbane local, optional
+    locationId?: string
+  }
+): Promise<ActionResult> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    const existing = await prisma.attendanceRecord.findUnique({ where: { id: recordId } })
+    if (!existing) return { success: false, error: 'Attendance record not found.' }
+
+    const signInAt = parseBrisbaneDateTime(data.signInAt)
+    if (isNaN(signInAt.getTime())) return { success: false, error: 'Invalid sign-in time.' }
+
+    let signOutAt: Date | null = null
+    let durationMins: number | null = null
+
+    if (data.signOutAt) {
+      signOutAt = parseBrisbaneDateTime(data.signOutAt)
+      if (isNaN(signOutAt.getTime())) return { success: false, error: 'Invalid sign-out time.' }
+      if (signOutAt <= signInAt) return { success: false, error: 'Sign-out must be after sign-in.' }
+      durationMins = Math.round((signOutAt.getTime() - signInAt.getTime()) / 60000)
+    }
+
+    await prisma.attendanceRecord.update({
+      where: { id: recordId },
+      data: {
+        signInAt,
+        signOutAt,
+        durationMins,
+        ...(data.locationId !== undefined ? { locationId: data.locationId || null } : {}),
+      },
+    })
+
+    return { success: true }
+  } catch (err) {
+    console.error('[adminEditAttendanceAction]', err)
+    return { success: false, error: 'Failed to update attendance record.' }
+  }
+}
