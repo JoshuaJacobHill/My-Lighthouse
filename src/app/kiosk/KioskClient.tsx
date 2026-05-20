@@ -56,6 +56,13 @@ interface KioskClientProps {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Mask an email for privacy: sarah.jones@gmail.com → s***s@gmail.com */
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length < 6) return '••• •••'
+  // Show first 4 digits and last 2, mask the middle
+  return digits.slice(0, 4) + ' ••• ' + digits.slice(-2)
+}
+
 function maskEmail(email: string): string {
   const at = email.indexOf('@')
   if (at < 0) return email
@@ -166,7 +173,7 @@ function OnSiteGuestsTable({
                 <td className="px-5 py-4 font-semibold text-gray-900">
                   {g.firstName} {g.lastName}
                   {g.mobile && (
-                    <div className="text-sm text-gray-400 font-normal mt-0.5">{g.mobile}</div>
+                    <div className="text-sm text-gray-400 font-normal mt-0.5">{maskPhone(g.mobile)}</div>
                   )}
                 </td>
                 <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">
