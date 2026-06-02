@@ -129,14 +129,10 @@ export async function kioskSignInAction(
       return { success: false, error: 'This volunteer account is no longer active.' }
     }
 
-    // Check if they're already signed in (no sign-out time, signed in today)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
+    // Check if they're already signed in (any open record with no sign-out)
     const existingSignIn = await prisma.attendanceRecord.findFirst({
       where: {
         volunteerId,
-        signInAt: { gte: today },
         signOutAt: null,
       },
     })
@@ -325,6 +321,52 @@ export async function guestSignInAction(data: GuestSignInData): Promise<
   } catch (err) {
     console.error('[guestSignInAction]', err)
     return { success: false, error: 'Guest sign-in failed. Please try again.' }
+  }
+}
+
+// ─── On-site volunteers (kiosk) ──────────────────────────────────────────────
+
+export interface OnSiteVolunteer {
+  id: string           // attendanceRecord id
+  volunteerId: string
+  firstName: string
+  lastName: string
+  signInAt: string     // ISO string
+}
+
+export async function kioskGetOnSiteVolunteersAction(): Promise<
+  ActionResult & { volunteers?: OnSiteVolunteer[] }
+> {
+  try {
+    await requireKioskSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  try {
+    const records = await prisma.attendanceRecord.findMany({
+      where: { signOutAt: null },
+      select: {
+        id: true,
+        signInAt: true,
+        volunteer: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { signInAt: 'asc' },
+    })
+
+    return {
+      success: true,
+      volunteers: records.map((r) => ({
+        id: r.id,
+        volunteerId: r.volunteer.id,
+        firstName: r.volunteer.firstName,
+        lastName: r.volunteer.lastName,
+        signInAt: r.signInAt.toISOString(),
+      })),
+    }
+  } catch (err) {
+    console.error('[kioskGetOnSiteVolunteersAction]', err)
+    return { success: false, error: 'Failed to fetch on-site volunteers.' }
   }
 }
 

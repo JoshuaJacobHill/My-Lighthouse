@@ -21,7 +21,9 @@ import {
   guestSignInAction,
   kioskGetOnSiteGuestsAction,
   kioskGuestSignOutAction,
+  kioskGetOnSiteVolunteersAction,
   type OnSiteGuest,
+  type OnSiteVolunteer,
 } from '@/lib/actions/kiosk.actions'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
@@ -127,6 +129,75 @@ function LiveClock() {
       </div>
       <div className="text-sm text-gray-500 mt-0.5">
         {format(time, 'EEEE d MMMM yyyy')}
+      </div>
+    </div>
+  )
+}
+
+// ─── On-site volunteers table ─────────────────────────────────────────────────
+
+function OnSiteVolunteersTable({
+  volunteers,
+  signingOut,
+  onSignOut,
+}: {
+  volunteers: OnSiteVolunteer[]
+  signingOut: string | null
+  onSignOut: (attendanceId: string, name: string) => void
+}) {
+  const [, tick] = React.useReducer((n: number) => n + 1, 0)
+  React.useEffect(() => {
+    const interval = setInterval(tick, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (volunteers.length === 0) return null
+
+  return (
+    <div className="w-full mt-10">
+      <h2 className="text-xl font-bold text-gray-800 mb-3">
+        Registered volunteers on site ({volunteers.length})
+      </h2>
+      <div className="rounded-2xl border-2 border-orange-200 overflow-hidden">
+        <table className="w-full text-base">
+          <thead className="bg-orange-50 border-b border-orange-200">
+            <tr>
+              <th className="text-left px-5 py-3 font-semibold text-gray-600 text-sm uppercase tracking-wide">Name</th>
+              <th className="text-left px-5 py-3 font-semibold text-gray-600 text-sm uppercase tracking-wide hidden sm:table-cell">Signed in</th>
+              <th className="text-left px-5 py-3 font-semibold text-gray-600 text-sm uppercase tracking-wide">Duration</th>
+              <th className="px-5 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-orange-100">
+            {volunteers.map((v) => (
+              <tr key={v.id} className="bg-white hover:bg-orange-50 transition-colors">
+                <td className="px-5 py-4 font-semibold text-gray-900">
+                  {v.firstName} {v.lastName}
+                </td>
+                <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">
+                  {format(new Date(v.signInAt), 'h:mm a')}
+                </td>
+                <td className="px-5 py-4 font-semibold text-green-600">
+                  {signedInFor(v.signInAt)}
+                </td>
+                <td className="px-5 py-4 text-right">
+                  <button
+                    onClick={() => onSignOut(v.id, `${v.firstName} ${v.lastName}`)}
+                    disabled={signingOut === v.id}
+                    className="flex items-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 px-4 py-2.5 text-white font-semibold text-sm transition-colors ml-auto"
+                  >
+                    {signingOut === v.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogOut className="h-4 w-4" />
+                    )}
+                    Sign Out
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -242,7 +313,9 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
   const [guestError, setGuestError] = React.useState<string | null>(null)
   const [guestLoading, setGuestLoading] = React.useState(false)
 
-  // On-site guests (for sign-out screen)
+  // On-site volunteers and guests (for sign-out screen)
+  const [onSiteVolunteers, setOnSiteVolunteers] = React.useState<OnSiteVolunteer[]>([])
+  const [volunteerSigningOut, setVolunteerSigningOut] = React.useState<string | null>(null)
   const [onSiteGuests, setOnSiteGuests] = React.useState<OnSiteGuest[]>([])
   const [guestSigningOut, setGuestSigningOut] = React.useState<string | null>(null)
 
@@ -270,7 +343,15 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
       safetyAcknowledged: false,
     })
     setGuestError(null)
+    setOnSiteVolunteers([])
     setOnSiteGuests([])
+  }
+
+  async function loadOnSiteVolunteers() {
+    const result = await kioskGetOnSiteVolunteersAction()
+    if (result.success && result.volunteers) {
+      setOnSiteVolunteers(result.volunteers)
+    }
   }
 
   async function loadOnSiteGuests() {
@@ -346,6 +427,23 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
     setConfirmedDuration(result.durationLabel ?? '')
     resetLookup()
     setScreen('signout-confirm')
+  }
+
+  async function handleOnSiteVolunteerSignOut(attendanceId: string, name: string) {
+    setVolunteerSigningOut(attendanceId)
+    const result = await kioskSignOutAction(attendanceId)
+    setVolunteerSigningOut(null)
+
+    if (!result.success) {
+      setActionError(result.error ?? 'Sign-out failed.')
+      return
+    }
+
+    setConfirmedName(name)
+    setConfirmedDuration(result.durationLabel ?? '')
+    setScreen('signout-confirm')
+    loadOnSiteVolunteers()
+    loadOnSiteGuests()
   }
 
   async function handleGuestSignOut(guestId: string, guestName: string) {
@@ -772,13 +870,20 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
             </div>
           )}
 
-          {/* On-site guests table (sign-out screen only) */}
+          {/* On-site tables (sign-out screen only) */}
           {!isSignIn && (
-            <OnSiteGuestsTable
-              guests={onSiteGuests}
-              signingOut={guestSigningOut}
-              onSignOut={handleGuestSignOut}
-            />
+            <>
+              <OnSiteVolunteersTable
+                volunteers={onSiteVolunteers}
+                signingOut={volunteerSigningOut}
+                onSignOut={handleOnSiteVolunteerSignOut}
+              />
+              <OnSiteGuestsTable
+                guests={onSiteGuests}
+                signingOut={guestSigningOut}
+                onSignOut={handleGuestSignOut}
+              />
+            </>
           )}
         </div>
       </div>
@@ -855,6 +960,7 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
               onClick={() => {
                 resetLookup()
                 setScreen('lookup-signout')
+                loadOnSiteVolunteers()
                 loadOnSiteGuests()
               }}
               className="w-full flex items-center justify-between rounded-2xl bg-white border-2 border-gray-200 px-8 py-7 text-gray-900 hover:border-orange-300 hover:bg-orange-50 active:scale-[0.99] transition-all shadow-sm"
