@@ -75,24 +75,30 @@ model User {
   updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
 
-  accounts              Account[]
-  sessions              UserSession[]
-  volunteerProfile      VolunteerProfile?
-  adminNotes            AdminNote[]            @relation("NoteCreatedBy")
-  emailLogs             EmailLog[]             @relation("EmailSentBy")
-  passwordResetTokens   PasswordResetToken[]
+  accounts            Account[]
+  sessions            UserSession[]
+  volunteerProfile    VolunteerProfile?
+  adminNotes          AdminNote[]          @relation("NoteCreatedBy")
+  emailLogs           EmailLog[]           @relation("EmailSentBy")
+  passwordResetTokens PasswordResetToken[]
+
+  // Donor & fundraising (additive — see docs/donor-portal-plan.md)
+  donorProfile DonorProfile?
+  donations    Donation[]
+  sponsorships Sponsorship[]
+  ticketOrders TicketOrder[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
 
 enum VolunteerStatus {
   PENDING_INDUCTION
-  INDUCTED    // legacy — no longer assigned; kept for DB compat
+  INDUCTED // legacy — no longer assigned; kept for DB compat
   ACTIVE
   INACTIVE
-  ON_LEAVE    // replaces PAUSED — volunteer-requested break
-  PAUSED      // legacy — no longer assigned; kept for DB compat
-  SUSPENDED   // admin-imposed hold (conduct, blue card, etc.)
+  ON_LEAVE // replaces PAUSED — volunteer-requested break
+  PAUSED // legacy — no longer assigned; kept for DB compat
+  SUSPENDED // admin-imposed hold (conduct, blue card, etc.)
   REMOVED
 }
 
@@ -184,10 +190,10 @@ enum DayOfWeek {
 }
 
 enum TimePeriod {
-  PRE_OPEN   // before 9:00 am
-  MORNING    // 9:00 am – 12:30 pm
-  AFTERNOON  // 12:30 pm onwards
-  EVENING    // kept for legacy compat
+  PRE_OPEN // before 9:00 am
+  MORNING // 9:00 am – 12:30 pm
+  AFTERNOON // 12:30 pm onwards
+  EVENING // kept for legacy compat
 }
 
 model VolunteerAvailability {
@@ -321,24 +327,24 @@ enum ShiftAssignmentStatus {
 }
 
 model Shift {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   locationId   String
   departmentId String?
   title        String?
   date         DateTime
   startTime    DateTime
   endTime      DateTime
-  capacity     Int       @default(1)
-  isRecurring  Boolean   @default(false)
+  capacity     Int      @default(1)
+  isRecurring  Boolean  @default(false)
   recurringId  String?
-  notes        String?   @db.Text
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  notes        String?  @db.Text
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   createdById  String?
 
-  location    Location    @relation(fields: [locationId], references: [id])
-  department  Department? @relation(fields: [departmentId], references: [id])
+  location    Location          @relation(fields: [locationId], references: [id])
+  department  Department?       @relation(fields: [departmentId], references: [id])
   assignments ShiftAssignment[]
 
   @@index([date])
@@ -372,9 +378,9 @@ model RecurringBooking {
   id          String             @id @default(cuid())
   volunteerId String
   locationId  String
-  shiftTitle  String             // e.g. "Morning Shift"
-  dayOfWeek   Int                // 1=Mon … 6=Sat (UTC day of the anchor shift)
-  anchorDate  DateTime           // Date of the first booked shift — used to calculate fortnightly/monthly cadence
+  shiftTitle  String // e.g. "Morning Shift"
+  dayOfWeek   Int // 1=Mon … 6=Sat (UTC day of the anchor shift)
+  anchorDate  DateTime // Date of the first booked shift — used to calculate fortnightly/monthly cadence
   frequency   RecurringFrequency
   isActive    Boolean            @default(true)
   createdAt   DateTime           @default(now())
@@ -470,15 +476,15 @@ enum EmailTemplateType {
 }
 
 model EmailTemplate {
-  id       String            @id @default(cuid())
-  type     EmailTemplateType @unique
-  name     String
-  subject  String
-  bodyHtml String            @db.Text
-  bodyText String?           @db.Text
-  isActive Boolean           @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id        String            @id @default(cuid())
+  type      EmailTemplateType @unique
+  name      String
+  subject   String
+  bodyHtml  String            @db.Text
+  bodyText  String?           @db.Text
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 }
 
 enum EmailStatus {
@@ -534,4 +540,241 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 
   @@index([group])
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// DONOR & FUNDRAISING PORTAL
+//
+// All models below are ADDITIVE. They do not change any existing table and are
+// not referenced by the volunteer portal, kiosk, or attendance features.
+// Blueprint: docs/donor-portal-plan.md
+// ════════════════════════════════════════════════════════════════════════════
+
+enum DonationSource {
+  DONATE_PAGE
+  FUNDRAISER
+  WORDPRESS_FORM
+  APPEAL_LINK
+  EVENT
+}
+
+enum SponsorshipStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum TicketOrderStatus {
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+// ─── Donor profile (one per donor, optional) ──────────────────────────────────
+
+model DonorProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  displayName         String?
+  phone               String?
+  address             String?
+  consentEmailUpdates Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Fund / designation (where the money goes) ────────────────────────────────
+
+model Fund {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?   @db.Text
+  isActive    Boolean   @default(true)
+  goalAmount  Decimal?  @db.Decimal(10, 2)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  donations    Donation[]
+  fundraisers  Fundraiser[]
+  events       Event[]
+  sponsorships Sponsorship[]
+
+  @@index([isActive])
+}
+
+// ─── Donation (one row per completed gift) ────────────────────────────────────
+
+model Donation {
+  id                  String         @id @default(cuid())
+  userId              String? // null until matched to an account by email
+  donorEmail          String
+  donorName           String?
+  amount              Decimal        @db.Decimal(10, 2)
+  currency            String         @default("AUD")
+  paypalTransactionId String         @unique
+  fundId              String? // reconcilable; defaults to General once seeded
+  fundraiserId        String?
+  sponsorshipId       String?
+  isRecurring         Boolean        @default(false)
+  source              DonationSource @default(DONATE_PAGE)
+  taxReceiptEligible  Boolean        @default(true)
+  taxReceiptIssued    Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  fund        Fund?        @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  fundraiser  Fundraiser?  @relation(fields: [fundraiserId], references: [id], onDelete: SetNull)
+  sponsorship Sponsorship? @relation(fields: [sponsorshipId], references: [id], onDelete: SetNull)
+
+  @@index([donorEmail])
+  @@index([userId])
+  @@index([fundId])
+  @@index([fundraiserId])
+  @@index([createdAt])
+}
+
+// ─── Sponsorship (recurring commitment) ───────────────────────────────────────
+
+model Sponsorship {
+  id                   String            @id @default(cuid())
+  userId               String
+  amount               Decimal           @db.Decimal(10, 2)
+  frequency            String            @default("MONTHLY")
+  fundId               String?
+  paypalSubscriptionId String?           @unique
+  status               SponsorshipStatus @default(ACTIVE)
+  startedAt            DateTime          @default(now())
+  cancelledAt          DateTime?
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fund      Fund?      @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  donations Donation[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ─── Fundraiser (GoFundMe-style page) ─────────────────────────────────────────
+
+model Fundraiser {
+  id             String    @id @default(cuid())
+  title          String
+  slug           String    @unique
+  story          String    @db.Text
+  imageUrl       String?
+  goalAmount     Decimal?  @db.Decimal(10, 2)
+  raisedAmount   Decimal   @default(0) @db.Decimal(10, 2)
+  organiserName  String
+  organiserEmail String?
+  fundId         String
+  startsAt       DateTime?
+  endsAt         DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  fund      Fund       @relation(fields: [fundId], references: [id])
+  donations Donation[]
+
+  @@index([fundId])
+  @@index([isActive])
+}
+
+// ─── Event ticketing ──────────────────────────────────────────────────────────
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  description String    @db.Text
+  imageUrl    String?
+  venue       String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  fundId      String?
+  capacity    Int?
+  isPublished Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  fund        Fund?         @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  ticketTypes TicketType[]
+  orders      TicketOrder[]
+
+  @@index([fundId])
+  @@index([isPublished])
+}
+
+model TicketType {
+  id                String    @id @default(cuid())
+  eventId           String
+  name              String
+  price             Decimal   @db.Decimal(10, 2)
+  quantityAvailable Int?
+  maxPerOrder       Int?
+  salesStartAt      DateTime?
+  salesEndAt        DateTime?
+  sortOrder         Int       @default(0)
+
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@index([eventId])
+}
+
+model TicketOrder {
+  id                  String            @id @default(cuid())
+  userId              String? // matched by email
+  purchaserName       String
+  purchaserEmail      String
+  eventId             String
+  amountTotal         Decimal           @db.Decimal(10, 2)
+  paypalTransactionId String?           @unique
+  status              TicketOrderStatus @default(CONFIRMED)
+  createdAt           DateTime          @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@index([eventId])
+  @@index([purchaserEmail])
+  @@index([userId])
+}
+
+model Ticket {
+  id           String    @id @default(cuid())
+  orderId      String
+  ticketTypeId String
+  attendeeName String?
+  reference    String    @unique
+  checkedInAt  DateTime?
+
+  order      TicketOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType TicketType  @relation(fields: [ticketTypeId], references: [id])
+
+  @@index([orderId])
+  @@index([ticketTypeId])
+}
+
+// ─── Webhook audit / idempotency ──────────────────────────────────────────────
+
+model WebhookEvent {
+  id              String    @id @default(cuid())
+  provider        String    @default("PAYPAL")
+  eventType       String
+  providerEventId String    @unique
+  payload         Json
+  processedAt     DateTime?
+  error           String?   @db.Text
+  createdAt       DateTime  @default(now())
+
+  @@index([provider])
+  @@index([processedAt])
 }
