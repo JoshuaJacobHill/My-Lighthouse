@@ -9,6 +9,14 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 // ─── Date formatting ──────────────────────────────────────────────────────────
+//
+// IMPORTANT: all dates/times are stored in UTC. We display them in Brisbane time
+// (AEST, UTC+10, no daylight saving). These helpers MUST force the Brisbane
+// timezone — date-fns `format()` renders in the runtime's local timezone, and on
+// the server (Vercel) that is UTC, which made every server-rendered time show
+// ~10 hours behind (e.g. a 1:30 pm sign-in appearing as 3:30 am).
+
+const BRISBANE_TZ = 'Australia/Brisbane'
 
 function toDate(date: Date | string): Date {
   if (typeof date === 'string') {
@@ -18,22 +26,47 @@ function toDate(date: Date | string): Date {
 }
 
 /**
- * Format a date in Australian format. Default: dd/MM/yyyy
+ * Format a date in Australian format (Brisbane time). Default: dd/MM/yyyy
  */
 export function formatDate(date: Date | string, fmt = 'dd/MM/yyyy'): string {
   try {
-    return format(toDate(date), fmt)
+    const d = toDate(date)
+    if (fmt === 'dd/MM/yyyy') {
+      return new Intl.DateTimeFormat('en-AU', {
+        timeZone: BRISBANE_TZ,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(d)
+    }
+    // Custom format string: shift the instant to the Brisbane wall clock
+    // (+10h, no DST) and format, since date-fns has no timezone support here.
+    return format(new Date(d.getTime() + 10 * 60 * 60 * 1000), fmt)
   } catch {
     return ''
   }
 }
 
 /**
- * Format a date and time in Australian format. e.g. 25/12/2024 9:30 am
+ * Format a date and time in Australian format (Brisbane time).
+ * e.g. 25/12/2024 9:30 am
  */
 export function formatDateTime(date: Date | string): string {
   try {
-    return format(toDate(date), 'dd/MM/yyyy h:mm aa')
+    const d = toDate(date)
+    const datePart = new Intl.DateTimeFormat('en-AU', {
+      timeZone: BRISBANE_TZ,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(d)
+    const timePart = new Intl.DateTimeFormat('en-AU', {
+      timeZone: BRISBANE_TZ,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(d)
+    return `${datePart} ${timePart}`
   } catch {
     return ''
   }

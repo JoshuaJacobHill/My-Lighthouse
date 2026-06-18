@@ -74,6 +74,17 @@ function maskEmail(email: string): string {
   return local[0] + '·'.repeat(Math.min(local.length - 2, 5)) + local[local.length - 1] + domain
 }
 
+/** Format a time as Brisbane local (AEST), regardless of the device timezone. */
+function brisbaneTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  return new Intl.DateTimeFormat('en-AU', {
+    timeZone: 'Australia/Brisbane',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(d)
+}
+
 /** Format duration since sign-in */
 function signedInFor(isoStr: string): string {
   try {
@@ -175,7 +186,7 @@ function OnSiteVolunteersTable({
                   {v.firstName} {v.lastName}
                 </td>
                 <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">
-                  {format(new Date(v.signInAt), 'h:mm a')}
+                  {brisbaneTime(v.signInAt)}
                 </td>
                 <td className="px-5 py-4 font-semibold text-green-600">
                   {signedInFor(v.signInAt)}
@@ -248,7 +259,7 @@ function OnSiteGuestsTable({
                   )}
                 </td>
                 <td className="px-5 py-4 text-gray-500 hidden sm:table-cell">
-                  {format(new Date(g.signInAt), 'h:mm a')}
+                  {brisbaneTime(g.signInAt)}
                 </td>
                 <td className="px-5 py-4 font-semibold text-green-600">
                   {signedInFor(g.signInAt)}
@@ -396,7 +407,7 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
 
     setConfirmedName(`${volunteer.firstName} ${volunteer.lastName}`)
     setConfirmedLocation(currentLocation?.name ?? '')
-    setConfirmedTime(format(new Date(), 'h:mm a'))
+    setConfirmedTime(brisbaneTime(new Date()))
     resetLookup()
     setScreen('signin-confirm')
   }
@@ -497,7 +508,7 @@ export default function KioskClient({ locations, defaultLocationId }: KioskClien
 
     setConfirmedName(`${guestForm.firstName} ${guestForm.lastName}`)
     setConfirmedLocation(currentLocation?.name ?? '')
-    setConfirmedTime(format(new Date(), 'h:mm a'))
+    setConfirmedTime(brisbaneTime(new Date()))
     goHome()
     setScreen('signin-confirm')
   }
