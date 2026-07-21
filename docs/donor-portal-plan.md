@@ -1,7 +1,7 @@
 # Donor & Fundraising Portal — Design Blueprint
 
-**Status:** Planning only. No code has been written. This document is a blueprint for review.
-**Last updated:** June 2026
+**Status:** In build on the `donor-portal` branch (uncommitted). Foundation, Funds/designations, and the embeddable progress widget are built; Stripe payment integration not yet started.
+**Last updated:** July 2026
 **Author:** Lighthouse Care digital platform team
 
 ---
@@ -19,7 +19,7 @@ It serves two jobs:
 2. **Fundraisers** — GoFundMe-style fundraising pages, for our own appeals or for partners raising money on our behalf
 3. **Donation designations** — different donation buttons/links so we can track what each gift is for (e.g. general donation page, Christmas Appeal, Good Food Hampers)
 
-It uses the **same login** as the Volunteer Portal — a person can be a volunteer, a donor, or both, behind one account. Donations and payments are powered by **PayPal**, captured automatically via webhooks, and matched to donor accounts by verified email.
+It uses the **same login** as the Volunteer Portal — a person can be a volunteer, a donor, or both, behind one account. Donations and payments are powered by **Stripe** (see §4), captured automatically via webhooks, and matched to donor accounts by verified email.
 
 > ⏰ **Time-sensitive:** because ShoutForGood is closing, confirm its **shutdown date** and whether **historical data** (past donations, event records, recurring donors) can be exported before it goes. See §12.
 
@@ -58,23 +58,34 @@ This mirrors the Volunteer Portal you already have.
 
 ---
 
-## 4. Payment provider: PayPal
+## 4. Payment provider: Stripe (PayPal as an optional wallet later)
 
-### Use PayPal Donate / Checkout — NOT PayPal Giving Fund
+> **Decision (July 2026):** the primary gateway is **Stripe**. CommBank was considered but ruled out — its online gateways (CommWeb/PowerBoard/BPOINT) are closed to new customers while CBA transitions to a new platform with no firm date, and Lighthouse Care holds CommBank EFTPOS in-store only. Stripe is the engine most modern donation suites (Zeffy, Raisely, GiveWP) are built on, and it powers the Zeffy-style feature set we want. The data model stays **provider-neutral** (`provider`, `providerTransactionId`, `providerSubscriptionRef`), now defaulting to `STRIPE`, so **PayPal can be added later as an optional "Pay with PayPal" wallet** at checkout without a migration.
 
-The single most important technical decision.
+### Why Stripe for a Zeffy-style suite
+- **Flexible recurring** — Stripe Billing does weekly / monthly / quarterly / annual, not PayPal's monthly-only.
+- **Apple Pay & Google Pay** built in — one-tap for mobile donors.
+- **BECS Direct Debit** (bank-to-bank) — cheap recurring giving, well suited to Australian donors.
+- **Rich webhooks + metadata** — tag every gift by fund / appeal / fundraiser, the core of our reporting.
+- **Clean APIs** — faster to build a custom suite on.
 
-- **PayPal Donate / Checkout (direct to our account)** — money lands directly in the Lighthouse Care PayPal business account. We receive the payer's **name, email, and amount** on every transaction, we issue our own receipts, and we control the data. **This is what the portal requires.**
-- **PayPal Giving Fund (PGF)** — money goes to PGF first; donors must **opt in** to share details, and PGF issues the receipt. **Not suitable** for a portal that tracks giving and runs its own events/fundraisers.
+### Integration method: Stripe Checkout (hosted) first, Elements later
+- **Stripe Checkout (hosted)** — Stripe hosts the payment fields; card data never touches our servers (minimal PCI burden). Fastest to launch, embeds cleanly on lighthousecare.org.au. **Start here.**
+- **Stripe Elements / Payment Element** — our own fully custom form with Stripe-hosted fields. More control; a later refinement.
+- **PayPal button** — added as an alternative wallet at checkout in a later phase, for donors who prefer it.
 
 ### One pipeline for all money in
-Every inbound payment — a donation, a fundraiser gift, or an event ticket order — flows through the **same PayPal account** and the **same webhook**, is recorded in our database, tagged with its **source** and **fund**, and matched to a donor account by verified email. This single pipeline is what makes unified reporting possible.
+Every inbound payment — a donation, a fundraiser gift, or an event ticket order — flows through **Stripe** and is confirmed by the **same webhook handler**, recorded in our database, tagged with its **source** and **fund**, and matched to a donor account by verified email. Each callback is stored in `WebhookEvent` for idempotency + audit. Because we capture everything ourselves, **reporting and receipting are ours** regardless of provider.
 
 ### Notes to confirm / action
-- **Charity rate:** apply at paypal.com/charities for the discounted nonprofit transaction rate.
-- **Recurring giving:** PayPal supports **monthly** recurring only — adequate for most sponsorship models.
-- **PCI/security:** PayPal-hosted checkout means card details never touch our servers.
+- **Stripe account + test keys:** create the Stripe account and grab test keys (publishable + secret) and a webhook signing secret — free and instant, so this does **not** block the build the way CommBank did.
+- **Nonprofit rate:** apply for Stripe's nonprofit discount with ACNC/DGR details (confirm the exact current AU rate on application). Grab PayPal's confirmed-charity rate too when the PayPal button is added.
+- **Recurring giving:** use **Stripe Billing** subscriptions (native) — no stored-card scheduler of our own needed.
+- **PCI/security:** hosted Checkout / Elements keeps card data off our servers.
 - **Tax deductibility differs by type** (see §10): genuine donations to a DGR are deductible; **event tickets are generally NOT** (the payer receives a benefit). Receipting logic must distinguish them.
+
+### Model the product on Zeffy — not its pricing
+Zeffy is our reference for the *feature suite and UX* (funds/designations, fundraisers, events + ticketing, donor accounts, receipting) — and the blueprint already mirrors it. The one thing **not** to copy is Zeffy's "free" pricing: that works only because Zeffy funds itself via donor tips. In a custom build there is no tip prompt; we simply pay Stripe/PayPal processing. Model the product, not the pricing.
 
 ---
 
@@ -116,11 +127,13 @@ All new tables follow existing conventions (`cuid()` IDs, etc.). The shared `Use
 - Each fund yields a donate button/link (e.g. `/donate?fund=good-food-hampers`).
 - Reporting rolls up total raised per fund.
 
+**`Fund`** also carries `showPublicProgress` (bool) — gates the embeddable raised/goal widget (see §9).
+
 **`Donation`** (one row per completed gift, from any source)
-`id`, `userId?` (null until matched), `donorEmail`, `donorName?`, `amount`, `currency` (default AUD), `paypalTransactionId` (unique), `fundId` (→ Fund), `fundraiserId?` (→ Fundraiser), `isRecurring`, `sponsorshipId?`, `source` (`DONATE_PAGE` / `FUNDRAISER` / `WORDPRESS_FORM` / `APPEAL_LINK`), `taxReceiptEligible` (bool), `taxReceiptIssued` (bool), `createdAt`
+`id`, `userId?` (null until matched), `donorEmail`, `donorName?`, `amount`, `currency` (default AUD), `provider` (default `STRIPE`), `providerTransactionId` (unique), `fundId` (→ Fund), `fundraiserId?` (→ Fundraiser), `isRecurring`, `sponsorshipId?`, `source` (`DONATE_PAGE` / `FUNDRAISER` / `WORDPRESS_FORM` / `APPEAL_LINK` / `EVENT`), `taxReceiptEligible` (bool), `taxReceiptIssued` (bool), `createdAt`
 
 **`Sponsorship`** (recurring commitment)
-`id`, `userId` (→ User), `amount`, `frequency` (`MONTHLY`), `fundId?`, `paypalSubscriptionId`, `status` (`ACTIVE`/`CANCELLED`/`PAUSED`), `startedAt`, `cancelledAt?`
+`id`, `userId` (→ User), `amount`, `frequency` (`MONTHLY`), `fundId?`, `provider` (default `STRIPE`), `providerSubscriptionRef` (Stripe Billing subscription id), `status` (`ACTIVE`/`CANCELLED`/`PAUSED`), `startedAt`, `cancelledAt?`
 
 ### Fundraiser tables — *covers feature #2*
 
@@ -139,7 +152,7 @@ All new tables follow existing conventions (`cuid()` IDs, etc.). The shared `Use
 `id`, `eventId` (→ Event), `name` (e.g. "General", "Family", "Free/RSVP"), `price` (0 allowed for free), `quantityAvailable?`, `maxPerOrder?`, `salesStartAt?`, `salesEndAt?`, `sortOrder`
 
 **`TicketOrder`** (one per registration/purchase)
-`id`, `userId?` (matched by email), `purchaserName`, `purchaserEmail`, `eventId`, `amountTotal`, `paypalTransactionId?` (null for free orders), `status` (`CONFIRMED`/`CANCELLED`/`REFUNDED`), `createdAt`
+`id`, `userId?` (matched by email), `purchaserName`, `purchaserEmail`, `eventId`, `amountTotal`, `provider` (default `STRIPE`), `providerTransactionId?` (null for free orders), `status` (`CONFIRMED`/`CANCELLED`/`REFUNDED`), `createdAt`
 
 **`Ticket`** (one per individual ticket/attendee)
 `id`, `orderId` (→ TicketOrder), `ticketTypeId` (→ TicketType), `attendeeName?`, `reference` (unique code for check-in), `checkedInAt?`
@@ -147,8 +160,8 @@ All new tables follow existing conventions (`cuid()` IDs, etc.). The shared `Use
 ### Plumbing
 
 **`WebhookEvent`** (audit + idempotency)
-`id`, `provider` (`PAYPAL`), `eventType`, `payload` (json), `processedAt?`, `error?`, `createdAt`
-- Prevents double-processing; gives an audit trail for every PayPal callback.
+`id`, `provider` (default `STRIPE`), `eventType`, `providerEventId` (unique), `payload` (json), `processedAt?`, `error?`, `createdAt`
+- Prevents double-processing; gives an audit trail for every gateway callback.
 
 ---
 
@@ -167,7 +180,7 @@ All new tables follow existing conventions (`cuid()` IDs, etc.). The shared `Use
 
 ### 7.3 Event ticketing (feature #1)
 - Admin creates an **Event** with one or more **TicketTypes** (name, price, quantity, per-order limit). Free/RSVP tickets supported (price 0).
-- Public **registration page**: choose ticket types and quantities → PayPal checkout (skipped for free tickets) → webhook → `TicketOrder` + `Ticket` rows created → **confirmation email** with a reference code per ticket.
+- Public **registration page**: choose ticket types and quantities → Stripe Checkout (skipped for free tickets) → webhook → `TicketOrder` + `Ticket` rows created → **confirmation email** with a reference code per ticket.
 - **Capacity is enforced by our app** (don't oversell) using `quantityAvailable` and event `capacity`.
 - Admin backend shows the **attendee list** per event, with totals and CSV export.
 - **Check-in** (scanning/marking `checkedInAt`) is supported in the data model and is a natural later addition — the kiosk pattern could even be reused. Not required for v1.
@@ -180,7 +193,7 @@ The thread tying anonymous transactions to accounts is the **verified email addr
 
 ```
 Anonymous gift / ticket purchase (WordPress, fundraiser page, event page)
-   → PayPal processes payment
+   → Stripe processes payment
    → Webhook fires → recorded against payer email (userId: null)
    → Follow-up email: "thanks — create an account to track your giving"
 
@@ -198,7 +211,7 @@ Payer creates an account / logs in with that email
 
 ## 9. WordPress & post-payment email
 
-**WordPress:** every donate button / fundraiser link / event link routes through the **same PayPal account and webhook**, so all activity lands in one place. The no-login giving form on the main site works the same way.
+**WordPress:** the donate experience is delivered to lighthousecare.org.au as an **embeddable iframe widget** served from this app (`/embed/donate/<fund-slug>`), so donors stay on the main site. The widget shows the live **raised / goal progress bar** and a Donate button, and is toggled per fund by the **"Show public progress"** flag (`Fund.showPublicProgress`) — staff can switch the public total on or off without affecting whether the fund accepts gifts. A small JSON endpoint (`/api/public/funds/<slug>`) is also available for a script-based widget. Framing is restricted (CSP `frame-ancestors`) to the Lighthouse Care domains. Every donate button / fundraiser link / event link still routes through the **same Stripe account and webhook**, so all activity lands in one place.
 
 **Emails:** reuse the **existing Resend integration** and mirror the **guest-volunteer "create an account" nudge** pattern already built. Confirmation emails (donation receipt, ticket confirmation with reference code) and the account-creation nudge all run through Resend in the Lighthouse Care voice.
 
@@ -232,15 +245,15 @@ For paid advertising (Google Ads, Meta Ads) and traffic measurement, the public-
 
 1. **Schema (additive):** add new tables + new relations on `User`. `prisma db push` to local **and** production (production via session pooler, port 5432). No existing tables touched.
 2. **Feature flag + early-access allow-list:** everything built next is invisible to volunteers/public.
-3. **PayPal sandbox + webhook + `WebhookEvent`:** one pipeline, idempotent, tested end-to-end in sandbox.
+3. **Stripe test mode + webhook + `WebhookEvent`:** one pipeline, idempotent, tested end-to-end with Stripe test keys (free/instant — not blocked like CommBank was).
 4. **Funds + donate buttons** (feature #3) — simplest, highest-value first; gives working designated giving.
 5. **Donor front end (`/donor`):** giving history, totals, receipts, via early-access account.
 6. **Fundraisers** (feature #2): admin create/manage + public page + progress bar.
 7. **Event ticketing** (feature #1): events, ticket types, registration, capacity, attendee list, confirmation emails.
 8. **Account-matching flow** on email verification + admin manual-link tool.
-9. **WordPress buttons/forms** pointed at the same PayPal account + webhook.
+9. **WordPress embed** — the iframe donate/progress widget dropped into lighthousecare.org.au, all pointed at the same Stripe account + webhook.
 10. **Analytics:** GA4 + Meta Pixel on public pages with conversion events; server-side conversions from the webhook (phase 2).
-11. **Go live in PayPal, final test, flip the feature flag.**
+11. **Switch Stripe to live keys, final test, flip the feature flag.**
 
 ---
 
@@ -248,10 +261,11 @@ For paid advertising (Google Ads, Meta Ads) and traffic measurement, the public-
 
 - [ ] **ShoutForGood shutdown date** — when exactly does it close? This sets our deadline.
 - [ ] **Historical data export** — can we export past donations, recurring donors, and event/attendee records from ShoutForGood before it closes? Do we need to import them? **(Time-critical.)**
-- [ ] **Recurring donors on ShoutForGood** — how are existing monthly donors migrated to PayPal subscriptions without interruption? (May require asking them to re-subscribe.)
+- [ ] **Recurring donors on ShoutForGood** — how are existing monthly donors migrated to Stripe subscriptions without interruption? (Will almost certainly require asking them to re-enter card details / re-subscribe.)
 - [ ] **DGR status** — confirm, for receipting (§10).
-- [ ] **PayPal business account** — confirm access; apply for the charity rate.
-- [ ] **WordPress integration** — PayPal SDK directly, or a plugin (e.g. GiveWP)?
+- [ ] **Stripe account** — create it and grab **test keys** (publishable + secret + webhook signing secret; free/instant); apply for the nonprofit rate with ACNC/DGR details.
+- [ ] **PayPal (optional wallet, later)** — apply for the confirmed-charity rate when the "Pay with PayPal" button is added.
+- [ ] **WordPress integration** — confirmed: an **iframe embed** of our own widget (built). Decide which WordPress page(s) host it.
 - [ ] **Sponsorship meaning** — what does a "sponsorship" represent (e.g. sponsor a family's weekly trolley)?
 - [ ] **Event check-in** — needed for v1, or a later enhancement?
 - [ ] **Partner self-serve fundraisers** — admin-created only for v1; partner logins later?
@@ -264,7 +278,7 @@ For paid advertising (Google Ads, Meta Ads) and traffic measurement, the public-
 - **Safe:** additive only — the live Volunteer Portal is untouched.
 - **Replaces ShoutForGood:** event ticketing, fundraisers, and donation designations, all admin-managed.
 - **Familiar:** reuses shared login, Resend emails, email verification, and the two-sided (front end + admin backend) structure proven in the Volunteer Portal.
-- **One money pipeline:** PayPal Donate/Checkout direct (not Giving Fund), every transaction tagged by source and fund, captured via one webhook.
+- **One money pipeline:** Stripe (hosted Checkout), every transaction tagged by source and fund, captured via one webhook; data model kept provider-neutral so PayPal can be added later as an optional wallet.
 - **Safe rollout:** built behind a feature flag + early-access allow-list; launched by flipping one switch.
 - **No new role:** donor access is based on being logged in / having giving history.
 - **Watch the clock:** confirm ShoutForGood's closure date and export historical data before it's gone.

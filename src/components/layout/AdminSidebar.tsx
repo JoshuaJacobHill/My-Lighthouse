@@ -11,6 +11,7 @@ import {
   MapPin,
   CheckSquare,
   BarChart2,
+  HeartHandshake,
   Mail,
   Settings,
   ChevronLeft,
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   { href: '/admin/on-site', label: 'On-Site Now', icon: MapPin },
   { href: '/admin/attendance', label: 'Attendance', icon: CheckSquare },
   { href: '/admin/reports', label: 'Reports', icon: BarChart2 },
+  { href: '/admin/funds', label: 'Funds', icon: HeartHandshake },
   { href: '/admin/emails', label: 'Emails', icon: Mail },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]

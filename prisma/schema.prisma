@@ -593,6 +593,10 @@ model Fund {
   slug        String    @unique
   description String?   @db.Text
   isActive    Boolean   @default(true)
+  // When true, the public progress widget (raised vs goal) may be embedded for
+  // this fund on lighthousecare.org.au. Independent of isActive so totals can be
+  // shown/hidden without affecting whether the fund accepts gifts.
+  showPublicProgress Boolean @default(false)
   goalAmount  Decimal?  @db.Decimal(10, 2)
   startsAt    DateTime?
   endsAt      DateTime?
@@ -617,7 +621,10 @@ model Donation {
   donorName           String?
   amount              Decimal        @db.Decimal(10, 2)
   currency            String         @default("AUD")
-  paypalTransactionId String         @unique
+  // Payment provider for this gift (e.g. STRIPE). Kept provider-neutral so a
+  // gateway can change without a schema migration.
+  provider              String       @default("STRIPE")
+  providerTransactionId String       @unique
   fundId              String? // reconcilable; defaults to General once seeded
   fundraiserId        String?
   sponsorshipId       String?
@@ -647,7 +654,10 @@ model Sponsorship {
   amount               Decimal           @db.Decimal(10, 2)
   frequency            String            @default("MONTHLY")
   fundId               String?
-  paypalSubscriptionId String?           @unique
+  provider             String            @default("STRIPE")
+  // Provider reference for the recurring arrangement — with Stripe, the Stripe
+  // Billing subscription id (native recurring; no scheduler of our own needed).
+  providerSubscriptionRef String?        @unique
   status               SponsorshipStatus @default(ACTIVE)
   startedAt            DateTime          @default(now())
   cancelledAt          DateTime?
@@ -735,7 +745,8 @@ model TicketOrder {
   purchaserEmail      String
   eventId             String
   amountTotal         Decimal           @db.Decimal(10, 2)
-  paypalTransactionId String?           @unique
+  provider            String            @default("STRIPE")
+  providerTransactionId String?         @unique
   status              TicketOrderStatus @default(CONFIRMED)
   createdAt           DateTime          @default(now())
 
@@ -767,7 +778,7 @@ model Ticket {
 
 model WebhookEvent {
   id              String    @id @default(cuid())
-  provider        String    @default("PAYPAL")
+  provider        String    @default("STRIPE")
   eventType       String
   providerEventId String    @unique
   payload         Json

@@ -150,4 +150,49 @@ export const adminNoteSchema = z.object({
   isInternal: z.boolean().optional().default(true),
 })
 
+// ─── Fund / designation (donor portal) ──────────────────────────────────────
+
+const optionalTrimmed = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v.length > 0 ? v : undefined))
+
+export const fundSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Fund name is required')
+    .max(120, 'Fund name is too long (max 120 characters)'),
+  // Optional — generated from the name when left blank. Lowercase, hyphenated.
+  slug: z
+    .string()
+    .trim()
+    .max(120)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers and hyphens only')
+    .optional()
+    .or(z.literal('')),
+  description: optionalTrimmed,
+  // Money comes off a number input as a string; keep it optional.
+  goalAmount: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : Number(v)))
+    .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), {
+      message: 'Goal must be a positive amount',
+    }),
+  startsAt: optionalTrimmed,
+  endsAt: optionalTrimmed,
+  sortOrder: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? 0 : Number(v)))
+    .refine((v) => Number.isInteger(v), { message: 'Sort order must be a whole number' }),
+  isActive: z.boolean().optional().default(true),
+  showPublicProgress: z.boolean().optional().default(false),
+})
+
+// Input type (pre-transform): forms send strings for numbers/dates.
+export type FundInput = z.input<typeof fundSchema>
+
 export type AdminNoteInput = z.infer<typeof adminNoteSchema>
