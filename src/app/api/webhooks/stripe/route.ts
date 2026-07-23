@@ -3,6 +3,7 @@ import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getStripe } from '@/lib/stripe'
+import { sendDonationReceiptEmail } from '@/lib/donation-emails'
 
 // Never cached; must read the raw body for signature verification.
 export const dynamic = 'force-dynamic'
@@ -111,18 +112,39 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
     select: { id: true },
   })
 
-  await prisma.donation.create({
+  const donorName = meta.donorName || session.customer_details?.name || null
+  const fundId = meta.fundId || null
+
+  const donation = await prisma.donation.create({
     data: {
       userId: user?.id ?? null,
       donorEmail,
-      donorName: meta.donorName || session.customer_details?.name || null,
+      donorName,
       amount,
       currency,
       provider: 'STRIPE',
       providerTransactionId: paymentIntentId,
-      fundId: meta.fundId || null,
+      fundId,
       source: 'DONATE_PAGE',
       taxReceiptEligible: true,
     },
+    select: { id: true },
   })
+
+  // Best-effort receipt email — never let a send failure fail the webhook (the
+  // gift is already safely recorded; retrying would only re-send).
+  try {
+    const fund = fundId
+      ? await prisma.fund.findUnique({ where: { id: fundId }, select: { name: true } })
+      : null
+    await sendDonationReceiptEmail({
+      to: donorEmail,
+      name: donorName,
+      amount,
+      fundName: fund?.name ?? null,
+      receiptNo: `LC-${donation.id.slice(-8).toUpperCase()}`,
+    })
+  } catch (err) {
+    console.error('Donation receipt email failed', err)
+  }
 }
