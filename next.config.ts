@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      // Enforce HTTPS for a year (the site is already HTTPS on Vercel). Not
+      // preloaded — that's an irreversible commitment to review before launch.
+      { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
     ];
     return [
       {

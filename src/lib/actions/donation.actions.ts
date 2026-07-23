@@ -1,8 +1,10 @@
 'use server'
 
 import { z } from 'zod'
+import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { getStripe, isStripeConfigured, toCents } from '@/lib/stripe'
+import { rateLimit } from '@/lib/rate-limit'
 
 interface CheckoutResult {
   success: boolean
@@ -37,6 +39,14 @@ export async function createDonationCheckoutAction(
 ): Promise<CheckoutResult> {
   if (!isStripeConfigured()) {
     return { success: false, error: 'Donations aren’t configured yet. Please try again soon.' }
+  }
+
+  // Rate limit by client IP — defence against flooding the checkout endpoint.
+  const hdrs = await headers()
+  const ip = (hdrs.get('x-forwarded-for') ?? '').split(',')[0]?.trim() || 'unknown'
+  const limit = rateLimit(`donate:${ip}`, 10, 60_000)
+  if (!limit.ok) {
+    return { success: false, error: 'Too many attempts — please wait a moment and try again.' }
   }
 
   const parsed = donateSchema.safeParse(input)
