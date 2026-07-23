@@ -12,6 +12,7 @@ import {
   CheckSquare,
   BarChart2,
   HeartHandshake,
+  Ticket,
   Mail,
   Settings,
   ChevronLeft,
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { href: '/admin/attendance', label: 'Attendance', icon: CheckSquare },
   { href: '/admin/reports', label: 'Reports', icon: BarChart2 },
   { href: '/admin/funds', label: 'Funds', icon: HeartHandshake },
+  { href: '/admin/events', label: 'Events', icon: Ticket },
   { href: '/admin/emails', label: 'Emails', icon: Mail },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]

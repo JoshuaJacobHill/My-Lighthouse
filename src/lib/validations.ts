@@ -195,4 +195,48 @@ export const fundSchema = z.object({
 // Input type (pre-transform): forms send strings for numbers/dates.
 export type FundInput = z.input<typeof fundSchema>
 
+// ─── Events & ticketing (donor portal) ───────────────────────────────────────
+
+const optInt = (msg: string, min: number) =>
+  z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? null : Number(v)))
+    .refine((v) => v === null || (Number.isInteger(v) && v >= min), { message: msg })
+
+const ticketTypeInputSchema = z.object({
+  id: z.string().optional(), // present when editing an existing type
+  name: z.string().trim().min(1, 'Ticket name is required').max(100),
+  // 0 = free / RSVP ticket.
+  price: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? 0 : Number(v)))
+    .refine((v) => Number.isFinite(v) && v >= 0, { message: 'Price must be $0 or more' }),
+  quantityAvailable: optInt('Quantity must be a whole number', 0), // null = unlimited
+  maxPerOrder: optInt('Max per order must be at least 1', 1), // null = no limit
+})
+
+export const eventSchema = z.object({
+  title: z.string().trim().min(1, 'Event title is required').max(200),
+  slug: z
+    .string()
+    .trim()
+    .max(200)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers and hyphens only')
+    .optional()
+    .or(z.literal('')),
+  description: z.string().trim().min(1, 'Please add a description'),
+  venue: optionalTrimmed,
+  startsAt: z.string().min(1, 'Start date and time is required'),
+  endsAt: optionalTrimmed,
+  capacity: optInt('Capacity must be at least 1', 1), // null = unlimited
+  fundId: optionalTrimmed,
+  isPublished: z.boolean().optional().default(false),
+  ticketTypes: z.array(ticketTypeInputSchema).min(1, 'Add at least one ticket type'),
+})
+
+export type EventInput = z.input<typeof eventSchema>
+export type TicketTypeInput = z.input<typeof ticketTypeInputSchema>
+
 export type AdminNoteInput = z.infer<typeof adminNoteSchema>
