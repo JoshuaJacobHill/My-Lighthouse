@@ -139,6 +139,9 @@ export async function loginAction(formData: FormData): Promise<{
       redirectTo = '/admin'
     } else if (user.role === 'KIOSK') {
       redirectTo = '/kiosk'
+    } else if (!user.volunteerProfile) {
+      // Donor-only account (no volunteer profile) → the giving dashboard.
+      redirectTo = '/donor'
     }
 
     return { success: true, redirectTo }

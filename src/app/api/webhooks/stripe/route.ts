@@ -3,7 +3,8 @@ import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getStripe } from '@/lib/stripe'
-import { sendDonationReceiptEmail } from '@/lib/donation-emails'
+import { sendDonationReceiptEmail, sendAccountSetupEmail } from '@/lib/donation-emails'
+import { createAccountSetupToken } from '@/lib/account-setup'
 
 // Never cached; must read the raw body for signature verification.
 export const dynamic = 'force-dynamic'
@@ -146,5 +147,22 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
     })
   } catch (err) {
     console.error('Donation receipt email failed', err)
+  }
+
+  // First-time donor with no account yet → invite them to set one up. Never
+  // required to give; best-effort so it can't fail the webhook.
+  try {
+    if (!user) {
+      const existing = await prisma.user.findFirst({
+        where: { email: { equals: donorEmail, mode: 'insensitive' } },
+        select: { id: true },
+      })
+      if (!existing) {
+        const token = await createAccountSetupToken(donorEmail)
+        await sendAccountSetupEmail({ to: donorEmail, name: donorName, token })
+      }
+    }
+  } catch (err) {
+    console.error('Account setup email failed', err)
   }
 }

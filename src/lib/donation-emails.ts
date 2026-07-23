@@ -45,3 +45,41 @@ export async function sendDonationReceiptEmail(opts: {
     html: wrapEmailHtml(body, appUrl),
   })
 }
+
+/**
+ * Invite a first-time donor to finish setting up an account (set a password),
+ * so their giving history and receipts are theirs to see. Sent only when no
+ * account exists yet — donating never requires one.
+ */
+export async function sendAccountSetupEmail(opts: {
+  to: string
+  name?: string | null
+  token: string
+}): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
+  const firstName = opts.name?.trim().split(/\s+/)[0] || 'friend'
+  const link = `${appUrl}/account/setup?token=${opts.token}`
+  const btn =
+    'background:#f97316;color:#ffffff;padding:13px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;font-size:14px;'
+
+  const body = `
+    <p style="${P}">Hi ${firstName},</p>
+    <p style="${P}">
+      Thank you again for your generosity. Would you like to keep track of your
+      giving with ${ORG.name}? Set a password and your account is ready — you&rsquo;ll
+      be able to see your giving history and download your receipts any time.
+    </p>
+    <p style="margin:24px 0;"><a href="${link}" style="${btn}">Set up my account &rarr;</a></p>
+    <p style="${P}">
+      This link is valid for 14 days. There&rsquo;s no obligation — if you&rsquo;d rather not,
+      you can simply ignore this email; your gift is already received.
+    </p>
+    <p style="${P}">With thanks,<br/>The ${ORG.name} team</p>
+  `
+
+  await sendEmail({
+    to: opts.to,
+    subject: `Set up your ${ORG.name} account`,
+    html: wrapEmailHtml(body, appUrl),
+  })
+}
