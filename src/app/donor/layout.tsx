@@ -1,7 +1,11 @@
 import { redirect, notFound } from 'next/navigation'
+import Link from 'next/link'
+import Image from 'next/image'
+import { LogOut, Heart } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { canAccessDonorPortal } from '@/lib/features'
+import { logoutAction } from '@/lib/actions/auth.actions'
 
 /**
  * Donor portal layout — gated.
@@ -28,5 +32,38 @@ export default async function DonorLayout({
     notFound()
   }
 
-  return <div className="min-h-screen bg-gray-50">{children}</div>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
+          <Link href="/donor" className="flex items-center gap-2">
+            <Image
+              src="/logo-inline-black.png"
+              alt="Lighthouse Care"
+              width={150}
+              height={40}
+              className="h-7 w-auto"
+            />
+          </Link>
+          <nav className="flex items-center gap-1 sm:gap-2">
+            <Link
+              href="/donate"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-50"
+            >
+              <Heart className="h-4 w-4" /> Donate
+            </Link>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              >
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            </form>
+          </nav>
+        </div>
+      </header>
+      {children}
+    </div>
+  )
 }
