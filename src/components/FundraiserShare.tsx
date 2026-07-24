@@ -11,10 +11,12 @@ export function FundraiserShare({
   url,
   title,
   qrDataUrl,
+  onDark = false,
 }: {
   url: string
   title: string
   qrDataUrl: string
+  onDark?: boolean
 }) {
   const [copied, setCopied] = React.useState(false)
   const [showQr, setShowQr] = React.useState(false)
@@ -37,13 +39,14 @@ export function FundraiserShare({
     { label: 'LinkedIn', href: `https://www.linkedin.com/sharing/share-offsite/?url=${enc}` },
   ]
 
-  const pill =
-    'inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-orange-400 hover:text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500'
+  const pill = onDark
+    ? 'inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-white/10 px-3.5 py-2 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/70'
+    : 'inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-orange-400 hover:text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500'
 
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-sm font-medium text-gray-500">Share:</span>
+    <div className={onDark ? 'flex flex-col items-center' : 'mt-4 border-t border-gray-100 pt-4'}>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <span className={onDark ? 'mr-1 text-sm font-medium text-white/80' : 'mr-1 text-sm font-medium text-gray-500'}>Share:</span>
         {links.map(({ label, href }) => (
           <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={`Share on ${label}`} className={pill}>
             {label}
