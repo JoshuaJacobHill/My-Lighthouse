@@ -122,6 +122,7 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
 
   const donorName = meta.donorName || session.customer_details?.name || null
   const fundId = meta.fundId || null
+  const fundraiserId = meta.fundraiserId || null
 
   const donation = await prisma.donation.create({
     data: {
@@ -133,7 +134,8 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
       provider: 'STRIPE',
       providerTransactionId: paymentIntentId,
       fundId,
-      source: 'DONATE_PAGE',
+      fundraiserId,
+      source: fundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
       taxReceiptEligible: true,
     },
     select: { id: true },

@@ -11,9 +11,11 @@ const PRESETS = [25, 50, 100, 250]
 export function DonateForm({
   fundSlug,
   fundName,
+  fundraiserId,
 }: {
   fundSlug: string
   fundName: string
+  fundraiserId?: string
 }) {
   const [amount, setAmount] = React.useState<number>(25)
   const [custom, setCustom] = React.useState('')
@@ -33,6 +35,7 @@ export function DonateForm({
       amount: effectiveAmount,
       name: (fd.get('name') as string) ?? '',
       email: (fd.get('email') as string) ?? '',
+      fundraiserId,
     })
 
     if (result.success && result.url) {

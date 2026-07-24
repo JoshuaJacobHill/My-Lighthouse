@@ -239,4 +239,39 @@ export const eventSchema = z.object({
 export type EventInput = z.input<typeof eventSchema>
 export type TicketTypeInput = z.input<typeof ticketTypeInputSchema>
 
+// ─── Fundraisers (donor portal) ───────────────────────────────────────────────
+
+export const fundraiserSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(200),
+  slug: z
+    .string()
+    .trim()
+    .max(200)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers and hyphens only')
+    .optional()
+    .or(z.literal('')),
+  story: z.string().trim().min(1, 'Please add the fundraiser story'),
+  imageUrl: optionalTrimmed,
+  goalAmount: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : Number(v)))
+    .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), { message: 'Goal must be $0 or more' }),
+  organiserName: z.string().trim().min(1, 'Organiser name is required').max(200),
+  organiserEmail: z.union([z.literal(''), z.email('Please enter a valid email address')]).optional(),
+  fundId: z.string().min(1, 'Choose which fund the proceeds go to'),
+  isActive: z.boolean().optional().default(true),
+})
+
+export type FundraiserInput = z.input<typeof fundraiserSchema>
+
+export const offlineDonationSchema = z.object({
+  fundraiserId: z.string().min(1),
+  donorName: z.string().trim().max(200).optional(), // business name; blank = Anonymous
+  amount: z.coerce.number().min(0.01, 'Amount must be greater than $0').max(1_000_000),
+  donatedAt: optionalTrimmed, // yyyy-mm-dd; defaults to now
+})
+
+export type OfflineDonationInput = z.input<typeof offlineDonationSchema>
+
 export type AdminNoteInput = z.infer<typeof adminNoteSchema>

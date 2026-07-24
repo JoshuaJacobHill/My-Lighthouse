@@ -556,6 +556,7 @@ enum DonationSource {
   WORDPRESS_FORM
   APPEAL_LINK
   EVENT
+  OFFLINE // manually recorded / imported (e.g. migrated from ShoutForGood)
 }
 
 enum SponsorshipStatus {
@@ -624,7 +625,8 @@ model Donation {
   // Payment provider for this gift (e.g. STRIPE). Kept provider-neutral so a
   // gateway can change without a schema migration.
   provider              String       @default("STRIPE")
-  providerTransactionId String       @unique
+  // Null for offline / imported gifts (no gateway transaction). Unique when set.
+  providerTransactionId String?      @unique
   fundId              String? // reconcilable; defaults to General once seeded
   fundraiserId        String?
   sponsorshipId       String?

@@ -20,6 +20,7 @@ const donateSchema = z.object({
     .max(100000, 'Please contact us directly for gifts over $100,000'),
   name: z.string().trim().min(1, 'Please enter your name').max(120),
   email: z.email('Please enter a valid email address'),
+  fundraiserId: z.string().optional(), // tag the gift to a fundraiser page
 })
 
 export type DonateInput = z.input<typeof donateSchema>
@@ -53,7 +54,7 @@ export async function createDonationCheckoutAction(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { fundSlug, amount, name, email } = parsed.data
+  const { fundSlug, amount, name, email, fundraiserId } = parsed.data
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
@@ -63,8 +64,29 @@ export async function createDonationCheckoutAction(
     return { success: false, error: 'That fund isn’t available right now.' }
   }
 
+  // If this gift is for a fundraiser page, confirm it's live so we can tag it.
+  let validFundraiserId: string | undefined
+  if (fundraiserId) {
+    const fr = await prisma.fundraiser.findUnique({
+      where: { id: fundraiserId },
+      select: { id: true, isActive: true },
+    })
+    if (fr?.isActive) validFundraiserId = fr.id
+  }
+
   try {
     const base = appUrl()
+    const meta: Record<string, string> = {
+      kind: 'donation',
+      fundId: fund.id,
+      fundSlug: fund.slug,
+      donorName: name,
+      source: validFundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
+    }
+    if (validFundraiserId) meta.fundraiserId = validFundraiserId
+    const cancelUrl = validFundraiserId
+      ? `${base}/donate?fundraiser=${fundraiserId}&cancelled=1`
+      : `${base}/donate?fund=${fund.slug}&cancelled=1`
     const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       customer_email: email,
@@ -81,20 +103,11 @@ export async function createDonationCheckoutAction(
           },
         },
       ],
-      // Everything the webhook needs to record the gift and tag it to a fund.
-      metadata: {
-        kind: 'donation',
-        fundId: fund.id,
-        fundSlug: fund.slug,
-        donorName: name,
-        source: 'DONATE_PAGE',
-      },
-      payment_intent_data: {
-        description: `Donation — ${fund.name}`,
-        metadata: { fundId: fund.id, fundSlug: fund.slug, donorName: name, source: 'DONATE_PAGE' },
-      },
+      // Everything the webhook needs to record the gift and tag it to a fund/fundraiser.
+      metadata: meta,
+      payment_intent_data: { description: `Donation — ${fund.name}`, metadata: meta },
       success_url: `${base}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${base}/donate?fund=${fund.slug}&cancelled=1`,
+      cancel_url: cancelUrl,
     })
 
     if (!session.url) {

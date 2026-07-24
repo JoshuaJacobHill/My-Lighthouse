@@ -13,24 +13,34 @@ export const metadata = {
 export default async function DonatePage({
   searchParams,
 }: {
-  searchParams: Promise<{ fund?: string; cancelled?: string }>
+  searchParams: Promise<{ fund?: string; fundraiser?: string; cancelled?: string }>
 }) {
   // Public-facing, so it stays behind the feature flag until launch.
   if (!isDonorPortalEnabled()) notFound()
 
-  const { fund: fundSlug, cancelled } = await searchParams
+  const { fund: fundSlug, fundraiser: fundraiserSlug, cancelled } = await searchParams
 
-  // Use the requested fund, or fall back to the first active fund.
-  const fund = fundSlug
-    ? await prisma.fund.findFirst({
-        where: { slug: fundSlug, isActive: true },
-        select: { name: true, slug: true, description: true },
+  // A gift to a fundraiser page uses that fundraiser's fund and is tagged to it.
+  const fundraiser = fundraiserSlug
+    ? await prisma.fundraiser.findFirst({
+        where: { slug: fundraiserSlug, isActive: true },
+        select: { id: true, title: true, fund: { select: { name: true, slug: true, description: true } } },
       })
-    : await prisma.fund.findFirst({
-        where: { isActive: true },
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-        select: { name: true, slug: true, description: true },
-      })
+    : null
+
+  // Use the fundraiser's fund, the requested fund, or the first active fund.
+  const fund = fundraiser
+    ? fundraiser.fund
+    : fundSlug
+      ? await prisma.fund.findFirst({
+          where: { slug: fundSlug, isActive: true },
+          select: { name: true, slug: true, description: true },
+        })
+      : await prisma.fund.findFirst({
+          where: { isActive: true },
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          select: { name: true, slug: true, description: true },
+        })
 
   if (!fund) {
     return (
@@ -45,10 +55,14 @@ export default async function DonatePage({
     <div className="min-h-screen bg-gray-50 px-6 py-12">
       <div className="mx-auto max-w-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Donate to {fund.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {fundraiser ? `Donate to ${fundraiser.title}` : `Donate to ${fund.name}`}
+          </h1>
           <p className="mt-2 text-gray-500">
-            {fund.description ??
-              'Your gift helps families doing it tough across South East Queensland.'}
+            {fundraiser
+              ? 'Your gift supports this fundraiser for Lighthouse Care.'
+              : (fund.description ??
+                'Your gift helps families doing it tough across South East Queensland.')}
           </p>
         </div>
 
@@ -58,7 +72,11 @@ export default async function DonatePage({
           </div>
         )}
 
-        <DonateForm fundSlug={fund.slug} fundName={fund.name} />
+        <DonateForm
+          fundSlug={fund.slug}
+          fundName={fundraiser ? fundraiser.title : fund.name}
+          fundraiserId={fundraiser?.id}
+        />
 
         <p className="mt-6 text-center text-xs text-gray-400">
           Payments are processed securely by Stripe. Lighthouse Care never sees your card details.
