@@ -620,6 +620,7 @@ model Donation {
   userId              String? // null until matched to an account by email
   donorEmail          String
   donorName           String?
+  message             String?        @db.Text // optional public message shown on the donor wall
   amount              Decimal        @db.Decimal(10, 2)
   currency            String         @default("AUD")
   // Payment provider for this gift (e.g. STRIPE). Kept provider-neutral so a

@@ -38,6 +38,7 @@ export function OfflineDonationsManager({
       donorName: (fd.get('donorName') as string) ?? '',
       amount: (fd.get('amount') as string) ?? '',
       donatedAt: (fd.get('donatedAt') as string) ?? '',
+      message: (fd.get('message') as string) ?? '',
     })
     setLoading(false)
     if (result.success) {
@@ -72,13 +73,16 @@ export function OfflineDonationsManager({
         </div>
       )}
 
-      <form ref={formRef} onSubmit={handleAdd} className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
-        <Input label="Business / donor name" name="donorName" placeholder="e.g. JCK Construction (blank = Anonymous)" />
-        <Input label="Amount (AUD)" name="amount" type="number" min="0.01" step="0.01" required />
-        <Input label="Date" name="donatedAt" type="date" hint="Defaults to today" />
-        <Button type="submit" disabled={loading} className="mb-1">
-          <Plus className="h-4 w-4" /> {loading ? 'Adding…' : 'Add'}
-        </Button>
+      <form ref={formRef} onSubmit={handleAdd} className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
+          <Input label="Business / donor name" name="donorName" placeholder="e.g. JCK Construction (blank = Anonymous)" />
+          <Input label="Amount (AUD)" name="amount" type="number" min="0.01" step="0.01" required />
+          <Input label="Date" name="donatedAt" type="date" hint="Defaults to today" />
+          <Button type="submit" disabled={loading} className="mb-1">
+            <Plus className="h-4 w-4" /> {loading ? 'Adding…' : 'Add'}
+          </Button>
+        </div>
+        <Input label="Message (optional)" name="message" placeholder="e.g. Great cause, well done JCK team!" />
       </form>
 
       {donations.length > 0 && (

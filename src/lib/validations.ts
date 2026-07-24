@@ -270,6 +270,7 @@ export const offlineDonationSchema = z.object({
   donorName: z.string().trim().max(200).optional(), // business name; blank = Anonymous
   amount: z.coerce.number().min(0.01, 'Amount must be greater than $0').max(1_000_000),
   donatedAt: optionalTrimmed, // yyyy-mm-dd; defaults to now
+  message: z.string().trim().max(250).optional(), // optional public message
 })
 
 export type OfflineDonationInput = z.input<typeof offlineDonationSchema>

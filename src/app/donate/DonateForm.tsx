@@ -36,6 +36,7 @@ export function DonateForm({
       name: (fd.get('name') as string) ?? '',
       email: (fd.get('email') as string) ?? '',
       fundraiserId,
+      message: (fd.get('message') as string) ?? '',
     })
 
     if (result.success && result.url) {
@@ -105,6 +106,12 @@ export function DonateForm({
           required
           autoComplete="email"
           hint="We’ll send your receipt here."
+        />
+        <Input
+          label="Leave a message of support (optional)"
+          name="message"
+          maxLength={250}
+          placeholder="e.g. Great cause — keep it up!"
         />
       </div>
 

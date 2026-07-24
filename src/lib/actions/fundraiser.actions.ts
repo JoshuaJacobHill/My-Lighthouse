@@ -155,6 +155,7 @@ export async function addOfflineDonationAction(input: OfflineDonationInput): Pro
       data: {
         donorEmail: '', // offline gifts often have no email
         donorName: data.donorName || null,
+        message: data.message || null,
         amount: data.amount,
         currency: 'AUD',
         provider: 'OFFLINE',

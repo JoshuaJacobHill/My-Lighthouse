@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import QRCode from 'qrcode'
 import { Heart, Users } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { formatDate } from '@/lib/utils'
+import { FundraiserShare } from '@/components/FundraiserShare'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +41,7 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
       where: { fundraiserId: fundraiser.id },
       orderBy: { createdAt: 'desc' },
       take: 200,
-      select: { id: true, donorName: true, amount: true, createdAt: true },
+      select: { id: true, donorName: true, message: true, amount: true, createdAt: true },
     }),
   ])
 
@@ -47,6 +49,10 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
   const goal = fundraiser.goalAmount ? Number(fundraiser.goalAmount) : null
   const pct = goal && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : null
   const donorCount = agg._count
+
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const shareUrl = `${base}/fundraisers/${slug}`
+  const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 240, margin: 1 })
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
@@ -82,6 +88,8 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
             >
               <Heart className="h-4 w-4" /> Donate to this fundraiser
             </Link>
+
+            <FundraiserShare url={shareUrl} title={fundraiser.title} qrDataUrl={qrDataUrl} />
           </div>
 
           <div className="mt-8 whitespace-pre-line leading-relaxed text-gray-700">{fundraiser.story}</div>
@@ -95,17 +103,21 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
             ) : (
               <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
                 {donations.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between gap-4 px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-500">
+                  <li key={d.id} className="flex items-start justify-between gap-4 px-5 py-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-500">
                         <Heart className="h-4 w-4" />
                       </span>
                       <div>
                         <p className="font-medium text-gray-900">{d.donorName || 'Anonymous'}</p>
-                        <p className="text-xs text-gray-400">{formatDate(d.createdAt)}</p>
+                        {d.message ? (
+                          <p className="mt-0.5 text-sm text-gray-600">“{d.message}”</p>
+                        ) : (
+                          <p className="text-xs text-gray-400">{formatDate(d.createdAt)}</p>
+                        )}
                       </div>
                     </div>
-                    <span className="font-semibold tabular-nums text-gray-900">{aud2.format(Number(d.amount))}</span>
+                    <span className="shrink-0 font-semibold tabular-nums text-gray-900">{aud2.format(Number(d.amount))}</span>
                   </li>
                 ))}
               </ul>

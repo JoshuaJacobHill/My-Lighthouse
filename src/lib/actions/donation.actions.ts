@@ -21,6 +21,7 @@ const donateSchema = z.object({
   name: z.string().trim().min(1, 'Please enter your name').max(120),
   email: z.email('Please enter a valid email address'),
   fundraiserId: z.string().optional(), // tag the gift to a fundraiser page
+  message: z.string().trim().max(250).optional(), // optional public message
 })
 
 export type DonateInput = z.input<typeof donateSchema>
@@ -54,7 +55,7 @@ export async function createDonationCheckoutAction(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { fundSlug, amount, name, email, fundraiserId } = parsed.data
+  const { fundSlug, amount, name, email, fundraiserId, message } = parsed.data
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
@@ -84,6 +85,7 @@ export async function createDonationCheckoutAction(
       source: validFundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
     }
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
+    if (message) meta.message = message
     const cancelUrl = validFundraiserId
       ? `${base}/donate?fundraiser=${fundraiserId}&cancelled=1`
       : `${base}/donate?fund=${fund.slug}&cancelled=1`

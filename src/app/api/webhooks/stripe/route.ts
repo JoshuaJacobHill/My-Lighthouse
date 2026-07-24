@@ -129,6 +129,7 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
       userId: user?.id ?? null,
       donorEmail,
       donorName,
+      message: meta.message || null,
       amount,
       currency,
       provider: 'STRIPE',
