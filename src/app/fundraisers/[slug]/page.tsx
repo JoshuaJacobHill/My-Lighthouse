@@ -4,8 +4,9 @@ import QRCode from 'qrcode'
 import { Heart } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
-import { formatDate } from '@/lib/utils'
+import { ORG } from '@/lib/org'
 import { FundraiserShare } from '@/components/FundraiserShare'
+import { DonationTicker } from '@/components/DonationTicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +16,34 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: fr ? `${fr.title} — Lighthouse Care` : 'Fundraiser — Lighthouse Care' }
 }
 
-const aud2 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
-const audCents = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 })
+const aud2 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 })
+
+type ContentBlock = {
+  type?: 'imageText' | 'video'
+  heading?: string
+  body?: string
+  bullets?: string[]
+  imageUrl?: string
+  side?: 'left' | 'right' // which side the media sits on
+  videoUrl?: string
+}
+
+// Turn a YouTube watch/share URL into an embeddable URL.
+function toEmbed(url: string): string {
+  const m = url.match(/(?:youtu\.be\/|v=)([\w-]{6,})/)
+  return m ? `https://www.youtube.com/embed/${m[1]}` : url
+}
+
+function DonateButton({ slug, className = '' }: { slug: string; className?: string }) {
+  return (
+    <Link
+      href={`/donate?fundraiser=${slug}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-colors hover:bg-orange-600 ${className}`}
+    >
+      <Heart className="h-5 w-5" /> Donate now
+    </Link>
+  )
+}
 
 export default async function FundraiserPage({ params }: { params: Promise<{ slug: string }> }) {
   if (!isDonorPortalEnabled()) notFound()
@@ -24,7 +51,16 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
   const { slug } = await params
   const fundraiser = await prisma.fundraiser.findFirst({
     where: { slug, isActive: true },
-    select: { id: true, title: true, story: true, imageUrl: true, goalAmount: true, organiserName: true },
+    select: {
+      id: true,
+      title: true,
+      storyHeading: true,
+      story: true,
+      contentBlocks: true,
+      imageUrl: true,
+      goalAmount: true,
+      organiserName: true,
+    },
   })
   if (!fundraiser) notFound()
 
@@ -33,8 +69,8 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
     prisma.donation.findMany({
       where: { fundraiserId: fundraiser.id },
       orderBy: { createdAt: 'desc' },
-      take: 200,
-      select: { id: true, donorName: true, message: true, amount: true, createdAt: true },
+      take: 60,
+      select: { id: true, donorName: true, message: true, amount: true },
     }),
   ])
 
@@ -42,13 +78,15 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
   const goal = fundraiser.goalAmount ? Number(fundraiser.goalAmount) : null
   const pct = goal && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : null
   const donorCount = agg._count
+  const blocks = (Array.isArray(fundraiser.contentBlocks) ? fundraiser.contentBlocks : []) as ContentBlock[]
+  const tickerDonations = donations.map((d) => ({ ...d, amount: Number(d.amount) }))
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const shareUrl = `${base}/fundraisers/${slug}`
   const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 240, margin: 1 })
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-white">
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative flex min-h-[460px] items-center justify-center overflow-hidden px-6 py-16">
         {fundraiser.imageUrl ? (
@@ -60,7 +98,6 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-orange-700" />
         )}
-
         <div className="relative z-10 flex max-w-2xl flex-col items-center text-center">
           <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white shadow-lg">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -68,14 +105,7 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
           </span>
           <p className="mt-4 text-sm font-medium uppercase tracking-wide text-white/80">Lighthouse Care</p>
           <h1 className="mt-2 text-3xl font-bold text-white drop-shadow sm:text-5xl">{fundraiser.title}</h1>
-
-          <Link
-            href={`/donate?fundraiser=${slug}`}
-            className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-colors hover:bg-orange-600"
-          >
-            <Heart className="h-5 w-5" /> Donate now
-          </Link>
-
+          <DonateButton slug={slug} className="mt-8" />
           <div className="mt-6">
             <FundraiserShare url={shareUrl} title={fundraiser.title} qrDataUrl={qrDataUrl} onDark />
           </div>
@@ -86,9 +116,7 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
       <section className="px-6 py-14 text-center">
         <h2 className="text-lg font-medium uppercase tracking-wide text-gray-400">So far we have raised</h2>
         <p className="mt-2 text-5xl font-bold text-orange-500 sm:text-6xl">{aud2.format(raised)}</p>
-        {goal && (
-          <p className="mt-2 text-gray-500">Our goal is to raise {aud2.format(goal)}</p>
-        )}
+        {goal && <p className="mt-3 text-2xl font-semibold text-gray-700">Our goal is to raise {aud2.format(goal)}</p>}
         {pct !== null && (
           <div className="mx-auto mt-6 h-3 w-full max-w-xl overflow-hidden rounded-full bg-gray-100">
             <div className="h-full rounded-full bg-orange-500" style={{ width: `${pct}%` }} />
@@ -100,47 +128,87 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
       </section>
 
       {/* ── Story ────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-2xl px-6">
-        <div className="whitespace-pre-line text-lg leading-relaxed text-gray-700">{fundraiser.story}</div>
+      <section className="mx-auto max-w-2xl px-6 pb-4 text-center">
+        {fundraiser.storyHeading && (
+          <h2 className="mb-6 text-3xl font-bold text-gray-900">{fundraiser.storyHeading}</h2>
+        )}
+        <div className="whitespace-pre-line text-lg leading-relaxed text-gray-600">{fundraiser.story}</div>
       </section>
 
-      {/* ── Donations ────────────────────────────────────────── */}
-      <section className="mx-auto mt-14 max-w-2xl px-6">
-        <h2 className="mb-5 text-center text-2xl font-bold text-gray-900">Latest donations</h2>
-        {donations.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
-            Be the first to donate.
-          </p>
-        ) : (
-          <ul className="space-y-3">
-            {donations.map((d) => (
-              <li key={d.id} className="flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-xl">
-                  💛
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="font-semibold text-gray-900">{d.donorName || 'Anonymous'}</p>
-                    <p className="shrink-0 font-bold tabular-nums text-gray-900">{audCents.format(Number(d.amount))}</p>
-                  </div>
-                  {d.message ? (
-                    <p className="mt-1 text-gray-600">{d.message}</p>
-                  ) : (
-                    <p className="mt-0.5 text-xs text-gray-400">{formatDate(d.createdAt)}</p>
+      {/* ── Latest donations (ticker) ────────────────────────── */}
+      {tickerDonations.length > 0 && (
+        <section className="mt-10 bg-gray-50 py-12">
+          <h2 className="mb-6 text-center text-2xl font-bold text-gray-900">Latest donations</h2>
+          <DonationTicker donations={tickerDonations} />
+        </section>
+      )}
+
+      {/* ── Content blocks ───────────────────────────────────── */}
+      {blocks.length > 0 && (
+        <div className="mx-auto max-w-5xl space-y-16 px-6 py-16">
+          {blocks.map((b, i) => {
+            const mediaRight = (b.side ?? (i % 2 === 0 ? 'right' : 'left')) === 'right'
+            const media =
+              b.type === 'video' && b.videoUrl ? (
+                <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
+                  <iframe
+                    src={toEmbed(b.videoUrl)}
+                    title={b.heading ?? 'Video'}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : b.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={b.imageUrl} alt={b.heading ?? ''} className="w-full rounded-xl object-cover" />
+              ) : null
+
+            return (
+              <div key={i} className="grid grid-cols-1 items-center gap-8 md:grid-cols-2">
+                <div className={media && mediaRight ? 'md:order-1' : 'md:order-2'}>
+                  {b.heading && <h3 className="text-2xl font-bold text-gray-900 sm:text-3xl">{b.heading}</h3>}
+                  {b.body && <p className="mt-4 whitespace-pre-line leading-relaxed text-gray-600">{b.body}</p>}
+                  {b.bullets && b.bullets.length > 0 && (
+                    <ul className="mt-4 space-y-2">
+                      {b.bullets.map((li, j) => (
+                        <li key={j} className="flex gap-2 font-medium text-gray-700">
+                          <span className="text-orange-500">•</span> {li}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                {media && <div className={mediaRight ? 'md:order-2' : 'md:order-1'}>{media}</div>}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
-        <div className="mt-10 text-center">
-          <Link
-            href={`/donate?fundraiser=${slug}`}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-8 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
-          >
-            <Heart className="h-5 w-5" /> Donate now
-          </Link>
+      {/* ── Charity information ───────────────────────────────── */}
+      <section className="bg-gray-50 px-6 py-16">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="mb-6 text-center text-2xl font-bold text-gray-900">Charity information</h2>
+          <div className="flex items-start gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white shadow">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-square.png" alt="Lighthouse Care" className="h-9 w-9 rounded" />
+            </span>
+            <div>
+              <p className="font-semibold text-gray-900">{ORG.name}</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">{ORG.blurb}</p>
+              <a href={ORG.website} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-medium text-orange-600 hover:text-orange-700">
+                Learn more →
+              </a>
+            </div>
+          </div>
+          <div className="mt-10 text-center">
+            <DonateButton slug={slug} />
+          </div>
+          <p className="mt-8 text-center text-xs text-gray-400">
+            {ORG.name} · ABN {ORG.abn} · Payments processed securely by Stripe.
+          </p>
         </div>
       </section>
     </div>

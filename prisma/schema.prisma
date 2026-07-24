@@ -679,7 +679,9 @@ model Fundraiser {
   id             String    @id @default(cuid())
   title          String
   slug           String    @unique
+  storyHeading   String?   // optional heading above the story (e.g. "Building with Purpose")
   story          String    @db.Text
+  contentBlocks  Json?     // rich sections below the story (image+text, video) — see the public page
   imageUrl       String?
   goalAmount     Decimal?  @db.Decimal(10, 2)
   raisedAmount   Decimal   @default(0) @db.Decimal(10, 2)
