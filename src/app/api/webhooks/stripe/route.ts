@@ -5,6 +5,8 @@ import prisma from '@/lib/prisma'
 import { getStripe } from '@/lib/stripe'
 import { sendDonationReceiptEmail, sendAccountSetupEmail } from '@/lib/donation-emails'
 import { createAccountSetupToken } from '@/lib/account-setup'
+import { createOrderWithTickets, type Selection } from '@/lib/tickets'
+import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
 
 // Never cached; must read the raw body for signature verification.
 export const dynamic = 'force-dynamic'
@@ -61,7 +63,12 @@ export async function POST(req: NextRequest) {
 
   try {
     if (event.type === 'checkout.session.completed') {
-      await recordDonation(event.data.object as Stripe.Checkout.Session)
+      const session = event.data.object as Stripe.Checkout.Session
+      if (session.metadata?.kind === 'event_tickets') {
+        await recordTicketOrder(session)
+      } else {
+        await recordDonation(session)
+      }
     }
     await prisma.webhookEvent.update({
       where: { providerEventId: event.id },
@@ -164,5 +171,53 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
     }
   } catch (err) {
     console.error('Account setup email failed', err)
+  }
+}
+
+async function recordTicketOrder(session: Stripe.Checkout.Session): Promise<void> {
+  if (session.payment_status !== 'paid') return
+
+  const meta = session.metadata ?? {}
+  const eventId = meta.eventId
+  if (!eventId) return
+
+  const paymentIntentId =
+    typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id
+  if (!paymentIntentId) return
+
+  // Decode the compact selection map set at checkout time.
+  let selections: Selection[] = []
+  try {
+    const raw = JSON.parse(meta.selections ?? '[]') as { t: string; q: number }[]
+    selections = raw.map((s) => ({ ticketTypeId: s.t, quantity: s.q }))
+  } catch {
+    console.error('Could not parse ticket selections from webhook metadata')
+    return
+  }
+  if (selections.length === 0) return
+
+  const purchaserEmail = session.customer_details?.email ?? session.customer_email ?? ''
+  if (!purchaserEmail) return
+  const purchaserName = meta.purchaserName || session.customer_details?.name || 'Guest'
+  const amountTotal = (session.amount_total ?? 0) / 100
+
+  // createOrderWithTickets is idempotent on providerTransactionId and enforces
+  // capacity, so a retry (or a race with the buyer's return) is safe.
+  const { orderId } = await createOrderWithTickets({
+    eventId,
+    selections,
+    purchaserName,
+    purchaserEmail,
+    amountTotal,
+    provider: 'STRIPE',
+    providerTransactionId: paymentIntentId,
+  })
+
+  try {
+    await sendTicketConfirmationEmailForOrder(orderId)
+  } catch (err) {
+    console.error('Ticket confirmation email failed', err)
   }
 }
