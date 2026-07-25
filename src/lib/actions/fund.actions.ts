@@ -91,6 +91,7 @@ export async function createFundAction(input: FundInput): Promise<ActionResult> 
         sortOrder: data.sortOrder ?? 0,
         isActive: data.isActive ?? true,
         showPublicProgress: data.showPublicProgress ?? false,
+        stripeConnectAccountId: data.stripeConnectAccountId || null,
       },
       select: { id: true },
     })
@@ -142,6 +143,7 @@ export async function updateFundAction(
         sortOrder: data.sortOrder ?? 0,
         isActive: data.isActive ?? true,
         showPublicProgress: data.showPublicProgress ?? false,
+        stripeConnectAccountId: data.stripeConnectAccountId || null,
       },
     })
 

@@ -33,6 +33,7 @@ export default async function EditFundPage({
     sortOrder: String(fund.sortOrder),
     isActive: fund.isActive,
     showPublicProgress: fund.showPublicProgress,
+    stripeConnectAccountId: fund.stripeConnectAccountId ?? '',
   }
 
   return (

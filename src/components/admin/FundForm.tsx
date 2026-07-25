@@ -20,6 +20,7 @@ export interface FundFormValues {
   sortOrder: string
   isActive: boolean
   showPublicProgress: boolean
+  stripeConnectAccountId: string
 }
 
 const EMPTY: FundFormValues = {
@@ -32,6 +33,7 @@ const EMPTY: FundFormValues = {
   sortOrder: '0',
   isActive: true,
   showPublicProgress: false,
+  stripeConnectAccountId: '',
 }
 
 export function FundForm({ fund }: { fund?: FundFormValues }) {
@@ -60,6 +62,7 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
       sortOrder: (fd.get('sortOrder') as string) ?? '0',
       isActive,
       showPublicProgress,
+      stripeConnectAccountId: (fd.get('stripeConnectAccountId') as string) ?? '',
     }
 
     const result = isEdit
@@ -162,6 +165,16 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
             description="Allow the raised / goal progress bar to be embedded on lighthousecare.org.au. Turn off to hide the total without affecting giving."
             checked={showPublicProgress}
             onCheckedChange={(v) => setShowPublicProgress(v === true)}
+          />
+        </div>
+
+        <div className="border-t border-gray-100 pt-5">
+          <Input
+            label="Stripe Connect account (advanced)"
+            name="stripeConnectAccountId"
+            defaultValue={fund?.stripeConnectAccountId}
+            placeholder="acct_… (leave blank to use the main account)"
+            hint="Route this fund's gifts to a separate connected Stripe account / bank. Leave blank for the main Lighthouse Care account."
           />
         </div>
       </section>

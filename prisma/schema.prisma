@@ -598,6 +598,10 @@ model Fund {
   // this fund on lighthousecare.org.au. Independent of isActive so totals can be
   // shown/hidden without affecting whether the fund accepts gifts.
   showPublicProgress Boolean @default(false)
+  // Optional Stripe Connect account (acct_…) that this fund's gifts settle to —
+  // e.g. a separate entity/bank. Just an ID (not a secret). Null = the platform
+  // account. See donation.actions / the Stripe webhook.
+  stripeConnectAccountId String?
   goalAmount  Decimal?  @db.Decimal(10, 2)
   startsAt    DateTime?
   endsAt      DateTime?

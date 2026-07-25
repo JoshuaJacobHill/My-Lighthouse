@@ -59,11 +59,15 @@ export async function createDonationCheckoutAction(
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
-    select: { id: true, name: true, slug: true, isActive: true },
+    select: { id: true, name: true, slug: true, isActive: true, stripeConnectAccountId: true },
   })
   if (!fund || !fund.isActive) {
     return { success: false, error: 'That fund isn’t available right now.' }
   }
+  // Funds with a connected account settle to that separate Stripe account/bank.
+  const stripeOptions = fund.stripeConnectAccountId
+    ? { stripeAccount: fund.stripeConnectAccountId }
+    : undefined
 
   // If this gift is for a fundraiser page, confirm it's live so we can tag it.
   let validFundraiserId: string | undefined
@@ -110,7 +114,7 @@ export async function createDonationCheckoutAction(
       payment_intent_data: { description: `Donation — ${fund.name}`, metadata: meta },
       success_url: `${base}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl,
-    })
+    }, stripeOptions)
 
     if (!session.url) {
       return { success: false, error: 'Could not start checkout. Please try again.' }
