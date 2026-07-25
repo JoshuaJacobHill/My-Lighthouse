@@ -14,6 +14,8 @@ import {
   HeartHandshake,
   Ticket,
   Megaphone,
+  Receipt,
+  HandHeart,
   Mail,
   Settings,
   ChevronLeft,
@@ -27,6 +29,7 @@ interface NavItem {
   href: string
   label: string
   icon: React.ElementType
+  finance?: boolean // hidden from admins without donations access
 }
 
 const navItems: NavItem[] = [
@@ -36,9 +39,11 @@ const navItems: NavItem[] = [
   { href: '/admin/on-site', label: 'On-Site Now', icon: MapPin },
   { href: '/admin/attendance', label: 'Attendance', icon: CheckSquare },
   { href: '/admin/reports', label: 'Reports', icon: BarChart2 },
-  { href: '/admin/funds', label: 'Funds', icon: HeartHandshake },
-  { href: '/admin/fundraisers', label: 'Fundraisers', icon: Megaphone },
-  { href: '/admin/events', label: 'Events', icon: Ticket },
+  { href: '/admin/funds', label: 'Funds', icon: HeartHandshake, finance: true },
+  { href: '/admin/fundraisers', label: 'Fundraisers', icon: Megaphone, finance: true },
+  { href: '/admin/events', label: 'Events', icon: Ticket, finance: true },
+  { href: '/admin/transactions', label: 'Transactions', icon: Receipt, finance: true },
+  { href: '/admin/donors', label: 'Donors', icon: HandHeart, finance: true },
   { href: '/admin/emails', label: 'Emails', icon: Mail },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
@@ -74,11 +79,15 @@ interface AdminSidebarProps {
   /** Controlled collapsed state — for desktop only */
   collapsed?: boolean
   onCollapsedChange?: (collapsed: boolean) => void
+  /** When false, the fundraising/donations items are hidden. */
+  canSeeDonations?: boolean
 }
 
-export function AdminSidebar({ collapsed = false, onCollapsedChange }: AdminSidebarProps) {
+export function AdminSidebar({ collapsed = false, onCollapsedChange, canSeeDonations = false }: AdminSidebarProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = React.useState(false)
+
+  const items = navItems.filter((item) => !item.finance || canSeeDonations)
 
   const isActive = (href: string) =>
     href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
@@ -114,7 +123,7 @@ export function AdminSidebar({ collapsed = false, onCollapsedChange }: AdminSide
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Admin navigation">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <SidebarLink
             key={item.href}
             item={item}
@@ -202,7 +211,7 @@ export function AdminSidebar({ collapsed = false, onCollapsedChange }: AdminSide
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Admin navigation">
-              {navItems.map((item) => (
+              {items.map((item) => (
                 <SidebarLink
                   key={item.href}
                   item={item}

@@ -24,11 +24,12 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { name, email, role, password } = body as {
+    const { name, email, role, password, canViewDonations } = body as {
       name?: string
       email?: string
       role?: string
       password?: string
+      canViewDonations?: boolean
     }
 
     const allowedRoles = ['ADMIN', 'SUPER_ADMIN']
@@ -61,11 +62,12 @@ export async function PATCH(
     if (email) data.email = email.toLowerCase()
     if (role) data.role = role
     if (password) data.passwordHash = await hashPassword(password)
+    if (typeof canViewDonations === 'boolean') data.canViewDonations = canViewDonations
 
     const user = await prisma.user.update({
       where: { id },
       data,
-      select: { id: true, name: true, email: true, role: true, isActive: true, lastLoginAt: true },
+      select: { id: true, name: true, email: true, role: true, isActive: true, canViewDonations: true, lastLoginAt: true },
     })
 
     return NextResponse.json({ success: true, user })

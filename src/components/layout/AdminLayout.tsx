@@ -14,10 +14,11 @@ interface AdminUser {
 
 interface AdminLayoutProps {
   user: AdminUser
+  canSeeDonations?: boolean
   children: React.ReactNode
 }
 
-export default function AdminLayout({ user, children }: AdminLayoutProps) {
+export default function AdminLayout({ user, canSeeDonations = false, children }: AdminLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const router = useRouter()
 
@@ -35,6 +36,7 @@ export default function AdminLayout({ user, children }: AdminLayoutProps) {
       <AdminSidebar
         collapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
+        canSeeDonations={canSeeDonations}
       />
 
       {/* Main content area */}

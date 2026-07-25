@@ -12,6 +12,7 @@ interface AdminUser {
   email: string
   role: string
   isActive: boolean
+  canViewDonations: boolean
   lastLoginAt: Date | string | null
 }
 
@@ -55,13 +56,19 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
 
   // Edit admin
   const [editAdmin, setEditAdmin] = React.useState<AdminUser | null>(null)
-  const [editForm, setEditForm] = React.useState({ name: '', email: '', role: 'ADMIN', password: '' })
+  const [editForm, setEditForm] = React.useState({ name: '', email: '', role: 'ADMIN', password: '', canViewDonations: false })
   const [editLoading, setEditLoading] = React.useState(false)
   const [editError, setEditError] = React.useState<string | null>(null)
 
   function openEdit(admin: AdminUser) {
     setEditAdmin(admin)
-    setEditForm({ name: admin.name ?? '', email: admin.email, role: admin.role, password: '' })
+    setEditForm({
+      name: admin.name ?? '',
+      email: admin.email,
+      role: admin.role,
+      password: '',
+      canViewDonations: admin.canViewDonations,
+    })
     setEditError(null)
   }
 
@@ -71,10 +78,11 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
     setEditError(null)
     setEditLoading(true)
     try {
-      const body: Record<string, string> = {
+      const body: Record<string, string | boolean> = {
         name: editForm.name,
         email: editForm.email,
         role: editForm.role,
+        canViewDonations: editForm.canViewDonations,
       }
       if (editForm.password) body.password = editForm.password
       const res = await fetch(`/api/admin/users/${editAdmin.id}`, {
@@ -567,6 +575,29 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                       <option value="ADMIN">Admin</option>
                       <option value="SUPER_ADMIN">Super Admin</option>
                     </select>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                    {editForm.role === 'SUPER_ADMIN' ? (
+                      <p className="text-sm text-gray-500">
+                        Super Admins can always see donations, donors and the fundraising area.
+                      </p>
+                    ) : (
+                      <label className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={editForm.canViewDonations}
+                          onChange={(e) => setEditForm((p) => ({ ...p, canViewDonations: e.target.checked }))}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-gray-700">Can see donations &amp; donors</span>
+                          <span className="block text-xs text-gray-500">
+                            Access to Funds, Fundraisers, Events, Transactions and the Donors list. Leave off for
+                            volunteer-only managers.
+                          </span>
+                        </span>
+                      </label>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">

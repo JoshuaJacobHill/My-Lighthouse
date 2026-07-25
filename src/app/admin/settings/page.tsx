@@ -32,6 +32,7 @@ export default async function SettingsPage() {
             email: true,
             role: true,
             isActive: true,
+            canViewDonations: true,
             lastLoginAt: true,
           },
         })
