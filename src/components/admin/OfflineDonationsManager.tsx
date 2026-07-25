@@ -2,16 +2,22 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { addOfflineDonationAction, deleteOfflineDonationAction } from '@/lib/actions/fundraiser.actions'
+import {
+  addOfflineDonationAction,
+  updateOfflineDonationAction,
+  deleteOfflineDonationAction,
+} from '@/lib/actions/fundraiser.actions'
 
 export interface OfflineDonationRow {
   id: string
   donorName: string | null
+  message: string | null
   amount: number
-  date: string // formatted
+  date: string // formatted, for display
+  donatedAt: string // yyyy-mm-dd, for the date input
 }
 
 const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
@@ -26,7 +32,27 @@ export function OfflineDonationsManager({
   const router = useRouter()
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [editingId, setEditingId] = React.useState<string | null>(null)
+  const [savingId, setSavingId] = React.useState<string | null>(null)
+  // Draft values while editing a row.
+  const [draft, setDraft] = React.useState<{ donorName: string; amount: string; donatedAt: string; message: string }>({
+    donorName: '',
+    amount: '',
+    donatedAt: '',
+    message: '',
+  })
   const formRef = React.useRef<HTMLFormElement>(null)
+
+  function startEdit(d: OfflineDonationRow) {
+    setError(null)
+    setEditingId(d.id)
+    setDraft({
+      donorName: d.donorName ?? '',
+      amount: String(d.amount),
+      donatedAt: d.donatedAt,
+      message: d.message ?? '',
+    })
+  }
 
   async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -46,6 +72,24 @@ export function OfflineDonationsManager({
       router.refresh()
     } else {
       setError(result.error ?? 'Could not add the donation.')
+    }
+  }
+
+  async function handleSave(id: string) {
+    setError(null)
+    setSavingId(id)
+    const result = await updateOfflineDonationAction(id, {
+      donorName: draft.donorName,
+      amount: draft.amount,
+      donatedAt: draft.donatedAt,
+      message: draft.message,
+    })
+    setSavingId(null)
+    if (result.success) {
+      setEditingId(null)
+      router.refresh()
+    } else {
+      setError(result.error ?? 'Could not update the donation.')
     }
   }
 
@@ -93,27 +137,94 @@ export function OfflineDonationsManager({
                 <th className="px-4 py-2.5">Donor</th>
                 <th className="px-4 py-2.5">Date</th>
                 <th className="px-4 py-2.5 text-right">Amount</th>
-                <th className="px-4 py-2.5"></th>
+                <th className="px-4 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {donations.map((d) => (
-                <tr key={d.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-2.5 text-gray-900">{d.donorName || 'Anonymous'}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{d.date}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-medium text-gray-900">{aud.format(d.amount)}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(d.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
-                      aria-label="Remove donation"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {donations.map((d) =>
+                editingId === d.id ? (
+                  <tr key={d.id} className="border-b border-gray-100 bg-orange-50/40 last:border-0">
+                    <td className="px-4 py-2.5" colSpan={4}>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
+                        <Input
+                          label="Donor name"
+                          value={draft.donorName}
+                          onChange={(e) => setDraft((p) => ({ ...p, donorName: e.target.value }))}
+                          placeholder="Anonymous"
+                        />
+                        <Input
+                          label="Amount"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={draft.amount}
+                          onChange={(e) => setDraft((p) => ({ ...p, amount: e.target.value }))}
+                        />
+                        <Input
+                          label="Date"
+                          type="date"
+                          value={draft.donatedAt}
+                          onChange={(e) => setDraft((p) => ({ ...p, donatedAt: e.target.value }))}
+                        />
+                        <div className="mb-1 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleSave(d.id)}
+                            disabled={savingId === d.id}
+                            className="inline-flex h-10 items-center gap-1 rounded-md bg-orange-500 px-3 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+                          >
+                            <Check className="h-4 w-4" /> {savingId === d.id ? 'Saving…' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(null)}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100"
+                            aria-label="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="sm:col-span-4">
+                          <Input
+                            label="Message (optional)"
+                            value={draft.message}
+                            onChange={(e) => setDraft((p) => ({ ...p, message: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={d.id} className="border-b border-gray-100 last:border-0">
+                    <td className="px-4 py-2.5">
+                      <span className="text-gray-900">{d.donorName || 'Anonymous'}</span>
+                      {d.message && <p className="mt-0.5 text-xs text-gray-400">“{d.message}”</p>}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">{d.date}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-medium text-gray-900">{aud.format(d.amount)}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(d)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-orange-600"
+                          aria-label="Edit donation"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(d.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          aria-label="Remove donation"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              )}
               <tr className="bg-gray-50">
                 <td className="px-4 py-2.5 font-semibold text-gray-700" colSpan={2}>
                   {donations.length} offline {donations.length === 1 ? 'gift' : 'gifts'}

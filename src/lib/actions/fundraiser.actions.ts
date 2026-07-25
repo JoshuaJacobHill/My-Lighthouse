@@ -5,8 +5,10 @@ import { getSession } from '@/lib/auth'
 import {
   fundraiserSchema,
   offlineDonationSchema,
+  offlineDonationEditSchema,
   type FundraiserInput,
   type OfflineDonationInput,
+  type OfflineDonationEditInput,
 } from '@/lib/validations'
 
 interface ActionResult {
@@ -171,6 +173,48 @@ export async function addOfflineDonationAction(input: OfflineDonationInput): Pro
   } catch (err) {
     console.error('addOfflineDonationAction failed', err)
     return { success: false, error: 'Could not record the donation. Please try again.' }
+  }
+}
+
+/** Edit an offline / imported donation. OFFLINE source only. */
+export async function updateOfflineDonationAction(
+  donationId: string,
+  input: OfflineDonationEditInput
+): Promise<ActionResult> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+  const parsed = offlineDonationEditSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid donation' }
+  const data = parsed.data
+
+  try {
+    const donation = await prisma.donation.findUnique({
+      where: { id: donationId },
+      select: { source: true, fundraiserId: true },
+    })
+    if (!donation) return { success: false, error: 'Donation not found' }
+    if (donation.source !== 'OFFLINE') {
+      return { success: false, error: 'Only offline donations can be edited here.' }
+    }
+
+    const createdAt = data.donatedAt ? new Date(`${data.donatedAt}T00:00:00+10:00`) : undefined
+
+    await prisma.donation.update({
+      where: { id: donationId },
+      data: {
+        donorName: data.donorName || null,
+        message: data.message || null,
+        amount: data.amount,
+        ...(createdAt && !Number.isNaN(createdAt.getTime()) ? { createdAt } : {}),
+      },
+    })
+    return { success: true, fundraiserId: donation.fundraiserId ?? undefined }
+  } catch (err) {
+    console.error('updateOfflineDonationAction failed', err)
+    return { success: false, error: 'Could not update the donation. Please try again.' }
   }
 }
 

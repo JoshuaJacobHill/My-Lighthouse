@@ -275,4 +275,8 @@ export const offlineDonationSchema = z.object({
 
 export type OfflineDonationInput = z.input<typeof offlineDonationSchema>
 
+// Editing an existing offline gift — same fields, minus the fundraiser link.
+export const offlineDonationEditSchema = offlineDonationSchema.omit({ fundraiserId: true })
+export type OfflineDonationEditInput = z.input<typeof offlineDonationEditSchema>
+
 export type AdminNoteInput = z.infer<typeof adminNoteSchema>

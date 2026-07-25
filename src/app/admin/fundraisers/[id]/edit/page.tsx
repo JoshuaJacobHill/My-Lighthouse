@@ -27,7 +27,7 @@ export default async function EditFundraiserPage({
     prisma.donation.findMany({
       where: { fundraiserId: id, source: 'OFFLINE' },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, donorName: true, amount: true, createdAt: true },
+      select: { id: true, donorName: true, message: true, amount: true, createdAt: true },
     }),
   ])
   if (!fundraiser) notFound()
@@ -48,8 +48,10 @@ export default async function EditFundraiserPage({
   const offlineRows: OfflineDonationRow[] = offline.map((d) => ({
     id: d.id,
     donorName: d.donorName,
+    message: d.message,
     amount: Number(d.amount),
     date: formatDate(d.createdAt),
+    donatedAt: new Date(d.createdAt.getTime() + 10 * 60 * 60 * 1000).toISOString().slice(0, 10),
   }))
 
   return (
