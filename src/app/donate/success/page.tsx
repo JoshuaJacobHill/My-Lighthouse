@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
+import { getStripeFor, isAccountKey } from '@/lib/stripe-accounts'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,24 +14,35 @@ const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' 
 export default async function DonateSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string }>
+  searchParams: Promise<{
+    session_id?: string
+    payment_intent?: string
+    acct?: string
+  }>
 }) {
   if (!isDonorPortalEnabled()) notFound()
 
-  const { session_id: sessionId } = await searchParams
+  const { session_id: sessionId, payment_intent: paymentIntentId, acct } = await searchParams
 
   let amountLabel: string | null = null
   let donorName: string | null = null
 
   // Best-effort: show the gift amount. The gift is recorded by the webhook, not here.
-  if (sessionId && isStripeConfigured()) {
-    try {
+  try {
+    if (paymentIntentId && isAccountKey(acct)) {
+      // On-page (Payment Element) flow — retrieve the intent on its account.
+      const intent = await getStripeFor(acct).paymentIntents.retrieve(paymentIntentId)
+      const cents = intent.amount_received || intent.amount
+      if (cents) amountLabel = aud.format(cents / 100)
+      donorName = (intent.metadata?.donorName as string) || null
+    } else if (sessionId && isStripeConfigured()) {
+      // Legacy hosted-checkout flow.
       const session = await getStripe().checkout.sessions.retrieve(sessionId)
       if (session.amount_total) amountLabel = aud.format(session.amount_total / 100)
       donorName = (session.metadata?.donorName as string) || null
-    } catch {
-      // Ignore — still show a thank-you.
     }
+  } catch {
+    // Ignore — still show a thank-you.
   }
 
   return (

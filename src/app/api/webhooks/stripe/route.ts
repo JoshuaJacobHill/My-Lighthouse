@@ -78,6 +78,14 @@ export async function POST(req: NextRequest) {
       } else {
         await recordDonation(session)
       }
+    } else if (event.type === 'payment_intent.succeeded') {
+      // On-page (Payment Element) donations arrive as PaymentIntents, not
+      // Checkout Sessions. Only act on our donation intents — ticket/checkout
+      // PaymentIntents carry no `kind` and are recorded via the session event.
+      const intent = event.data.object as Stripe.PaymentIntent
+      if (intent.metadata?.kind === 'donation') {
+        await recordDonationFromIntent(intent)
+      }
     }
     await prisma.webhookEvent.update({
       where: { providerEventId: event.id },
@@ -109,6 +117,47 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
       : session.payment_intent?.id
   if (!paymentIntentId) return
 
+  await finalizeDonation({
+    paymentIntentId,
+    donorEmail: session.customer_details?.email ?? session.customer_email ?? '',
+    donorName: meta.donorName || session.customer_details?.name || null,
+    amount: (session.amount_total ?? 0) / 100,
+    currency: (session.currency ?? 'aud').toUpperCase(),
+    meta,
+  })
+}
+
+async function recordDonationFromIntent(intent: Stripe.PaymentIntent): Promise<void> {
+  const meta = intent.metadata ?? {}
+  if (meta.kind !== 'donation') return
+
+  await finalizeDonation({
+    paymentIntentId: intent.id,
+    donorEmail: intent.receipt_email || meta.donorEmail || '',
+    donorName: meta.donorName || null,
+    amount: (intent.amount_received ?? intent.amount ?? 0) / 100,
+    currency: (intent.currency ?? 'aud').toUpperCase(),
+    meta,
+  })
+}
+
+/**
+ * Record a completed gift and send the receipt — shared by the Checkout-session
+ * path (event tickets legacy / hosted checkout) and the on-page PaymentIntent
+ * path. Idempotent on providerTransactionId, so a retry or a duplicate event
+ * (e.g. both `checkout.session.completed` and `payment_intent.succeeded`) is safe.
+ */
+async function finalizeDonation(params: {
+  paymentIntentId: string
+  donorEmail: string
+  donorName: string | null
+  amount: number
+  currency: string
+  meta: Record<string, string>
+}): Promise<void> {
+  const { paymentIntentId, donorEmail, donorName, amount, currency, meta } = params
+  if (!paymentIntentId || !donorEmail) return
+
   // Idempotent on the gift itself: providerTransactionId is unique.
   const already = await prisma.donation.findUnique({
     where: { providerTransactionId: paymentIntentId },
@@ -116,20 +165,12 @@ async function recordDonation(session: Stripe.Checkout.Session): Promise<void> {
   })
   if (already) return
 
-  const donorEmail =
-    session.customer_details?.email ?? session.customer_email ?? ''
-  if (!donorEmail) return
-
-  const amount = (session.amount_total ?? 0) / 100
-  const currency = (session.currency ?? 'aud').toUpperCase()
-
   // Match to an account only when that email is verified (plan §8).
   const user = await prisma.user.findFirst({
     where: { email: { equals: donorEmail, mode: 'insensitive' }, emailVerified: { not: null } },
     select: { id: true },
   })
 
-  const donorName = meta.donorName || session.customer_details?.name || null
   const fundId = meta.fundId || null
   const fundraiserId = meta.fundraiserId || null
 

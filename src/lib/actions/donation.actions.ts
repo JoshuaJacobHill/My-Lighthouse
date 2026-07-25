@@ -13,6 +13,13 @@ interface CheckoutResult {
   url?: string
 }
 
+interface IntentResult {
+  success: boolean
+  error?: string
+  clientSecret?: string
+  accountKey?: 'CARE' | 'CHURCH'
+}
+
 const donateSchema = z.object({
   fundSlug: z.string().min(1),
   amount: z.coerce
@@ -123,5 +130,82 @@ export async function createDonationCheckoutAction(
   } catch (err) {
     console.error('createDonationCheckoutAction failed', err)
     return { success: false, error: 'Could not start checkout. Please try again.' }
+  }
+}
+
+/**
+ * On-page (Payment Element) donation: validate, then create a PaymentIntent on
+ * the fund's Stripe account and hand back its client secret so the browser can
+ * confirm the card without leaving the page. Same as the hosted-checkout action,
+ * the gift is only recorded once Stripe confirms via the `payment_intent.succeeded`
+ * webhook — this action never writes a Donation row.
+ */
+export async function createDonationIntentAction(input: DonateInput): Promise<IntentResult> {
+  if (!isStripeConfigured()) {
+    return { success: false, error: 'Donations aren’t configured yet. Please try again soon.' }
+  }
+
+  // Rate limit by client IP — defence against flooding the payments endpoint.
+  const hdrs = await headers()
+  const ip = (hdrs.get('x-forwarded-for') ?? '').split(',')[0]?.trim() || 'unknown'
+  const limit = rateLimit(`donate-intent:${ip}`, 15, 60_000)
+  if (!limit.ok) {
+    return { success: false, error: 'Too many attempts — please wait a moment and try again.' }
+  }
+
+  const parsed = donateSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
+  }
+  const { fundSlug, amount, name, email, fundraiserId, message } = parsed.data
+
+  const fund = await prisma.fund.findUnique({
+    where: { slug: fundSlug },
+    select: { id: true, name: true, slug: true, isActive: true, depositAccount: true },
+  })
+  if (!fund || !fund.isActive) {
+    return { success: false, error: 'That fund isn’t available right now.' }
+  }
+  const accountKey = resolveAccount(fund.depositAccount)
+
+  // If this gift is for a fundraiser page, confirm it's live so we can tag it.
+  let validFundraiserId: string | undefined
+  if (fundraiserId) {
+    const fr = await prisma.fundraiser.findUnique({
+      where: { id: fundraiserId },
+      select: { id: true, isActive: true },
+    })
+    if (fr?.isActive) validFundraiserId = fr.id
+  }
+
+  try {
+    const meta: Record<string, string> = {
+      kind: 'donation',
+      fundId: fund.id,
+      fundSlug: fund.slug,
+      donorName: name,
+      donorEmail: email,
+      account: accountKey,
+      source: validFundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
+    }
+    if (validFundraiserId) meta.fundraiserId = validFundraiserId
+    if (message) meta.message = message
+
+    const intent = await getStripeFor(accountKey).paymentIntents.create({
+      amount: toCents(amount),
+      currency: 'aud',
+      receipt_email: email,
+      description: `Donation — ${fund.name}`,
+      automatic_payment_methods: { enabled: true },
+      metadata: meta,
+    })
+
+    if (!intent.client_secret) {
+      return { success: false, error: 'Could not start payment. Please try again.' }
+    }
+    return { success: true, clientSecret: intent.client_secret, accountKey }
+  } catch (err) {
+    console.error('createDonationIntentAction failed', err)
+    return { success: false, error: 'Could not start payment. Please try again.' }
   }
 }

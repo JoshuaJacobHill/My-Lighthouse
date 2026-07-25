@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
+import { resolveAccount } from '@/lib/stripe-accounts'
 import { DonateForm } from './DonateForm'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,11 @@ export default async function DonatePage({
   const fundraiser = fundraiserSlug
     ? await prisma.fundraiser.findFirst({
         where: { slug: fundraiserSlug, isActive: true },
-        select: { id: true, title: true, fund: { select: { name: true, slug: true, description: true } } },
+        select: {
+          id: true,
+          title: true,
+          fund: { select: { name: true, slug: true, description: true, depositAccount: true } },
+        },
       })
     : null
 
@@ -34,12 +39,12 @@ export default async function DonatePage({
     : fundSlug
       ? await prisma.fund.findFirst({
           where: { slug: fundSlug, isActive: true },
-          select: { name: true, slug: true, description: true },
+          select: { name: true, slug: true, description: true, depositAccount: true },
         })
       : await prisma.fund.findFirst({
           where: { isActive: true },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-          select: { name: true, slug: true, description: true },
+          select: { name: true, slug: true, description: true, depositAccount: true },
         })
 
   if (!fund) {
@@ -76,6 +81,7 @@ export default async function DonatePage({
           fundSlug={fund.slug}
           fundName={fundraiser ? fundraiser.title : fund.name}
           fundraiserId={fundraiser?.id}
+          accountKey={resolveAccount(fund.depositAccount)}
         />
 
         <p className="mt-6 text-center text-xs text-gray-400">
