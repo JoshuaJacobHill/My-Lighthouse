@@ -9,8 +9,8 @@ import Stripe from 'stripe'
 export const STRIPE_ACCOUNTS = {
   CARE: {
     label: 'Lighthouse Care',
-    secretKeyEnv: 'STRIPE_SECRET_KEY',
-    webhookSecretEnv: 'STRIPE_WEBHOOK_SECRET',
+    secretKeyEnv: 'STRIPE_CARE_SECRET_KEY',
+    webhookSecretEnv: 'STRIPE_CARE_WEBHOOK_SECRET',
   },
   CHURCH: {
     label: 'Lighthouse Church',
