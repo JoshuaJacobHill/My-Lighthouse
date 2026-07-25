@@ -20,7 +20,7 @@ export interface FundFormValues {
   sortOrder: string
   isActive: boolean
   showPublicProgress: boolean
-  stripeConnectAccountId: string
+  depositAccount: string
 }
 
 const EMPTY: FundFormValues = {
@@ -33,7 +33,7 @@ const EMPTY: FundFormValues = {
   sortOrder: '0',
   isActive: true,
   showPublicProgress: false,
-  stripeConnectAccountId: '',
+  depositAccount: 'CARE',
 }
 
 export function FundForm({ fund }: { fund?: FundFormValues }) {
@@ -62,7 +62,7 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
       sortOrder: (fd.get('sortOrder') as string) ?? '0',
       isActive,
       showPublicProgress,
-      stripeConnectAccountId: (fd.get('stripeConnectAccountId') as string) ?? '',
+      depositAccount: ((fd.get('depositAccount') as string) ?? 'CARE') as 'CARE' | 'CHURCH',
     }
 
     const result = isEdit
@@ -169,13 +169,23 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
         </div>
 
         <div className="border-t border-gray-100 pt-5">
-          <Input
-            label="Stripe Connect account (advanced)"
-            name="stripeConnectAccountId"
-            defaultValue={fund?.stripeConnectAccountId}
-            placeholder="acct_… (leave blank to use the main account)"
-            hint="Route this fund's gifts to a separate connected Stripe account / bank. Leave blank for the main Lighthouse Care account."
-          />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="depositAccount" className="text-sm font-medium text-gray-700">
+              Deposit gifts to
+            </label>
+            <select
+              id="depositAccount"
+              name="depositAccount"
+              defaultValue={fund?.depositAccount ?? 'CARE'}
+              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="CARE">Lighthouse Care</option>
+              <option value="CHURCH">Lighthouse Church</option>
+            </select>
+            <p className="text-xs text-gray-500">
+              Which Stripe account (and bank) this fund&rsquo;s donations settle to.
+            </p>
+          </div>
         </div>
       </section>
 

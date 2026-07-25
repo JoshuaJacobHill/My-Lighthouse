@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
-import { getStripe } from '@/lib/stripe'
+import { configuredWebhookSecrets, getStripeFor } from '@/lib/stripe-accounts'
 import { sendDonationReceiptEmail, sendAccountSetupEmail } from '@/lib/donation-emails'
 import { createAccountSetupToken } from '@/lib/account-setup'
 import { createOrderWithTickets, type Selection } from '@/lib/tickets'
@@ -19,9 +19,9 @@ export const dynamic = 'force-dynamic'
 // and match it to an account by verified email.
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET
-  if (!secret) {
-    console.error('STRIPE_WEBHOOK_SECRET is not set')
+  const secrets = configuredWebhookSecrets()
+  if (secrets.length === 0) {
+    console.error('No Stripe webhook signing secret is configured')
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
   }
 
@@ -32,11 +32,20 @@ export async function POST(req: NextRequest) {
 
   const rawBody = await req.text()
 
-  let event: Stripe.Event
-  try {
-    event = getStripe().webhooks.constructEvent(rawBody, signature, secret)
-  } catch (err) {
-    console.error('Stripe signature verification failed', err)
+  // The event may come from any of our accounts (Care / Church) — verify against
+  // each configured signing secret and keep the one that validates.
+  const verifier = getStripeFor(secrets[0].key)
+  let event: Stripe.Event | null = null
+  for (const { secret } of secrets) {
+    try {
+      event = verifier.webhooks.constructEvent(rawBody, signature, secret)
+      break
+    } catch {
+      // try the next account's secret
+    }
+  }
+  if (!event) {
+    console.error('Stripe signature verification failed for all configured accounts')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 

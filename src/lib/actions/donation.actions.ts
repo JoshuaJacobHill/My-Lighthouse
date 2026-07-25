@@ -3,7 +3,8 @@
 import { z } from 'zod'
 import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
-import { getStripe, isStripeConfigured, toCents } from '@/lib/stripe'
+import { isStripeConfigured, toCents } from '@/lib/stripe'
+import { getStripeFor, resolveAccount } from '@/lib/stripe-accounts'
 import { rateLimit } from '@/lib/rate-limit'
 
 interface CheckoutResult {
@@ -59,15 +60,13 @@ export async function createDonationCheckoutAction(
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
-    select: { id: true, name: true, slug: true, isActive: true, stripeConnectAccountId: true },
+    select: { id: true, name: true, slug: true, isActive: true, depositAccount: true },
   })
   if (!fund || !fund.isActive) {
     return { success: false, error: 'That fund isn’t available right now.' }
   }
-  // Funds with a connected account settle to that separate Stripe account/bank.
-  const stripeOptions = fund.stripeConnectAccountId
-    ? { stripeAccount: fund.stripeConnectAccountId }
-    : undefined
+  // Which Stripe account this fund's gifts deposit to (falls back to CARE).
+  const accountKey = resolveAccount(fund.depositAccount)
 
   // If this gift is for a fundraiser page, confirm it's live so we can tag it.
   let validFundraiserId: string | undefined
@@ -86,6 +85,7 @@ export async function createDonationCheckoutAction(
       fundId: fund.id,
       fundSlug: fund.slug,
       donorName: name,
+      account: accountKey,
       source: validFundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
     }
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
@@ -93,7 +93,7 @@ export async function createDonationCheckoutAction(
     const cancelUrl = validFundraiserId
       ? `${base}/donate?fundraiser=${fundraiserId}&cancelled=1`
       : `${base}/donate?fund=${fund.slug}&cancelled=1`
-    const session = await getStripe().checkout.sessions.create({
+    const session = await getStripeFor(accountKey).checkout.sessions.create({
       mode: 'payment',
       customer_email: email,
       line_items: [
@@ -114,7 +114,7 @@ export async function createDonationCheckoutAction(
       payment_intent_data: { description: `Donation — ${fund.name}`, metadata: meta },
       success_url: `${base}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl,
-    }, stripeOptions)
+    })
 
     if (!session.url) {
       return { success: false, error: 'Could not start checkout. Please try again.' }

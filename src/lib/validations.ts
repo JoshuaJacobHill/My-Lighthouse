@@ -190,14 +190,8 @@ export const fundSchema = z.object({
     .refine((v) => Number.isInteger(v), { message: 'Sort order must be a whole number' }),
   isActive: z.boolean().optional().default(true),
   showPublicProgress: z.boolean().optional().default(false),
-  // Optional Stripe Connect account id (acct_…) — routes this fund's gifts to a
-  // separate Stripe account / bank. Blank = the main account.
-  stripeConnectAccountId: z
-    .string()
-    .trim()
-    .regex(/^acct_[A-Za-z0-9]+$/, 'Must be a Stripe account id starting with acct_')
-    .optional()
-    .or(z.literal('')),
+  // Which Stripe account this fund's gifts deposit to.
+  depositAccount: z.enum(['CARE', 'CHURCH']).optional().default('CARE'),
 })
 
 // Input type (pre-transform): forms send strings for numbers/dates.
