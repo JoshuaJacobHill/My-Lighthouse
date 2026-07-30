@@ -4,7 +4,7 @@ import { getSession, hashPassword, createPasswordResetToken } from '@/lib/auth'
 import { renderTemplate } from '@/lib/email-templates'
 import { sendEmail } from '@/lib/email'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

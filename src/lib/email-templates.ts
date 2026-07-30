@@ -29,7 +29,7 @@ function shiftTable(vars: { shift_date?: string; shift_time?: string; location?:
     </table>`
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 
 function wrap(body: string) {
   return wrapEmailHtml(body, APP_URL)
@@ -216,7 +216,7 @@ export async function renderTemplate(
 ): Promise<RenderedTemplate> {
   const mergedVars: Record<string, string> = {
     organisation_name: 'Lighthouse Care',
-    portal_link: process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au',
+    portal_link: process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au',
     ...variables,
   }
 

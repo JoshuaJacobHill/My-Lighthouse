@@ -271,7 +271,7 @@ export async function submitQuizAnswersAction(
 
       // Send INDUCTION_COMPLETE email
       try {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteer.lighthousecare.org.au'
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
         const template = await renderTemplate('INDUCTION_COMPLETE', {
           first_name: updated.firstName,
           last_name: updated.lastName,
@@ -470,7 +470,7 @@ export async function optOutAction(): Promise<ActionResult> {
 
     // Send farewell email
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteer.lighthousecare.org.au'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
       const farewell = buildFarewellEmail(volunteer.firstName, appUrl)
       await sendEmail({
         to: volunteer.email,

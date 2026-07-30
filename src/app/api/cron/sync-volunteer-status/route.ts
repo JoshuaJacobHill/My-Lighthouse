@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 
   const cutoff = THREE_MONTHS_AGO()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteer.lighthousecare.org.au'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
   const portalLink = `${appUrl}/volunteer`
 
   let markedInactive = 0

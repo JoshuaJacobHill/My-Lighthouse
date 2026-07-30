@@ -4,7 +4,7 @@ import { createPasswordResetToken } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 
 const ORANGE = '#f97316'
 const TEXT = '#374151'

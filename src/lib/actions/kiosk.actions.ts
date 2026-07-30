@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 const ORANGE = '#f97316'
 const P = `margin:0 0 18px 0;line-height:1.7;color:#374151;font-size:15px;`
 const BTN = `background:${ORANGE};color:#ffffff;padding:13px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;font-size:14px;`

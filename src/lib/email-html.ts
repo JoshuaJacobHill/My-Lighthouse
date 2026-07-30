@@ -25,7 +25,7 @@ const P_STYLE = `margin:0 0 18px 0;line-height:1.7;color:${TEXT_BODY};font-size:
 
 // ─── Full email wrapper ───────────────────────────────────────────────────────
 
-export function wrapEmailHtml(bodyContent: string, appUrl = 'https://volunteers.lighthousecare.org.au'): string {
+export function wrapEmailHtml(bodyContent: string, appUrl = 'https://my.lighthousecare.org.au'): string {
   const logoUrl = `${appUrl}/logo-inline-black.png`
 
   return `<!DOCTYPE html>
@@ -80,7 +80,7 @@ export function wrapEmailHtml(bodyContent: string, appUrl = 'https://volunteers.
 // email wrapper above. Handles paragraphs, line breaks, portal link buttons,
 // and inline links.
 
-export function buildHtmlFromText(text: string, appUrl = 'https://volunteers.lighthousecare.org.au'): string {
+export function buildHtmlFromText(text: string, appUrl = 'https://my.lighthousecare.org.au'): string {
   const button = (href: string, label: string) =>
     `<p style="margin:24px 0;"><a href="${href}" style="${BUTTON_STYLE}">${label}</a></p>`
 

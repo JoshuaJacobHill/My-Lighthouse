@@ -20,7 +20,7 @@ interface TemplateEditorProps {
 }
 
 const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+  process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 
 const SAMPLE_VARS: Record<string, string> = {
   first_name: 'Sarah',

@@ -79,7 +79,7 @@ export async function updateVolunteerStatusAction(
 
     // ── Send farewell email when a volunteer is newly marked as REMOVED ───
     if (status === 'REMOVED' && current?.status !== 'REMOVED' && current) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteer.lighthousecare.org.au'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
       const farewell = buildFarewellEmail(current.firstName, appUrl)
       try {
         await sendEmail({

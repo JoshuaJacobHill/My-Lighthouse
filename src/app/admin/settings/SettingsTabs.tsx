@@ -319,7 +319,7 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
           <SettingField
             label="App URL"
             settingKey="app_url"
-            value={values.app_url ?? 'https://volunteers.lighthousecare.org.au'}
+            value={values.app_url ?? 'https://my.lighthousecare.org.au'}
             onChange={update}
           />
           <SettingField

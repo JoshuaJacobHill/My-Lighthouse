@@ -26,7 +26,7 @@ import {
   type OnSiteVolunteer,
 } from '@/lib/actions/kiosk.actions'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://volunteers.lighthousecare.org.au'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 const SAFETY_INFO_URL = 'https://www.lighthousecare.org.au/volunteer-safety'
 
 type Screen =
