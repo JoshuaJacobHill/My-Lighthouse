@@ -56,14 +56,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
       <Suspense fallback={null}>
         <GoodbyeBanner />
       </Suspense>
 
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Sign In</h1>
-        <p className="mt-1 text-sm text-gray-600">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Sign In</h1>
+        <p className="mt-1.5 text-sm text-gray-500">
           Welcome back — let&apos;s get you signed in.
         </p>
       </div>
@@ -79,15 +79,25 @@ export default function LoginPage() {
           autoComplete="email"
           autoFocus
         />
-        <Input
-          label="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          required
-          autoComplete="current-password"
-        />
+        <div>
+          <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+            autoComplete="current-password"
+          />
+          <div className="mt-2 text-right">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-orange-500 hover:text-orange-600 hover:underline"
+            >
+              Forgot your password?
+            </Link>
+          </div>
+        </div>
 
         {error && (
           <div
@@ -99,7 +109,12 @@ export default function LoginPage() {
           </div>
         )}
 
-        <Button type="submit" className="w-full" size="lg" disabled={isPending}>
+        <Button
+          type="submit"
+          size="lg"
+          disabled={isPending}
+          className="w-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600"
+        >
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -109,22 +124,14 @@ export default function LoginPage() {
             'Sign In'
           )}
         </Button>
-
-        <div className="text-center">
-          <Link href="/forgot-password" className="text-sm text-orange-500 hover:underline">
-            Forgot your password?
-          </Link>
-        </div>
       </form>
 
-      <div className="mt-6 text-center text-sm text-gray-600">
-        <p>
-          New volunteer?{' '}
-          <Link href="/signup" className="font-medium text-orange-500 hover:underline">
-            Sign up here &rarr;
-          </Link>
-        </p>
-      </div>
+      <p className="mt-8 text-center text-sm text-gray-500">
+        New volunteer?{' '}
+        <Link href="/signup" className="font-medium text-orange-500 hover:underline">
+          Sign up here &rarr;
+        </Link>
+      </p>
     </div>
   )
 }
