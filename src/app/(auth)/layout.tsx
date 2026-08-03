@@ -1,55 +1,48 @@
 import * as React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import prisma from '@/lib/prisma'
 
 export const metadata = {
   title: 'Sign In',
 }
 
-// Swap this for a brand lifestyle photo any time (drop it in /public and update
-// the src). Kept as a real Good Food image so the panel looks intentional.
-const HERO_IMAGE = '/fundraisers/good-food-box.png'
+// Fallback when no image is set in admin (Settings → General → Login Page Image).
+const DEFAULT_HERO = '/fundraisers/good-food-box.png'
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+const CONTACT_URL = 'https://lighthousecare.org.au/contact/'
+
+async function getHeroImage(): Promise<string> {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: 'login_hero_image_url' },
+      select: { value: true },
+    })
+    return setting?.value?.trim() || DEFAULT_HERO
+  } catch {
+    return DEFAULT_HERO
+  }
+}
+
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  const heroSrc = await getHeroImage()
+
   return (
     <div className="min-h-screen w-full bg-white lg:grid lg:grid-cols-[1.05fr_1fr]">
-      {/* ── Left: brand / photo panel (desktop only) ─────────────────────── */}
-      <aside className="relative hidden lg:block">
-        <Image
-          src={HERO_IMAGE}
-          alt=""
-          fill
-          priority
-          sizes="(min-width: 1024px) 55vw, 0px"
-          className="object-cover"
-        />
-        {/* Warm brand wash so the white type is always legible */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-orange-900/95 via-orange-700/70 to-orange-500/30" />
+      {/* ── Left: photo panel (desktop only) — image + headline, nothing else ── */}
+      <aside className="relative hidden overflow-hidden bg-orange-100 lg:block">
+        {/* Plain <img> so any admin-provided URL works without next/image config. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={heroSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
 
-        <div className="absolute inset-0 z-10 flex flex-col justify-between p-12">
-          <Link href="/" aria-label="Lighthouse Care — home">
-            <Image
-              src="/logo-inline-black.png"
-              alt="Lighthouse Care"
-              width={220}
-              height={56}
-              className="h-9 w-auto brightness-0 invert drop-shadow"
-              priority
-            />
-          </Link>
-
-          <div className="max-w-md">
-            <h2 className="text-4xl font-extrabold leading-tight text-white drop-shadow-sm xl:text-5xl">
-              Thanks for helping make lives better
-            </h2>
-            <p className="mt-4 text-sm font-medium tracking-wide text-orange-50/90">
-              Lighthouse Care &mdash; ABN 87 637 110 948 &mdash; ACNC Registered Charity
-            </p>
-          </div>
+        <div className="absolute inset-x-0 bottom-0 z-10 p-12">
+          <h2 className="max-w-md text-4xl font-extrabold leading-tight text-white [text-shadow:0_2px_14px_rgba(0,0,0,0.55)] xl:text-5xl">
+            Thanks for helping make lives better
+          </h2>
         </div>
       </aside>
 
-      {/* ── Right: form panel ────────────────────────────────────────────── */}
+      {/* ── Right: form panel (holds the only logo) ──────────────────────── */}
       <main className="flex min-h-screen flex-col bg-white">
         {/* Mobile brand header (photo panel is hidden on small screens) */}
         <div className="bg-gradient-to-br from-orange-500 to-orange-700 px-6 pb-8 pt-10 text-center lg:hidden">
@@ -68,15 +61,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
           <div className="w-full max-w-md">
-            {/* Small wordmark on desktop, where there's no mobile header */}
+            {/* The single logo — desktop only (mobile shows it in the header above) */}
             <div className="mb-8 hidden lg:block">
-              <Image
-                src="/logo-inline-black.png"
-                alt="Lighthouse Care"
-                width={180}
-                height={48}
-                className="h-8 w-auto"
-              />
+              <Link href="/" aria-label="Lighthouse Care — home">
+                <Image
+                  src="/logo-inline-black.png"
+                  alt="Lighthouse Care"
+                  width={180}
+                  height={48}
+                  className="h-8 w-auto"
+                />
+              </Link>
               <p className="mt-1.5 text-sm text-gray-400">Volunteer Portal</p>
             </div>
 
@@ -84,9 +79,19 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
         </div>
 
-        <p className="px-6 pb-6 text-center text-xs text-gray-400">
-          Lighthouse Care &mdash; ABN 87 637 110 948 &mdash; ACNC Registered Charity
-        </p>
+        <div className="space-y-1 px-6 pb-6 text-center text-xs text-gray-400">
+          <p>
+            <a
+              href={CONTACT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-orange-500 hover:underline"
+            >
+              Contact us
+            </a>
+          </p>
+          <p>Lighthouse Care &mdash; ABN 87 637 110 948 &mdash; ACNC Registered Charity</p>
+        </div>
       </main>
     </div>
   )

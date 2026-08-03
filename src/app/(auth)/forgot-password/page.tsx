@@ -33,10 +33,10 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Forgot your password?</h1>
-        <p className="mt-1 text-sm text-gray-600">
+    <div>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Forgot your password?</h1>
+        <p className="mt-1.5 text-sm text-gray-500">
           Enter your email and we&apos;ll send you a reset link.
         </p>
       </div>
@@ -71,7 +71,12 @@ export default function ForgotPasswordPage() {
             </div>
           )}
 
-          <Button type="submit" className="w-full" size="lg" disabled={isPending}>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isPending}
+            className="w-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600"
+          >
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

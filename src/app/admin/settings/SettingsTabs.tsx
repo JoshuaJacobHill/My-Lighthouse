@@ -323,6 +323,14 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             onChange={update}
           />
           <SettingField
+            label="Login Page Image URL"
+            settingKey="login_hero_image_url"
+            value={values.login_hero_image_url ?? ''}
+            onChange={update}
+            placeholder="https://…"
+            helpText="Shown on the left of the sign-in screen. Paste an image URL (e.g. from your website's media library). Leave blank for the default."
+          />
+          <SettingField
             label="Loganholme Coordinator Email"
             settingKey="loganholme_coordinator_email"
             type="email"
