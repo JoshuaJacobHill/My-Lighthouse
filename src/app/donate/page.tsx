@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
+import { getSession } from '@/lib/auth'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { resolveAccount } from '@/lib/stripe-accounts'
 import { DonateForm } from './DonateForm'
@@ -56,8 +57,17 @@ export default async function DonatePage({
     )
   }
 
+  // Prefill donor details for signed-in users so they don't retype them.
+  const session = await getSession()
+  const currentUser = session
+    ? await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { name: true, email: true },
+      })
+    : null
+
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-12">
+    <div className="min-h-screen bg-white px-6 py-12">
       <div className="mx-auto max-w-lg">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-gray-900">
@@ -82,6 +92,8 @@ export default async function DonatePage({
           fundName={fundraiser ? fundraiser.title : fund.name}
           fundraiserId={fundraiser?.id}
           accountKey={resolveAccount(fund.depositAccount)}
+          initialName={currentUser?.name ?? undefined}
+          initialEmail={currentUser?.email ?? undefined}
         />
 
         <p className="mt-6 text-center text-xs text-gray-400">

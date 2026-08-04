@@ -1,11 +1,18 @@
 'use server'
 
 import { z } from 'zod'
+import type Stripe from 'stripe'
 import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { isStripeConfigured, toCents } from '@/lib/stripe'
 import { getStripeFor, resolveAccount } from '@/lib/stripe-accounts'
 import { rateLimit } from '@/lib/rate-limit'
+
+// Pin a modern API version for subscription calls — the account's default
+// version is old and doesn't accept the modern subscription params (and shapes
+// the invoice's payment intent differently). This version supports them and
+// still exposes latest_invoice.payment_intent.
+const SUB_API_VERSION = '2024-06-20' as Stripe.LatestApiVersion
 
 interface CheckoutResult {
   success: boolean
@@ -381,21 +388,28 @@ export async function createDonationSubscriptionIntentAction(
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
     if (message) meta.message = message
 
-    const customer = await stripe.customers.create({ email, name })
-    const price = await stripe.prices.create({
-      currency: 'aud',
-      unit_amount: toCents(amount),
-      recurring: { interval: freq.interval, interval_count: freq.interval_count },
-      product_data: { name: `${freq.label} donation — ${fund.name}` },
-    })
-    const sub = await stripe.subscriptions.create({
-      customer: customer.id,
-      items: [{ price: price.id }],
-      payment_behavior: 'default_incomplete',
-      payment_settings: { save_default_payment_method: 'on_subscription' },
-      expand: ['latest_invoice.payment_intent'],
-      metadata: meta,
-    })
+    const reqOpts = { apiVersion: SUB_API_VERSION }
+    const customer = await stripe.customers.create({ email, name }, reqOpts)
+    const price = await stripe.prices.create(
+      {
+        currency: 'aud',
+        unit_amount: toCents(amount),
+        recurring: { interval: freq.interval, interval_count: freq.interval_count },
+        product_data: { name: `${freq.label} donation — ${fund.name}` },
+      },
+      reqOpts
+    )
+    const sub = await stripe.subscriptions.create(
+      {
+        customer: customer.id,
+        items: [{ price: price.id }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+        metadata: meta,
+      },
+      reqOpts
+    )
 
     const inv = sub.latest_invoice as unknown as {
       payment_intent?: { client_secret?: string | null } | null

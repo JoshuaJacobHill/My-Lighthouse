@@ -34,16 +34,20 @@ export function DonateForm({
   fundName,
   fundraiserId,
   accountKey,
+  initialName,
+  initialEmail,
 }: {
   fundSlug: string
   fundName: string
   fundraiserId?: string
   accountKey: AccountKey
+  initialName?: string
+  initialEmail?: string
 }) {
   const [amount, setAmount] = React.useState<number>(25)
   const [custom, setCustom] = React.useState('')
-  const [name, setName] = React.useState('')
-  const [email, setEmail] = React.useState('')
+  const [name, setName] = React.useState(initialName ?? '')
+  const [email, setEmail] = React.useState(initialEmail ?? '')
   const [message, setMessage] = React.useState('')
   const [frequency, setFrequency] = React.useState<Frequency>('once')
   const [error, setError] = React.useState<string | null>(null)
