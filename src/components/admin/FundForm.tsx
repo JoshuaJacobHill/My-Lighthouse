@@ -20,6 +20,9 @@ export interface FundFormValues {
   sortOrder: string
   isActive: boolean
   showPublicProgress: boolean
+  imageUrl: string
+  tagline: string
+  showOnDashboard: boolean
   depositAccount: string
 }
 
@@ -33,6 +36,9 @@ const EMPTY: FundFormValues = {
   sortOrder: '0',
   isActive: true,
   showPublicProgress: false,
+  imageUrl: '',
+  tagline: '',
+  showOnDashboard: false,
   depositAccount: 'CARE',
 }
 
@@ -44,6 +50,9 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
   const [isActive, setIsActive] = React.useState(fund?.isActive ?? EMPTY.isActive)
   const [showPublicProgress, setShowPublicProgress] = React.useState(
     fund?.showPublicProgress ?? EMPTY.showPublicProgress
+  )
+  const [showOnDashboard, setShowOnDashboard] = React.useState(
+    fund?.showOnDashboard ?? EMPTY.showOnDashboard
   )
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -62,6 +71,9 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
       sortOrder: (fd.get('sortOrder') as string) ?? '0',
       isActive,
       showPublicProgress,
+      imageUrl: (fd.get('imageUrl') as string) ?? '',
+      tagline: (fd.get('tagline') as string) ?? '',
+      showOnDashboard,
       depositAccount: ((fd.get('depositAccount') as string) ?? 'CARE') as 'CARE' | 'CHURCH',
     }
 
@@ -165,6 +177,29 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
             description="Allow the raised / goal progress bar to be embedded on lighthousecare.org.au. Turn off to hide the total without affecting giving."
             checked={showPublicProgress}
             onCheckedChange={(v) => setShowPublicProgress(v === true)}
+          />
+        </div>
+
+        <div className="border-t border-gray-100 pt-5 space-y-4">
+          <Checkbox
+            label="Feature as an appeal on the donor dashboard"
+            description="Shows this fund as an appeal card (with its raised / goal progress) on the donor dashboard."
+            checked={showOnDashboard}
+            onCheckedChange={(v) => setShowOnDashboard(v === true)}
+          />
+          <Input
+            label="Appeal tagline"
+            name="tagline"
+            defaultValue={fund?.tagline}
+            placeholder="e.g. Christmas gifts for kids who’d go without."
+            hint="Optional. A short line shown on the appeal card."
+          />
+          <Input
+            label="Appeal image URL"
+            name="imageUrl"
+            defaultValue={fund?.imageUrl}
+            placeholder="https://…"
+            hint="Optional. Image shown on the appeal card."
           />
         </div>
 

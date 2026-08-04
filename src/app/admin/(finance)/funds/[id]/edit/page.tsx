@@ -33,6 +33,9 @@ export default async function EditFundPage({
     sortOrder: String(fund.sortOrder),
     isActive: fund.isActive,
     showPublicProgress: fund.showPublicProgress,
+    imageUrl: fund.imageUrl ?? '',
+    tagline: fund.tagline ?? '',
+    showOnDashboard: fund.showOnDashboard,
     depositAccount: fund.depositAccount,
   }
 

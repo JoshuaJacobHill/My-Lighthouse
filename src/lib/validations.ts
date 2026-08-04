@@ -190,12 +190,40 @@ export const fundSchema = z.object({
     .refine((v) => Number.isInteger(v), { message: 'Sort order must be a whole number' }),
   isActive: z.boolean().optional().default(true),
   showPublicProgress: z.boolean().optional().default(false),
+  // Appeal (donor dashboard) fields.
+  imageUrl: optionalTrimmed,
+  tagline: optionalTrimmed,
+  showOnDashboard: z.boolean().optional().default(false),
   // Which Stripe account this fund's gifts deposit to.
   depositAccount: z.enum(['CARE', 'CHURCH']).optional().default('CARE'),
 })
 
 // Input type (pre-transform): forms send strings for numbers/dates.
 export type FundInput = z.input<typeof fundSchema>
+
+// ─── Stories / Good News (donor dashboard content) ───────────────────────────
+
+export const storySchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(160, 'Title is too long'),
+  slug: z
+    .string()
+    .trim()
+    .max(160)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers and hyphens only')
+    .optional()
+    .or(z.literal('')),
+  category: z.string().trim().max(40).optional().default('Good news'),
+  excerpt: optionalTrimmed,
+  imageUrl: optionalTrimmed,
+  externalUrl: optionalTrimmed,
+  isPublished: z.boolean().optional().default(false),
+  sortOrder: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? 0 : Number(v)))
+    .refine((v) => Number.isInteger(v), { message: 'Sort order must be a whole number' }),
+})
+export type StoryInput = z.input<typeof storySchema>
 
 // ─── Events & ticketing (donor portal) ───────────────────────────────────────
 
