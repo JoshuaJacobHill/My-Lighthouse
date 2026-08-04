@@ -10,13 +10,24 @@ import {
 import type { StripeElementsOptions } from '@stripe/stripe-js'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { createDonationIntentAction } from '@/lib/actions/donation.actions'
+import {
+  createDonationIntentAction,
+  createDonationSubscriptionCheckoutAction,
+} from '@/lib/actions/donation.actions'
 import { stripePromiseFor } from '@/lib/stripe-public'
 
 // $25 leads deliberately — it's the price of a full $25 Trolley.
 const PRESETS = [25, 50, 100, 250]
 
 type AccountKey = 'CARE' | 'CHURCH'
+type Frequency = 'once' | 'weekly' | 'fortnightly' | 'monthly'
+
+const FREQUENCIES: { key: Frequency; label: string }[] = [
+  { key: 'once', label: 'One-off' },
+  { key: 'weekly', label: 'Weekly' },
+  { key: 'fortnightly', label: 'Fortnightly' },
+  { key: 'monthly', label: 'Monthly' },
+]
 
 export function DonateForm({
   fundSlug,
@@ -31,11 +42,15 @@ export function DonateForm({
 }) {
   const [amount, setAmount] = React.useState<number>(25)
   const [custom, setCustom] = React.useState('')
+  const [name, setName] = React.useState('')
+  const [email, setEmail] = React.useState('')
+  const [message, setMessage] = React.useState('')
+  const [frequency, setFrequency] = React.useState<Frequency>('once')
+  const [redirecting, setRedirecting] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
 
   const effectiveAmount = custom.trim() !== '' ? Number(custom) : amount
   const validAmount = Number.isFinite(effectiveAmount) && effectiveAmount > 0
-  // Stripe requires the Elements amount up front; keep it at/above the 50c floor
-  // even while the field is mid-edit. Real validation ($2 min) happens server-side.
   const amountCents = Math.max(Math.round((validAmount ? effectiveAmount : 0) * 100), 100)
 
   const stripePromise = React.useMemo(() => stripePromiseFor(accountKey), [accountKey])
@@ -58,8 +73,66 @@ export function DonateForm({
     },
   }
 
+  const recurring = frequency !== 'once'
+  const freqLabel = FREQUENCIES.find((f) => f.key === frequency)?.label.toLowerCase() ?? ''
+
+  async function startRecurring() {
+    setError(null)
+    if (!name.trim() || !email.trim()) {
+      setError('Please enter your name and email.')
+      return
+    }
+    if (!validAmount || effectiveAmount < 2) {
+      setError('Minimum donation is $2.')
+      return
+    }
+    setRedirecting(true)
+    const res = await createDonationSubscriptionCheckoutAction({
+      fundSlug,
+      amount: effectiveAmount,
+      name,
+      email,
+      frequency: frequency as 'weekly' | 'fortnightly' | 'monthly',
+      fundraiserId,
+      message,
+    })
+    if (res.success && res.url) {
+      window.location.href = res.url
+      return
+    }
+    setRedirecting(false)
+    setError(res.error ?? 'Something went wrong. Please try again.')
+  }
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+      {/* Frequency */}
+      <fieldset>
+        <legend className="text-sm font-medium text-gray-700">How often?</legend>
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          {FREQUENCIES.map((f) => {
+            const active = frequency === f.key
+            return (
+              <button
+                type="button"
+                key={f.key}
+                onClick={() => setFrequency(f.key)}
+                aria-pressed={active}
+                className={
+                  'rounded-lg border px-2 py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 sm:text-sm ' +
+                  (active
+                    ? 'border-orange-500 bg-orange-500 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-orange-400')
+                }
+              >
+                {f.label}
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
+
+      {/* Amount */}
       <fieldset>
         <legend className="text-sm font-medium text-gray-700">Choose an amount</legend>
         <div className="mt-2 grid grid-cols-4 gap-2">
@@ -101,62 +174,120 @@ export function DonateForm({
         </div>
       </fieldset>
 
-      <Elements stripe={stripePromise} options={options}>
-        <CheckoutInner
-          fundSlug={fundSlug}
-          fundName={fundName}
-          fundraiserId={fundraiserId}
-          amount={validAmount ? effectiveAmount : 0}
+      {/* Donor details */}
+      <div className="grid grid-cols-1 gap-4">
+        <Input
+          label="Your name"
+          required
+          autoComplete="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
-      </Elements>
+        <Input
+          label="Email address"
+          type="email"
+          required
+          autoComplete="email"
+          hint="We’ll send your receipt here."
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <Input
+          label="Leave a message of support (optional)"
+          maxLength={250}
+          placeholder="e.g. Great cause — keep it up!"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+      </div>
+
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {recurring ? (
+        <Button
+          type="button"
+          size="lg"
+          className="w-full"
+          disabled={redirecting}
+          onClick={startRecurring}
+        >
+          {redirecting
+            ? 'Taking you to secure checkout…'
+            : validAmount
+              ? `Set up ${freqLabel} gift of $${effectiveAmount} →`
+              : `Set up ${freqLabel} gift`}
+        </Button>
+      ) : (
+        <Elements stripe={stripePromise} options={options}>
+          <CardSection
+            fundSlug={fundSlug}
+            fundName={fundName}
+            fundraiserId={fundraiserId}
+            amount={validAmount ? effectiveAmount : 0}
+            name={name}
+            email={email}
+            message={message}
+            onError={setError}
+          />
+        </Elements>
+      )}
+
+      <p className="text-center text-xs text-gray-400">
+        {recurring
+          ? 'Recurring gifts are handled securely by Stripe. Cancel any time.'
+          : 'Payments are processed securely by Stripe. Lighthouse Care never sees your card details.'}
+      </p>
     </div>
   )
 }
 
-function CheckoutInner({
+function CardSection({
   fundSlug,
   fundName,
   fundraiserId,
   amount,
+  name,
+  email,
+  message,
+  onError,
 }: {
   fundSlug: string
   fundName: string
   fundraiserId?: string
   amount: number
+  name: string
+  email: string
+  message: string
+  onError: (msg: string | null) => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
-  const [name, setName] = React.useState('')
-  const [email, setEmail] = React.useState('')
-  const [message, setMessage] = React.useState('')
   const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!stripe || !elements) return
-    setError(null)
+    onError(null)
+    if (!name.trim() || !email.trim()) {
+      onError('Please enter your name and email.')
+      return
+    }
     setLoading(true)
 
-    // Validate the card details before we create a PaymentIntent.
     const { error: submitError } = await elements.submit()
     if (submitError) {
-      setError(submitError.message ?? 'Please check your card details.')
+      onError(submitError.message ?? 'Please check your card details.')
       setLoading(false)
       return
     }
 
-    // Create the PaymentIntent on the fund's account, then confirm on-page.
-    const res = await createDonationIntentAction({
-      fundSlug,
-      amount,
-      name,
-      email,
-      fundraiserId,
-      message,
-    })
+    const res = await createDonationIntentAction({ fundSlug, amount, name, email, fundraiserId, message })
     if (!res.success || !res.clientSecret || !res.accountKey) {
-      setError(res.error ?? 'Something went wrong. Please try again.')
+      onError(res.error ?? 'Something went wrong. Please try again.')
       setLoading(false)
       return
     }
@@ -169,63 +300,22 @@ function CheckoutInner({
         receipt_email: email,
       },
     })
-    // If we get here, confirmation failed (otherwise the browser has redirected).
     if (confirmError) {
-      setError(confirmError.message ?? 'Payment could not be completed. Please try again.')
+      onError(confirmError.message ?? 'Payment could not be completed. Please try again.')
       setLoading(false)
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3">
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4">
-        <Input
-          label="Your name"
-          name="name"
-          required
-          autoComplete="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Input
-          label="Email address"
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          hint="We’ll send your receipt here."
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <Input
-          label="Leave a message of support (optional)"
-          name="message"
-          maxLength={250}
-          placeholder="e.g. Great cause — keep it up!"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-        />
-      </div>
-
       <div>
         <span className="text-sm font-medium text-gray-700">Card details</span>
         <div className="mt-2">
           <PaymentElement options={{ layout: 'tabs' }} />
         </div>
       </div>
-
       <Button type="submit" size="lg" className="w-full" disabled={loading || !stripe}>
-        {loading
-          ? 'Processing…'
-          : amount > 0
-            ? `Donate $${amount} to ${fundName}`
-            : 'Donate'}
+        {loading ? 'Processing…' : amount > 0 ? `Donate $${amount} to ${fundName}` : 'Donate'}
       </Button>
     </form>
   )

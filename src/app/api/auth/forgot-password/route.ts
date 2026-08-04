@@ -28,10 +28,11 @@ export async function POST(req: NextRequest) {
   try {
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { volunteerProfile: { select: { id: true } } },
     })
 
-    if (user && user.volunteerProfile) {
+    // Send a reset link to ANY account with a login — volunteers, donors AND
+    // admins (previously only volunteers got the email, locking admins out).
+    if (user && user.isActive) {
       const token = await createPasswordResetToken(user.id, 48)
       const resetLink = `${APP_URL}/set-password?token=${token}`
 

@@ -209,3 +209,111 @@ export async function createDonationIntentAction(input: DonateInput): Promise<In
     return { success: false, error: 'Could not start payment. Please try again.' }
   }
 }
+
+// ─── Recurring donations (weekly / fortnightly / monthly) ─────────────────────
+
+const FREQ = {
+  weekly: { interval: 'week' as const, interval_count: 1, label: 'Weekly' },
+  fortnightly: { interval: 'week' as const, interval_count: 2, label: 'Fortnightly' },
+  monthly: { interval: 'month' as const, interval_count: 1, label: 'Monthly' },
+}
+
+const subscriptionSchema = donateSchema.extend({
+  frequency: z.enum(['weekly', 'fortnightly', 'monthly']),
+})
+export type SubscriptionInput = z.input<typeof subscriptionSchema>
+
+/**
+ * Start a recurring gift. Creates a Stripe Checkout Session in subscription mode
+ * on the fund's account and returns the hosted-checkout URL. Each successful
+ * charge is recorded by the `invoice.payment_succeeded` webhook.
+ */
+export async function createDonationSubscriptionCheckoutAction(
+  input: SubscriptionInput
+): Promise<CheckoutResult> {
+  if (!isStripeConfigured()) {
+    return { success: false, error: 'Donations aren’t configured yet. Please try again soon.' }
+  }
+
+  const hdrs = await headers()
+  const ip = (hdrs.get('x-forwarded-for') ?? '').split(',')[0]?.trim() || 'unknown'
+  const limit = rateLimit(`donate-sub:${ip}`, 10, 60_000)
+  if (!limit.ok) {
+    return { success: false, error: 'Too many attempts — please wait a moment and try again.' }
+  }
+
+  const parsed = subscriptionSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
+  }
+  const { fundSlug, amount, name, email, fundraiserId, message, frequency } = parsed.data
+
+  const fund = await prisma.fund.findUnique({
+    where: { slug: fundSlug },
+    select: { id: true, name: true, slug: true, isActive: true, depositAccount: true },
+  })
+  if (!fund || !fund.isActive) {
+    return { success: false, error: 'That fund isn’t available right now.' }
+  }
+  const accountKey = resolveAccount(fund.depositAccount)
+
+  let validFundraiserId: string | undefined
+  if (fundraiserId) {
+    const fr = await prisma.fundraiser.findUnique({
+      where: { id: fundraiserId },
+      select: { id: true, isActive: true },
+    })
+    if (fr?.isActive) validFundraiserId = fr.id
+  }
+
+  const freq = FREQ[frequency]
+
+  try {
+    const base = appUrl()
+    const meta: Record<string, string> = {
+      kind: 'donation',
+      isRecurring: 'true',
+      frequency,
+      fundId: fund.id,
+      fundSlug: fund.slug,
+      donorName: name,
+      donorEmail: email,
+      account: accountKey,
+      source: validFundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
+    }
+    if (validFundraiserId) meta.fundraiserId = validFundraiserId
+    if (message) meta.message = message
+
+    const cancelUrl = validFundraiserId
+      ? `${base}/donate?fundraiser=${fundraiserId}&cancelled=1`
+      : `${base}/donate?fund=${fund.slug}&cancelled=1`
+
+    const session = await getStripeFor(accountKey).checkout.sessions.create({
+      mode: 'subscription',
+      customer_email: email,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'aud',
+            unit_amount: toCents(amount),
+            recurring: { interval: freq.interval, interval_count: freq.interval_count },
+            product_data: { name: `${freq.label} donation — ${fund.name}` },
+          },
+        },
+      ],
+      subscription_data: { metadata: meta },
+      metadata: meta,
+      success_url: `${base}/donate/success?acct=${accountKey}`,
+      cancel_url: cancelUrl,
+    })
+
+    if (!session.url) {
+      return { success: false, error: 'Could not start checkout. Please try again.' }
+    }
+    return { success: true, url: session.url }
+  } catch (err) {
+    console.error('createDonationSubscriptionCheckoutAction failed', err)
+    return { success: false, error: 'Could not start checkout. Please try again.' }
+  }
+}

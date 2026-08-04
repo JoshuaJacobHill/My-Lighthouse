@@ -36,9 +36,11 @@ export async function POST(req: NextRequest) {
   // each configured signing secret and keep the one that validates.
   const verifier = getStripeFor(secrets[0].key)
   let event: Stripe.Event | null = null
-  for (const { secret } of secrets) {
+  let matchedAccount = secrets[0].key
+  for (const { key, secret } of secrets) {
     try {
       event = verifier.webhooks.constructEvent(rawBody, signature, secret)
+      matchedAccount = key
       break
     } catch {
       // try the next account's secret
@@ -86,6 +88,10 @@ export async function POST(req: NextRequest) {
       if (intent.metadata?.kind === 'donation') {
         await recordDonationFromIntent(intent)
       }
+    } else if (event.type === 'invoice.payment_succeeded') {
+      // Recurring gifts: one invoice per cycle (first + renewals).
+      const invoice = event.data.object as Stripe.Invoice
+      await recordRecurringDonationFromInvoice(invoice, matchedAccount)
     }
     await prisma.webhookEvent.update({
       where: { providerEventId: event.id },
@@ -141,11 +147,54 @@ async function recordDonationFromIntent(intent: Stripe.PaymentIntent): Promise<v
   })
 }
 
+async function recordRecurringDonationFromInvoice(
+  invoice: Stripe.Invoice,
+  accountKey: 'CARE' | 'CHURCH'
+): Promise<void> {
+  // The webhook delivers the endpoint's API version (2020-03-02), where these
+  // fields sit at the top level — but the SDK types target a newer version, so
+  // read them through a narrow cast.
+  const inv = invoice as unknown as {
+    subscription?: string | { id?: string } | null
+    payment_intent?: string | { id?: string } | null
+  }
+
+  const subId = typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id
+  if (!subId) return
+
+  // The subscription carries our metadata (set at checkout). Retrieve it on the
+  // account that signed this event so it works across Stripe API versions.
+  let meta: Record<string, string> = {}
+  try {
+    const sub = await getStripeFor(accountKey).subscriptions.retrieve(subId)
+    meta = (sub.metadata ?? {}) as Record<string, string>
+  } catch {
+    return
+  }
+  if (meta.kind !== 'donation') return
+
+  const paymentIntentId =
+    typeof inv.payment_intent === 'string'
+      ? inv.payment_intent
+      : inv.payment_intent?.id ?? invoice.id
+  if (!paymentIntentId) return
+
+  await finalizeDonation({
+    paymentIntentId,
+    donorEmail: invoice.customer_email || meta.donorEmail || '',
+    donorName: meta.donorName || null,
+    amount: (invoice.amount_paid ?? 0) / 100,
+    currency: (invoice.currency ?? 'aud').toUpperCase(),
+    meta,
+    isRecurring: true,
+  })
+}
+
 /**
  * Record a completed gift and send the receipt — shared by the Checkout-session
- * path (event tickets legacy / hosted checkout) and the on-page PaymentIntent
- * path. Idempotent on providerTransactionId, so a retry or a duplicate event
- * (e.g. both `checkout.session.completed` and `payment_intent.succeeded`) is safe.
+ * path (event tickets legacy / hosted checkout), the on-page PaymentIntent path,
+ * and recurring invoices. Idempotent on providerTransactionId, so a retry or a
+ * duplicate event is safe.
  */
 async function finalizeDonation(params: {
   paymentIntentId: string
@@ -154,8 +203,9 @@ async function finalizeDonation(params: {
   amount: number
   currency: string
   meta: Record<string, string>
+  isRecurring?: boolean
 }): Promise<void> {
-  const { paymentIntentId, donorEmail, donorName, amount, currency, meta } = params
+  const { paymentIntentId, donorEmail, donorName, amount, currency, meta, isRecurring } = params
   if (!paymentIntentId || !donorEmail) return
 
   // Idempotent on the gift itself: providerTransactionId is unique.
@@ -186,6 +236,7 @@ async function finalizeDonation(params: {
       providerTransactionId: paymentIntentId,
       fundId,
       fundraiserId,
+      isRecurring: isRecurring ?? false,
       source: fundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
       taxReceiptEligible: true,
     },
