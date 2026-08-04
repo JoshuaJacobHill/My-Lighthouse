@@ -1,10 +1,22 @@
+import * as React from 'react'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import Link from 'next/link'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Clock, Calendar, User, MessageSquare, AlertTriangle, CheckCircle2, ChevronRight, CalendarPlus } from 'lucide-react'
+import {
+  Clock,
+  Calendar,
+  CalendarCheck,
+  CalendarDays,
+  User,
+  MessageSquare,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  ArrowRight,
+  CalendarPlus,
+} from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -137,163 +149,178 @@ export default async function VolunteerDashboard() {
   ]
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Welcome back, {volunteer.firstName}!
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Member since {formatAustralianDate(volunteer.joinedAt)}
-          </p>
-        </div>
-        <StatusBadge status={volunteer.status} />
-      </div>
-
-      {/* Induction alert */}
-      {volunteer.status === 'PENDING_INDUCTION' && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-amber-800">Complete your induction to start volunteering</p>
-            <p className="mt-0.5 text-sm text-amber-700">
-              You&apos;re almost ready to join the team — just a few sections to work through first.
-              {totalInductionSections > 0 && (
-                <span className="ml-1">
-                  ({completedSections} of {totalInductionSections} sections done)
-                </span>
-              )}
-            </p>
-          </div>
-          <Link
-            href="/volunteer/induction"
-            className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md px-3 text-xs font-medium transition-colors bg-orange-500 text-white hover:bg-orange-600 h-8 shrink-0"
-          >
-            Start Induction <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-      )}
-
-      {/* Induction complete celebration — shown for newly ACTIVE volunteers who just passed */}
-      {volunteer.status === 'ACTIVE' && !volunteer.lastAttendedAt && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex items-start gap-3">
-          <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" aria-hidden="true" />
+    <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
+      <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
+        {/* Greeting */}
+        <header className="mb-10 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-green-800">Induction complete — welcome to the family!</p>
-            <p className="mt-0.5 text-sm text-green-700">
-              You&apos;re now part of the Lighthouse Care volunteer team. We can&apos;t wait to see you on your first shift!
+            <p className="text-sm font-medium text-neutral-400">Welcome back</p>
+            <h1 className="mt-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
+              Hi, {volunteer.firstName} <span className="font-normal">👋</span>
+            </h1>
+            <p className="mt-2 text-sm text-neutral-400">
+              Member since {formatAustralianDate(volunteer.joinedAt)}
             </p>
           </div>
-        </div>
-      )}
+          <StatusBadge status={volunteer.status} />
+        </header>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hours volunteered</p>
-            <p className="mt-1 text-3xl font-bold text-orange-600">{totalHours}</p>
-            <p className="text-xs text-gray-400 mt-0.5">across all sessions</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Shifts attended</p>
-            <p className="mt-1 text-3xl font-bold text-orange-600">{totalSessions}</p>
-            <p className="text-xs text-gray-400 mt-0.5">recorded sessions</p>
-          </CardContent>
-        </Card>
-        {volunteer.lastAttendedAt && (
-          <Card className="col-span-2 sm:col-span-1">
-            <CardContent className="pt-5 pb-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last attended</p>
-              <p className="mt-1 text-base font-semibold text-gray-700">
-                {formatAustralianDate(volunteer.lastAttendedAt)}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">most recent shift</p>
-            </CardContent>
-          </Card>
+        {/* Induction alert */}
+        {volunteer.status === 'PENDING_INDUCTION' && (
+          <div className="mb-8 flex flex-col items-start justify-between gap-4 rounded-[28px] bg-amber-50 p-6 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+              <div>
+                <p className="font-semibold text-amber-900">Complete your induction to start volunteering</p>
+                <p className="mt-0.5 text-sm text-amber-700">
+                  Just a few sections to work through first.
+                  {totalInductionSections > 0 &&
+                    ` (${completedSections} of ${totalInductionSections} done)`}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/volunteer/induction"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-600"
+            >
+              Start induction <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         )}
-      </div>
 
-      {/* Upcoming shifts */}
-      <section aria-labelledby="upcoming-shifts-heading">
-        <div className="flex items-center justify-between mb-3">
-          <h2 id="upcoming-shifts-heading" className="text-lg font-semibold text-gray-900">
-            Your Upcoming Shifts
-          </h2>
-          <Link
-            href="/volunteer/shifts"
-            className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 text-xs font-medium transition-colors border border-orange-500 text-orange-500 bg-transparent hover:bg-orange-50 h-8"
-          >
-            View all
-          </Link>
-        </div>
-
-        {upcomingAssignments.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" aria-hidden="true" />
-              <p className="text-sm font-medium text-gray-600">No upcoming shifts rostered</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Our team will reach out when there&apos;s a shift that suits your availability.
+        {/* Induction complete celebration */}
+        {volunteer.status === 'ACTIVE' && !volunteer.lastAttendedAt && (
+          <div className="mb-8 flex items-start gap-3 rounded-[28px] bg-green-50 p-6">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-green-900">Induction complete — welcome to the family!</p>
+              <p className="mt-0.5 text-sm text-green-700">
+                You&rsquo;re now part of the Lighthouse Care volunteer team. We can&rsquo;t wait to see you on
+                your first shift!
               </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {upcomingAssignments.map((assignment) => (
-              <Card key={assignment.id}>
-                <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">
+            </div>
+          </div>
+        )}
+
+        {/* Stats */}
+        <section className="mb-12 grid grid-cols-2 gap-5 sm:grid-cols-3">
+          <StatTile icon={<Clock className="h-6 w-6" />} value={totalHours} label="Hours volunteered" accent />
+          <StatTile icon={<CalendarCheck className="h-6 w-6" />} value={totalSessions} label="Shifts attended" />
+          <StatTile
+            icon={<CalendarDays className="h-6 w-6" />}
+            value={volunteer.lastAttendedAt ? formatAustralianDate(volunteer.lastAttendedAt) : '—'}
+            label="Last attended"
+            small
+          />
+        </section>
+
+        {/* Upcoming shifts */}
+        <section className="mb-12">
+          <div className="mb-6 flex items-end justify-between">
+            <h2 className="text-3xl font-normal tracking-tight sm:text-[2rem]">
+              Your upcoming <span className="font-extrabold">shifts</span>
+            </h2>
+            <Link
+              href="/volunteer/shifts"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700"
+            >
+              View all <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {upcomingAssignments.length === 0 ? (
+            <div className="rounded-[28px] border border-dashed border-neutral-300 p-10 text-center">
+              <Calendar className="mx-auto mb-3 h-10 w-10 text-neutral-300" aria-hidden="true" />
+              <p className="font-medium text-neutral-600">No upcoming shifts rostered</p>
+              <Link
+                href="/volunteer/roster"
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                Book a shift <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {upcomingAssignments.map((assignment) => (
+                <div
+                  key={assignment.id}
+                  className="flex flex-col gap-3 rounded-[28px] border border-neutral-200 p-6 sm:flex-row sm:items-center"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white">
+                    <Calendar className="h-6 w-6" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-neutral-950">
                       {formatAustralianDate(assignment.shift.date)}
                     </p>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      {formatTime(assignment.shift.startTime)} – {formatTime(assignment.shift.endTime)}
-                      {' · '}{assignment.shift.location.name}
+                    <p className="mt-0.5 text-sm text-neutral-500">
+                      {formatTime(assignment.shift.startTime)} – {formatTime(assignment.shift.endTime)} ·{' '}
+                      {assignment.shift.location.name}
                       {assignment.shift.department && ` · ${assignment.shift.department.name}`}
                     </p>
                   </div>
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${
+                    className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold ${
                       SHIFT_STATUS_COLOURS[assignment.status] ?? 'bg-gray-100 text-gray-700'
                     }`}
                   >
                     {SHIFT_STATUS_LABELS[assignment.status] ?? assignment.status}
                   </span>
-                </CardContent>
-              </Card>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Quick actions */}
+        <section>
+          <h2 className="mb-6 text-3xl font-normal tracking-tight sm:text-[2rem]">
+            Quick <span className="font-extrabold">actions</span>
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {quickActions.map(({ href, icon: Icon, label, description }) => (
+              <Link
+                key={href}
+                href={href}
+                className="group flex items-center gap-4 rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+              >
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white">
+                  <Icon className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-neutral-950">{label}</p>
+                  <p className="mt-0.5 text-sm text-neutral-500">{description}</p>
+                </div>
+                <ChevronRight className="ml-auto h-5 w-5 shrink-0 text-neutral-300 transition-colors group-hover:text-orange-500" aria-hidden="true" />
+              </Link>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      </div>
+    </div>
+  )
+}
 
-      {/* Quick actions */}
-      <section aria-labelledby="quick-actions-heading">
-        <h2 id="quick-actions-heading" className="text-lg font-semibold text-gray-900 mb-3">
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {quickActions.map(({ href, icon: Icon, label, description }) => (
-            <Link key={href} href={href} className="group">
-              <Card className="h-full transition-shadow hover:shadow-md cursor-pointer">
-                <CardContent className="py-4 flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 group-hover:bg-orange-100 transition-colors shrink-0">
-                    <Icon className="h-5 w-5 text-orange-500" aria-hidden="true" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{description}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-orange-500 ml-auto shrink-0 transition-colors" aria-hidden="true" />
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </section>
+function StatTile({
+  icon,
+  value,
+  label,
+  accent,
+  small,
+}: {
+  icon: React.ReactNode
+  value: string | number
+  label: string
+  accent?: boolean
+  small?: boolean
+}) {
+  return (
+    <div className={`rounded-[28px] p-7 ${accent ? 'bg-orange-500 text-white' : 'border border-neutral-200 text-neutral-950'}`}>
+      <span className={accent ? 'text-white' : 'text-orange-500'}>{icon}</span>
+      <p className={(small ? 'text-xl sm:text-2xl' : 'text-5xl') + ' mt-5 font-extrabold tracking-tighter tabular-nums'}>
+        {value}
+      </p>
+      <p className={`mt-1 text-sm ${accent ? 'text-orange-100' : 'text-neutral-500'}`}>{label}</p>
     </div>
   )
 }
