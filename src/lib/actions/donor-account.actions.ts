@@ -1,8 +1,9 @@
 'use server'
 
 import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
-import { hashPassword, createSession, setSessionCookie } from '@/lib/auth'
+import { hashPassword, createSession, setSessionCookie, getSession } from '@/lib/auth'
 import { validateAccountSetupToken, consumeAccountSetupToken } from '@/lib/account-setup'
 import { claimDonationsForUser } from '@/lib/donations'
 
@@ -81,5 +82,51 @@ export async function completeDonorAccountAction(input: CompleteAccountInput): P
   } catch (err) {
     console.error('completeDonorAccountAction failed', err)
     return { success: false, error: 'Could not complete your account. Please try again.' }
+  }
+}
+
+// ─── Edit account details (signed-in donor) ──────────────────────────────────
+
+const updateSchema = z.object({
+  name: z.string().trim().min(1, 'Please enter your name').max(120),
+  phone: z.string().trim().max(40).optional().or(z.literal('')),
+  address: z.string().trim().max(300).optional().or(z.literal('')),
+  consentEmailUpdates: z.boolean().optional().default(false),
+})
+export type UpdateDonorAccountInput = z.input<typeof updateSchema>
+
+export async function updateDonorAccountAction(input: UpdateDonorAccountInput): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in again.' }
+
+  const parsed = updateSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
+  }
+  const { name, phone, address, consentEmailUpdates } = parsed.data
+
+  try {
+    await prisma.user.update({ where: { id: session.userId }, data: { name } })
+    await prisma.donorProfile.upsert({
+      where: { userId: session.userId },
+      update: {
+        phone: phone || null,
+        address: address || null,
+        consentEmailUpdates: Boolean(consentEmailUpdates),
+      },
+      create: {
+        userId: session.userId,
+        displayName: name,
+        phone: phone || null,
+        address: address || null,
+        consentEmailUpdates: Boolean(consentEmailUpdates),
+      },
+    })
+    revalidatePath('/donor/account')
+    revalidatePath('/donor')
+    return { success: true }
+  } catch (err) {
+    console.error('updateDonorAccountAction failed', err)
+    return { success: false, error: 'Could not save your details. Please try again.' }
   }
 }

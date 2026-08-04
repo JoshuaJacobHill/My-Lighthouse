@@ -49,7 +49,7 @@ export function Footer() {
           {/* Links */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400">
-              Volunteer Portal
+              My Lighthouse Portal
             </h3>
             <ul className="space-y-2 text-sm">
               {footerLinks.map(({ href, label }) => (

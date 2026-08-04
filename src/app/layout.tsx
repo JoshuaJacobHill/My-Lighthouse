@@ -10,12 +10,12 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Lighthouse Care Volunteers',
-    template: '%s | Lighthouse Care Volunteers',
+    default: 'My Lighthouse Portal',
+    template: '%s | Lighthouse Care',
   },
   description:
-    'The volunteer management portal for Lighthouse Care — an Australian not-for-profit providing affordable groceries and food relief to families across South East Queensland.',
-  keywords: ['volunteer', 'Lighthouse Care', 'Logan', 'Queensland', 'charity', 'food relief'],
+    'My Lighthouse Portal — give, volunteer and stay connected with Lighthouse Care, an Australian not-for-profit providing affordable groceries and food relief to families across South East Queensland.',
+  keywords: ['Lighthouse Care', 'donate', 'volunteer', 'Logan', 'Queensland', 'charity', 'food relief'],
   authors: [{ name: 'Lighthouse Care' }],
   icons: {
     icon: '/Favicon.png',
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     apple: '/Favicon.png',
   },
   openGraph: {
-    siteName: 'Lighthouse Care Volunteers',
+    siteName: 'My Lighthouse Portal',
     locale: 'en_AU',
     type: 'website',
   },

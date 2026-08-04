@@ -55,7 +55,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             priority
           />
           <p className="mt-2 text-sm font-medium tracking-wide text-orange-100">
-            Volunteer Portal
+            My Lighthouse Portal
           </p>
         </div>
 
@@ -72,7 +72,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
                   className="h-8 w-auto"
                 />
               </Link>
-              <p className="mt-1.5 text-sm text-gray-400">Volunteer Portal</p>
+              <p className="mt-1.5 text-sm text-gray-400">My Lighthouse Portal</p>
             </div>
 
             {children}

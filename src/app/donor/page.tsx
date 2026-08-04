@@ -192,6 +192,26 @@ export default async function DonorHomePage() {
           </section>
         )}
 
+        {/* Become a volunteer (shown to non-volunteers) */}
+        {!isVolunteer && (
+          <section className="mb-16">
+            <div className="flex flex-col items-start justify-between gap-5 rounded-[28px] bg-neutral-950 p-8 text-white sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Want to volunteer too?</h2>
+                <p className="mt-1.5 text-neutral-400">
+                  Give your time alongside your generosity — join the team behind the mission.
+                </p>
+              </div>
+              <Link
+                href="/signup"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                Sign up to volunteer <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </section>
+        )}
+
         {/* Good news */}
         {stories.length > 0 && (
           <section>
