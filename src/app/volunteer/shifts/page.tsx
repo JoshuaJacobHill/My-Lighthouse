@@ -50,15 +50,17 @@ export default async function ShiftsPage() {
   }))
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Shifts</h1>
-        <p className="mt-1 text-sm text-gray-500">Your volunteering schedule with Lighthouse Care.</p>
+    <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
+      <div className="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-10">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight">My shifts</h1>
+          <p className="mt-1.5 text-neutral-500">Your volunteering schedule with Lighthouse Care.</p>
+        </div>
+        <ShiftsClient
+          assignments={assignments}
+          locations={locations.map((l) => ({ id: l.id, name: l.name }))}
+        />
       </div>
-      <ShiftsClient
-        assignments={assignments}
-        locations={locations.map((l) => ({ id: l.id, name: l.name }))}
-      />
     </div>
   )
 }

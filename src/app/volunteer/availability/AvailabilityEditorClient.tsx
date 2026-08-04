@@ -11,7 +11,6 @@ import {
 import { updateAvailabilityAction } from '@/lib/actions/volunteer.actions'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, CheckCircle2 } from 'lucide-react'
 
 interface AvailabilityEditorClientProps {
@@ -56,14 +55,13 @@ export default function AvailabilityEditorClient({ initialAvailability }: Availa
   const totalSelected = Object.values(availability).reduce((n, p) => n + (p?.length ?? 0), 0)
 
   return (
-    <Card>
-      <CardContent className="pt-6 space-y-6">
+    <div className="space-y-6 rounded-[28px] border border-neutral-200 p-6">
         <AvailabilityCheckboxGrid
           value={availability}
           onChange={setAvailability}
         />
 
-        <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-between border-t border-neutral-100 pt-4">
           <div className="text-sm text-gray-500">
             {totalSelected === 0 ? (
               'No availability set — tick the times you&apos;re generally free'
@@ -80,18 +78,17 @@ export default function AvailabilityEditorClient({ initialAvailability }: Availa
               </span>
             )}
           </div>
-          <Button onClick={handleSave} disabled={isPending} className="min-w-28">
+          <Button onClick={handleSave} disabled={isPending} className="min-w-28 rounded-full">
             {isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                 Saving…
               </>
             ) : (
-              'Save Availability'
+              'Save availability'
             )}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   )
 }

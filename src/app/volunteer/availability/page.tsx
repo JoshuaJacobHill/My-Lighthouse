@@ -33,22 +33,24 @@ export default async function AvailabilityPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Availability</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Let us know which sessions generally work for you — tick as many as you like. We&apos;ll use this to match you to shifts that suit your schedule.
-        </p>
+    <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
+      <div className="mx-auto max-w-2xl px-5 py-8 sm:px-8 sm:py-10">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold tracking-tight">My availability</h1>
+          <p className="mt-1.5 text-neutral-500">
+            Let us know which sessions generally work for you — tick as many as you like. We&apos;ll use this to match you to shifts that suit your schedule.
+          </p>
+        </div>
+        <div className="mb-6 rounded-2xl bg-orange-50 p-5 text-sm text-orange-900">
+          <p className="mb-1 font-semibold">Our trading hours:</p>
+          <ul className="list-none space-y-0.5 text-orange-800">
+            <li>Loganholme Store: Mon–Fri 9am–5pm, Sat 9am–4pm</li>
+            <li>Hillcrest Store: Mon–Fri 9am–5pm, Sat 9am–12pm</li>
+            <li>We are closed Sundays</li>
+          </ul>
+        </div>
+        <AvailabilityEditorClient initialAvailability={initialAvailability} />
       </div>
-      <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
-        <p className="font-semibold mb-1">Our trading hours:</p>
-        <ul className="space-y-0.5 list-none">
-          <li>Loganholme Store: Mon–Fri 9am–5pm, Sat 9am–4pm</li>
-          <li>Hillcrest Store: Mon–Fri 9am–5pm, Sat 9am–12pm</li>
-          <li>We are closed Sundays</li>
-        </ul>
-      </div>
-      <AvailabilityEditorClient initialAvailability={initialAvailability} />
     </div>
   )
 }
