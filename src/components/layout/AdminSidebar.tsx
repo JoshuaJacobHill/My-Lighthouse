@@ -15,7 +15,6 @@ import {
   Ticket,
   Megaphone,
   Receipt,
-  HandHeart,
   Mail,
   Settings,
   ChevronLeft,
@@ -34,7 +33,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/volunteers', label: 'Volunteers', icon: Users },
+  { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/roster', label: 'Roster / Calendar', icon: Calendar },
   { href: '/admin/on-site', label: 'On-Site Now', icon: MapPin },
   { href: '/admin/attendance', label: 'Attendance', icon: CheckSquare },
@@ -43,7 +42,6 @@ const navItems: NavItem[] = [
   { href: '/admin/fundraisers', label: 'Fundraisers', icon: Megaphone, finance: true },
   { href: '/admin/events', label: 'Events', icon: Ticket, finance: true },
   { href: '/admin/transactions', label: 'Transactions', icon: Receipt, finance: true },
-  { href: '/admin/donors', label: 'Donors', icon: HandHeart, finance: true },
   { href: '/admin/emails', label: 'Emails', icon: Mail },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
