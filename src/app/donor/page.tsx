@@ -93,7 +93,7 @@ export default async function DonorHomePage() {
   })
 
   return (
-    <div className="min-h-screen bg-white text-neutral-950">
+    <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         {!live && (
           <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
