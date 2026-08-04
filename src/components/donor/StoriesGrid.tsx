@@ -58,7 +58,7 @@ export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
       {active && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setActive(null)} />
-          <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-[28px] bg-white shadow-2xl">
+          <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
             <button
               onClick={() => setActive(null)}
               aria-label="Close"
@@ -66,7 +66,7 @@ export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
             >
               <X className="h-5 w-5" />
             </button>
-            <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden bg-neutral-100">
+            <div className="relative flex aspect-[16/9] shrink-0 items-center justify-center overflow-hidden bg-neutral-100">
               {active.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={active.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -77,7 +77,7 @@ export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
                 {active.category}
               </span>
             </div>
-            <div className="max-h-[50vh] overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6">
               <h3 className="text-2xl font-bold tracking-tight">{active.title}</h3>
               {active.excerpt ? (
                 <p className="mt-3 whitespace-pre-line leading-relaxed text-neutral-600">{active.excerpt}</p>
