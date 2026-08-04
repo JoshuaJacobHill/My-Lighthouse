@@ -110,8 +110,8 @@ export default async function DonorHomePage() {
         </header>
 
         {/* Giving */}
-        {showGiving && (
-          <section className="mb-16">
+        <section className="mb-16">
+          {hasGifts ? (
             <div className="grid gap-5 lg:grid-cols-3">
               <div className="rounded-[28px] bg-orange-500 p-8 text-white lg:col-span-2">
                 <div className="flex items-center gap-2.5">
@@ -160,8 +160,23 @@ export default async function DonorHomePage() {
                 </Link>
               </div>
             </div>
-          </section>
-        )}
+          ) : (
+            <div className="flex flex-col items-start justify-between gap-5 rounded-[28px] bg-orange-500 p-8 text-white sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Give and change a life</h2>
+                <p className="mt-1.5 text-orange-100">
+                  A $25 gift is a full trolley of weekly essentials for a family doing it tough.
+                </p>
+              </div>
+              <Link
+                href="/donate"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-neutral-950 px-6 py-3 text-sm font-semibold text-white"
+              >
+                Make a gift <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          )}
+        </section>
 
         {/* Appeals */}
         <AppealsCarousel appeals={appeals} />

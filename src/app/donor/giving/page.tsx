@@ -30,6 +30,12 @@ export default async function GivingHistoryPage() {
 
       <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900">My giving</h1>
       <p className="mt-1.5 text-gray-500">Every gift on your account, with receipts.</p>
+      <Link
+        href="/donor/recurring"
+        className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:text-orange-700"
+      >
+        <Repeat className="h-4 w-4" /> Manage recurring giving
+      </Link>
 
       {gifts.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
