@@ -317,3 +317,96 @@ export async function createDonationSubscriptionCheckoutAction(
     return { success: false, error: 'Could not start checkout. Please try again.' }
   }
 }
+
+/**
+ * On-page recurring donation (Payment Element, no redirect). Creates a Stripe
+ * subscription with an incomplete first invoice and returns that invoice's
+ * PaymentIntent client secret, so the browser can confirm it inline exactly
+ * like a one-off gift. The subscription carries our metadata; the recurring
+ * charges (including this first one) are recorded by the invoice webhook.
+ */
+export async function createDonationSubscriptionIntentAction(
+  input: SubscriptionInput
+): Promise<IntentResult> {
+  if (!isStripeConfigured()) {
+    return { success: false, error: 'Donations aren’t configured yet. Please try again soon.' }
+  }
+
+  const hdrs = await headers()
+  const ip = (hdrs.get('x-forwarded-for') ?? '').split(',')[0]?.trim() || 'unknown'
+  const limit = rateLimit(`donate-sub-intent:${ip}`, 15, 60_000)
+  if (!limit.ok) {
+    return { success: false, error: 'Too many attempts — please wait a moment and try again.' }
+  }
+
+  const parsed = subscriptionSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
+  }
+  const { fundSlug, amount, name, email, fundraiserId, message, frequency } = parsed.data
+
+  const fund = await prisma.fund.findUnique({
+    where: { slug: fundSlug },
+    select: { id: true, name: true, slug: true, isActive: true, depositAccount: true },
+  })
+  if (!fund || !fund.isActive) {
+    return { success: false, error: 'That fund isn’t available right now.' }
+  }
+  const accountKey = resolveAccount(fund.depositAccount)
+
+  let validFundraiserId: string | undefined
+  if (fundraiserId) {
+    const fr = await prisma.fundraiser.findUnique({
+      where: { id: fundraiserId },
+      select: { id: true, isActive: true },
+    })
+    if (fr?.isActive) validFundraiserId = fr.id
+  }
+
+  const freq = FREQ[frequency]
+
+  try {
+    const stripe = getStripeFor(accountKey)
+    const meta: Record<string, string> = {
+      kind: 'donation',
+      isRecurring: 'true',
+      frequency,
+      fundId: fund.id,
+      fundSlug: fund.slug,
+      donorName: name,
+      donorEmail: email,
+      account: accountKey,
+      source: validFundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
+    }
+    if (validFundraiserId) meta.fundraiserId = validFundraiserId
+    if (message) meta.message = message
+
+    const customer = await stripe.customers.create({ email, name })
+    const price = await stripe.prices.create({
+      currency: 'aud',
+      unit_amount: toCents(amount),
+      recurring: { interval: freq.interval, interval_count: freq.interval_count },
+      product_data: { name: `${freq.label} donation — ${fund.name}` },
+    })
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: price.id }],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      expand: ['latest_invoice.payment_intent'],
+      metadata: meta,
+    })
+
+    const inv = sub.latest_invoice as unknown as {
+      payment_intent?: { client_secret?: string | null } | null
+    } | null
+    const clientSecret = inv?.payment_intent?.client_secret ?? null
+    if (!clientSecret) {
+      return { success: false, error: 'Could not start recurring payment. Please try again.' }
+    }
+    return { success: true, clientSecret, accountKey }
+  } catch (err) {
+    console.error('createDonationSubscriptionIntentAction failed', err)
+    return { success: false, error: 'Could not start recurring payment. Please try again.' }
+  }
+}

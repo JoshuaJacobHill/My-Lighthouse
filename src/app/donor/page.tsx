@@ -8,7 +8,6 @@ import {
   HandHeart,
   CalendarCheck,
   CalendarDays,
-  ImageIcon,
   Repeat,
 } from 'lucide-react'
 import { getSession } from '@/lib/auth'
@@ -16,6 +15,7 @@ import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { AppealsCarousel, type AppealItem } from '@/components/donor/AppealsCarousel'
+import { StoriesGrid } from '@/components/donor/StoriesGrid'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,10 +153,10 @@ export default async function DonorHomePage() {
                   )}
                 </div>
                 <Link
-                  href="/donate"
+                  href="/donor/giving"
                   className="mt-6 inline-flex items-center justify-between gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-neutral-950"
                 >
-                  Give again <ArrowUpRight className="h-4 w-4" />
+                  View all giving &amp; receipts <ArrowUpRight className="h-4 w-4" />
                 </Link>
               </div>
             </div>
@@ -220,45 +220,7 @@ export default async function DonorHomePage() {
                 Good news &amp; <span className="font-extrabold">stories</span>
               </h2>
             </div>
-            <div className="grid gap-5 sm:grid-cols-3">
-              {stories.map((s) => {
-                const inner = (
-                  <>
-                    <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-neutral-100">
-                      {s.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={s.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      ) : (
-                        <ImageIcon className="h-8 w-8 text-neutral-300" />
-                      )}
-                      <span className="absolute bottom-3 left-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-neutral-950">
-                        {s.category}
-                      </span>
-                    </div>
-                    <div className="p-6">
-                      <h3 className="text-lg font-bold leading-snug tracking-tight">{s.title}</h3>
-                      {s.excerpt && <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{s.excerpt}</p>}
-                      {s.externalUrl && (
-                        <div className="mt-3 flex items-center justify-end text-neutral-500">
-                          <ArrowUpRight className="h-4 w-4" />
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )
-                const cls =
-                  'group block overflow-hidden rounded-[28px] border border-neutral-200 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60'
-                return s.externalUrl ? (
-                  <a key={s.id} href={s.externalUrl} target="_blank" rel="noopener noreferrer" className={cls}>
-                    {inner}
-                  </a>
-                ) : (
-                  <article key={s.id} className={cls}>
-                    {inner}
-                  </article>
-                )
-              })}
-            </div>
+            <StoriesGrid stories={stories} />
           </section>
         )}
 

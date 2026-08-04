@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
   createDonationIntentAction,
-  createDonationSubscriptionCheckoutAction,
+  createDonationSubscriptionIntentAction,
 } from '@/lib/actions/donation.actions'
 import { stripePromiseFor } from '@/lib/stripe-public'
 
@@ -46,7 +46,6 @@ export function DonateForm({
   const [email, setEmail] = React.useState('')
   const [message, setMessage] = React.useState('')
   const [frequency, setFrequency] = React.useState<Frequency>('once')
-  const [redirecting, setRedirecting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
   const effectiveAmount = custom.trim() !== '' ? Number(custom) : amount
@@ -63,45 +62,18 @@ export function DonateForm({
     )
   }
 
+  const recurring = frequency !== 'once'
+  const freqLabel = FREQUENCIES.find((f) => f.key === frequency)?.label.toLowerCase() ?? ''
+
   const options: StripeElementsOptions = {
-    mode: 'payment',
+    // Subscription mode drives the on-page recurring flow (no redirect).
+    mode: recurring ? 'subscription' : 'payment',
     amount: amountCents,
     currency: 'aud',
     appearance: {
       theme: 'stripe',
       variables: { colorPrimary: '#f97316', borderRadius: '8px' },
     },
-  }
-
-  const recurring = frequency !== 'once'
-  const freqLabel = FREQUENCIES.find((f) => f.key === frequency)?.label.toLowerCase() ?? ''
-
-  async function startRecurring() {
-    setError(null)
-    if (!name.trim() || !email.trim()) {
-      setError('Please enter your name and email.')
-      return
-    }
-    if (!validAmount || effectiveAmount < 2) {
-      setError('Minimum donation is $2.')
-      return
-    }
-    setRedirecting(true)
-    const res = await createDonationSubscriptionCheckoutAction({
-      fundSlug,
-      amount: effectiveAmount,
-      name,
-      email,
-      frequency: frequency as 'weekly' | 'fortnightly' | 'monthly',
-      fundraiserId,
-      message,
-    })
-    if (res.success && res.url) {
-      window.location.href = res.url
-      return
-    }
-    setRedirecting(false)
-    setError(res.error ?? 'Something went wrong. Please try again.')
   }
 
   return (
@@ -207,38 +179,24 @@ export function DonateForm({
         </div>
       )}
 
-      {recurring ? (
-        <Button
-          type="button"
-          size="lg"
-          className="w-full"
-          disabled={redirecting}
-          onClick={startRecurring}
-        >
-          {redirecting
-            ? 'Taking you to secure checkout…'
-            : validAmount
-              ? `Set up ${freqLabel} gift of $${effectiveAmount} →`
-              : `Set up ${freqLabel} gift`}
-        </Button>
-      ) : (
-        <Elements stripe={stripePromise} options={options}>
-          <CardSection
-            fundSlug={fundSlug}
-            fundName={fundName}
-            fundraiserId={fundraiserId}
-            amount={validAmount ? effectiveAmount : 0}
-            name={name}
-            email={email}
-            message={message}
-            onError={setError}
-          />
-        </Elements>
-      )}
+      <Elements key={frequency} stripe={stripePromise} options={options}>
+        <CardSection
+          fundSlug={fundSlug}
+          fundName={fundName}
+          fundraiserId={fundraiserId}
+          amount={validAmount ? effectiveAmount : 0}
+          name={name}
+          email={email}
+          message={message}
+          frequency={frequency}
+          freqLabel={freqLabel}
+          onError={setError}
+        />
+      </Elements>
 
       <p className="text-center text-xs text-gray-400">
         {recurring
-          ? 'Recurring gifts are handled securely by Stripe. Cancel any time.'
+          ? 'Recurring gifts are processed securely by Stripe. Cancel any time.'
           : 'Payments are processed securely by Stripe. Lighthouse Care never sees your card details.'}
       </p>
     </div>
@@ -253,6 +211,8 @@ function CardSection({
   name,
   email,
   message,
+  frequency,
+  freqLabel,
   onError,
 }: {
   fundSlug: string
@@ -262,11 +222,14 @@ function CardSection({
   name: string
   email: string
   message: string
+  frequency: Frequency
+  freqLabel: string
   onError: (msg: string | null) => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = React.useState(false)
+  const recurring = frequency !== 'once'
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -285,7 +248,17 @@ function CardSection({
       return
     }
 
-    const res = await createDonationIntentAction({ fundSlug, amount, name, email, fundraiserId, message })
+    const res = recurring
+      ? await createDonationSubscriptionIntentAction({
+          fundSlug,
+          amount,
+          name,
+          email,
+          frequency: frequency as 'weekly' | 'fortnightly' | 'monthly',
+          fundraiserId,
+          message,
+        })
+      : await createDonationIntentAction({ fundSlug, amount, name, email, fundraiserId, message })
     if (!res.success || !res.clientSecret || !res.accountKey) {
       onError(res.error ?? 'Something went wrong. Please try again.')
       setLoading(false)
@@ -315,7 +288,15 @@ function CardSection({
         </div>
       </div>
       <Button type="submit" size="lg" className="w-full" disabled={loading || !stripe}>
-        {loading ? 'Processing…' : amount > 0 ? `Donate $${amount} to ${fundName}` : 'Donate'}
+        {loading
+          ? 'Processing…'
+          : recurring
+            ? amount > 0
+              ? `Give $${amount} ${freqLabel}`
+              : `Set up ${freqLabel} gift`
+            : amount > 0
+              ? `Donate $${amount} to ${fundName}`
+              : 'Donate'}
       </Button>
     </form>
   )
