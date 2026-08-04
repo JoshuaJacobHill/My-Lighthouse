@@ -22,6 +22,9 @@ const TEMPLATE_NAMES: Record<string, string> = {
   INACTIVITY_CHECKIN: 'Inactivity Check-In',
   ADMIN_NEW_VOLUNTEER: 'Admin: New Volunteer',
   ADMIN_REPEATED_NOSHOWS: 'Admin: Repeated No-Shows',
+  DONATION_RECEIPT: 'Donation Receipt / Thank-You',
+  DONOR_ACCOUNT_SETUP: 'Donor Account Setup',
+  TICKET_CONFIRMATION: 'Event Ticket Confirmation',
   CUSTOM: 'Custom / One-Off',
 }
 

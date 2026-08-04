@@ -191,6 +191,44 @@ export const defaultTemplates: Record<
     text: `Alert: {{first_name}} {{last_name}} has had repeated no-shows.\n\nView profile: {{portal_link}}`,
   },
 
+  // ─── Donor portal emails ────────────────────────────────────────────────
+  DONATION_RECEIPT: {
+    subject: 'Thank you for your gift to {{organisation_name}}',
+    html: wrap(`
+      <p style="${P}">Hi {{first_name}},</p>
+      <p style="${P}">Thank you for your gift of <strong>{{amount}}</strong> to {{fund_name}}. Because of you, families doing it tough across South East Queensland have a little more hope this week.</p>
+      <p style="${P}">This email is your receipt. Receipt number <strong>{{receipt_no}}</strong>, issued by {{organisation_name}} (ABN {{abn}}).</p>
+      ${btn('{{portal_link}}/donor', 'View my giving &rarr;')}
+      <p style="${P};margin-bottom:0;">With heartfelt thanks,<br>The {{organisation_name}} team</p>
+    `),
+    text: `Hi {{first_name}},\n\nThank you for your gift of {{amount}} to {{fund_name}}.\n\nThis email is your receipt. Receipt number {{receipt_no}}, issued by {{organisation_name}} (ABN {{abn}}).\n\nView your giving: {{portal_link}}/donor\n\nWith heartfelt thanks,\nThe {{organisation_name}} team`,
+  },
+
+  DONOR_ACCOUNT_SETUP: {
+    subject: 'Set up your {{organisation_name}} account',
+    html: wrap(`
+      <p style="${P}">Hi {{first_name}},</p>
+      <p style="${P}">Thank you again for your generosity. Would you like to keep track of your giving with {{organisation_name}}? Set a password and your account is ready — you&rsquo;ll be able to see your giving history and download your receipts any time.</p>
+      ${btn('{{set_password_link}}', 'Set up my account &rarr;')}
+      <p style="${P}">This link is valid for 14 days. There&rsquo;s no obligation — if you&rsquo;d rather not, simply ignore this email; your gift is already received.</p>
+      <p style="${P};margin-bottom:0;">With thanks,<br>The {{organisation_name}} team</p>
+    `),
+    text: `Hi {{first_name}},\n\nThank you again for your generosity. Set up your {{organisation_name}} account to see your giving history and receipts any time:\n{{set_password_link}}\n\n(Valid for 14 days. No obligation.)\n\nWith thanks,\nThe {{organisation_name}} team`,
+  },
+
+  TICKET_CONFIRMATION: {
+    subject: 'Your tickets — {{event_name}}',
+    html: wrap(`
+      <p style="${P}">Hi {{first_name}},</p>
+      <p style="${P}">You&rsquo;re registered for <strong>{{event_name}}</strong>. Please bring your reference code(s) with you.</p>
+      <p style="${P}"><strong>When:</strong> {{when}}<br>{{where}}{{paid}}</p>
+      {{tickets}}
+      <p style="${P}">We can&rsquo;t wait to see you there.</p>
+      <p style="${P};margin-bottom:0;">Warm regards,<br>The {{organisation_name}} team</p>
+    `),
+    text: `Hi {{first_name}},\n\nYou're registered for {{event_name}}.\n\nWhen: {{when}}\n\nYour ticket reference(s) are shown in this confirmation. We can't wait to see you there.\n\nWarm regards,\nThe {{organisation_name}} team`,
+  },
+
   CUSTOM: {
     subject: 'Message from {{organisation_name}}',
     html: wrap(`

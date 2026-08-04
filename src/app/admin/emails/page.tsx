@@ -22,14 +22,27 @@ const TEMPLATE_NAMES: Record<string, string> = {
   INACTIVITY_CHECKIN: 'Inactivity Check-In',
   ADMIN_NEW_VOLUNTEER: 'Admin: New Volunteer',
   ADMIN_REPEATED_NOSHOWS: 'Admin: Repeated No-Shows',
+  DONATION_RECEIPT: 'Donation Receipt / Thank-You',
+  DONOR_ACCOUNT_SETUP: 'Donor Account Setup',
+  TICKET_CONFIRMATION: 'Event Ticket Confirmation',
   CUSTOM: 'Custom / One-Off',
 }
 
-export default async function EmailsPage() {
+// Which templates belong to the Donors tab (everything else is a Volunteer email).
+const DONOR_TYPES = new Set(['DONATION_RECEIPT', 'DONOR_ACCOUNT_SETUP', 'TICKET_CONFIRMATION'])
+
+export default async function EmailsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
   const session = await getSession()
   if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
     redirect('/login')
   }
+
+  const { tab: tabParam } = await searchParams
+  const tab: 'volunteers' | 'donors' = tabParam === 'donors' ? 'donors' : 'volunteers'
 
   const templates = await prisma.emailTemplate.findMany({
     orderBy: { type: 'asc' },
@@ -38,8 +51,10 @@ export default async function EmailsPage() {
   // Build a map for quick lookup
   const templateMap = new Map(templates.map((t) => [t.type, t]))
 
-  // Show all defined types, using DB template if available
-  const allTypes = Object.keys(TEMPLATE_NAMES)
+  // Show the types for the active tab, using the DB template if available.
+  const allTypes = Object.keys(TEMPLATE_NAMES).filter((t) =>
+    tab === 'donors' ? DONOR_TYPES.has(t) : !DONOR_TYPES.has(t)
+  )
 
   return (
     <div className="space-y-6">
@@ -58,6 +73,22 @@ export default async function EmailsPage() {
           <Send className="h-4 w-4" />
           Send Email
         </Link>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
+        {(['volunteers', 'donors'] as const).map((t) => (
+          <Link
+            key={t}
+            href={`/admin/emails?tab=${t}`}
+            className={
+              'rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-colors ' +
+              (tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900')
+            }
+          >
+            {t}
+          </Link>
+        ))}
       </div>
 
       {/* Templates list */}

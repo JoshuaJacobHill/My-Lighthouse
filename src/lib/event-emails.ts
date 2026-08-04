@@ -1,16 +1,17 @@
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
-import { wrapEmailHtml } from '@/lib/email-html'
+import { renderTemplate } from '@/lib/email-templates'
 import { ORG } from '@/lib/org'
 import { formatDateTime } from '@/lib/utils'
-
-const P = 'margin:0 0 18px 0;line-height:1.7;color:#374151;font-size:15px;'
 
 const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
 
 /**
  * Email a purchaser their e-tickets for an order, each with its check-in
- * reference. Best-effort: callers must not let a send failure break the flow.
+ * reference. Uses the editable TICKET_CONFIRMATION template — the ticket table
+ * and event details are injected as the {{tickets}}/{{when}}/{{where}}/{{paid}}
+ * variables, so the surrounding copy stays admin-editable.
+ * Best-effort: callers must not let a send failure break the flow.
  */
 export async function sendTicketConfirmationEmailForOrder(orderId: string): Promise<void> {
   const order = await prisma.ticketOrder.findUnique({
@@ -28,7 +29,6 @@ export async function sendTicketConfirmationEmailForOrder(orderId: string): Prom
   })
   if (!order) return
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
   const firstName = order.purchaserName?.trim().split(/\s+/)[0] || 'friend'
   const total = Number(order.amountTotal)
 
@@ -42,32 +42,30 @@ export async function sendTicketConfirmationEmailForOrder(orderId: string): Prom
     )
     .join('')
 
-  const body = `
-    <p style="${P}">Hi ${firstName},</p>
-    <p style="${P}">
-      You&rsquo;re registered for <strong>${order.event.title}</strong>. Here ${
-        order.tickets.length === 1 ? 'is your ticket' : 'are your tickets'
-      } — please bring the reference code${order.tickets.length === 1 ? '' : 's'} with you.
-    </p>
-    <p style="${P}">
-      <strong>When:</strong> ${formatDateTime(order.event.startsAt)}<br/>
-      ${order.event.venue ? `<strong>Where:</strong> ${order.event.venue}<br/>` : ''}
-      ${total > 0 ? `<strong>Paid:</strong> ${aud.format(total)}` : '<strong>Free registration</strong>'}
-    </p>
+  const ticketsTable = `
     <table style="width:100%;border-collapse:collapse;margin:8px 0 20px;">
       <tr>
         <th style="text-align:left;padding:6px 0;border-bottom:2px solid #e5e7eb;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;">Ticket</th>
         <th style="text-align:right;padding:6px 0;border-bottom:2px solid #e5e7eb;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;">Reference</th>
       </tr>
       ${ticketRows}
-    </table>
-    <p style="${P}">We can&rsquo;t wait to see you there.</p>
-    <p style="${P}">Warm regards,<br/>The ${ORG.name} team</p>
-  `
+    </table>`
+
+  const { subject, html, text } = await renderTemplate('TICKET_CONFIRMATION', {
+    first_name: firstName,
+    event_name: order.event.title,
+    when: formatDateTime(order.event.startsAt),
+    where: order.event.venue ? `<strong>Where:</strong> ${order.event.venue}<br>` : '',
+    paid: total > 0 ? `<strong>Paid:</strong> ${aud.format(total)}` : '<strong>Free registration</strong>',
+    tickets: ticketsTable,
+    organisation_name: ORG.name,
+  })
 
   await sendEmail({
     to: order.purchaserEmail,
-    subject: `Your tickets — ${order.event.title}`,
-    html: wrapEmailHtml(body, appUrl),
+    subject,
+    html,
+    text,
+    templateType: 'TICKET_CONFIRMATION',
   })
 }
