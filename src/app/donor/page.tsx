@@ -37,6 +37,7 @@ export default async function DonorHomePage() {
       volunteerProfile: {
         select: {
           id: true,
+          status: true,
           joinedAt: true,
           preferredLocations: true,
           _count: { select: { attendanceRecords: true, shiftAssignments: true } },
@@ -56,6 +57,21 @@ export default async function DonorHomePage() {
   const isVolunteer = Boolean(vp)
   const firstName = user.name?.split(' ')[0] ?? 'there'
   const live = isDonorPortalEnabled()
+
+  // Volunteer specifics folded in from the old volunteer dashboard.
+  const pendingInduction = vp?.status === 'PENDING_INDUCTION'
+  const upcomingShifts = vp
+    ? await prisma.shiftAssignment.findMany({
+        where: {
+          volunteerId: vp.id,
+          status: { in: ['SCHEDULED', 'CONFIRMED'] },
+          shift: { date: { gte: new Date() } },
+        },
+        include: { shift: { include: { location: true } } },
+        orderBy: { shift: { date: 'asc' } },
+        take: 3,
+      })
+    : []
 
   // Only show the giving block to people who actually give (never-givers and
   // volunteer-only users see a volunteering-first dashboard instead).
@@ -189,12 +205,27 @@ export default async function DonorHomePage() {
                 Your <span className="font-extrabold">volunteering</span>
               </h2>
               <Link
-                href="/volunteer"
+                href="/volunteer/shifts"
                 className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700"
               >
-                Volunteer portal <ArrowRight className="h-4 w-4" />
+                My shifts <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+
+            {pendingInduction && (
+              <div className="mb-5 flex flex-col items-start justify-between gap-4 rounded-[28px] bg-amber-50 p-6 sm:flex-row sm:items-center">
+                <p className="text-sm font-medium text-amber-800">
+                  Complete your induction to start booking shifts.
+                </p>
+                <Link
+                  href="/volunteer/induction"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-600"
+                >
+                  Start induction <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
               <StatTile icon={<HandHeart className="h-6 w-6" />} value={vp._count.attendanceRecords} label="Attendances" accent />
               <StatTile icon={<CalendarCheck className="h-6 w-6" />} value={vp._count.shiftAssignments} label="Shifts booked" />
@@ -204,6 +235,36 @@ export default async function DonorHomePage() {
                 label="Volunteering since"
               />
             </div>
+
+            {upcomingShifts.length > 0 && (
+              <div className="mt-5 rounded-[28px] border border-neutral-200 p-6">
+                <h3 className="text-lg font-bold tracking-tight">Your next shifts</h3>
+                <div className="mt-4 space-y-3">
+                  {upcomingShifts.map((a) => (
+                    <div key={a.id} className="flex items-center gap-4 rounded-2xl bg-neutral-50 p-4">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white">
+                        <CalendarCheck className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-neutral-950">
+                          {a.shift.date.toLocaleDateString('en-AU', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            timeZone: 'Australia/Brisbane',
+                          })}
+                        </p>
+                        <p className="mt-0.5 text-sm text-neutral-500">
+                          {a.shift.startTime.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Australia/Brisbane' })}
+                          {' · '}
+                          {a.shift.location.name}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 

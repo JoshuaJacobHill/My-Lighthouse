@@ -133,15 +133,14 @@ export async function loginAction(formData: FormData): Promise<{
       data: { lastLoginAt: new Date() },
     })
 
-    // Determine redirect destination based on role
-    let redirectTo = '/volunteer'
+    // Determine redirect destination based on role. Everyone who isn't an admin
+    // or kiosk lands on the one unified portal dashboard (/donor), which adapts
+    // to whether they give, volunteer, both, or neither.
+    let redirectTo = '/donor'
     if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
       redirectTo = '/admin'
     } else if (user.role === 'KIOSK') {
       redirectTo = '/kiosk'
-    } else if (!user.volunteerProfile) {
-      // Donor-only account (no volunteer profile) → the giving dashboard.
-      redirectTo = '/donor'
     }
 
     return { success: true, redirectTo }
