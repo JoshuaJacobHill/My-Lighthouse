@@ -88,6 +88,11 @@ const INITIAL_FORM: FormData = {
   agreedToInduction: false,
 }
 
+// Fields we can pre-fill for a signed-in donor signing up to volunteer.
+export type SignupPrefill = Partial<
+  Pick<FormData, 'firstName' | 'lastName' | 'email' | 'mobile' | 'addressLine1'>
+>
+
 const STEP_TITLES = [
   'Personal Details',
   'Emergency & Health',
@@ -709,9 +714,9 @@ function Step4({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SignupClient() {
+export default function SignupClient({ prefill }: { prefill?: SignupPrefill }) {
   const [step, setStep] = useState(1)
-  const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
+  const [formData, setFormData] = useState<FormData>({ ...INITIAL_FORM, ...prefill })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [globalError, setGlobalError] = useState('')

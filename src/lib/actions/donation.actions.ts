@@ -37,6 +37,7 @@ const donateSchema = z.object({
   email: z.email('Please enter a valid email address'),
   fundraiserId: z.string().optional(), // tag the gift to a fundraiser page
   message: z.string().trim().max(250).optional(), // optional public message
+  company: z.string().trim().max(120).optional(), // optional company / organisation
 })
 
 export type DonateInput = z.input<typeof donateSchema>
@@ -70,7 +71,7 @@ export async function createDonationCheckoutAction(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { fundSlug, amount, name, email, fundraiserId, message } = parsed.data
+  const { fundSlug, amount, name, email, fundraiserId, message, company } = parsed.data
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
@@ -104,6 +105,7 @@ export async function createDonationCheckoutAction(
     }
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
     if (message) meta.message = message
+    if (company) meta.donorCompany = company
     const cancelUrl = validFundraiserId
       ? `${base}/donate?fundraiser=${fundraiserId}&cancelled=1`
       : `${base}/donate?fund=${fund.slug}&cancelled=1`
@@ -164,7 +166,7 @@ export async function createDonationIntentAction(input: DonateInput): Promise<In
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { fundSlug, amount, name, email, fundraiserId, message } = parsed.data
+  const { fundSlug, amount, name, email, fundraiserId, message, company } = parsed.data
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
@@ -197,6 +199,7 @@ export async function createDonationIntentAction(input: DonateInput): Promise<In
     }
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
     if (message) meta.message = message
+    if (company) meta.donorCompany = company
 
     const intent = await getStripeFor(accountKey).paymentIntents.create({
       amount: toCents(amount),
@@ -253,7 +256,7 @@ export async function createDonationSubscriptionCheckoutAction(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { fundSlug, amount, name, email, fundraiserId, message, frequency } = parsed.data
+  const { fundSlug, amount, name, email, fundraiserId, message, frequency, company } = parsed.data
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
@@ -290,6 +293,7 @@ export async function createDonationSubscriptionCheckoutAction(
     }
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
     if (message) meta.message = message
+    if (company) meta.donorCompany = company
 
     const cancelUrl = validFundraiserId
       ? `${base}/donate?fundraiser=${fundraiserId}&cancelled=1`
@@ -350,7 +354,7 @@ export async function createDonationSubscriptionIntentAction(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { fundSlug, amount, name, email, fundraiserId, message, frequency } = parsed.data
+  const { fundSlug, amount, name, email, fundraiserId, message, frequency, company } = parsed.data
 
   const fund = await prisma.fund.findUnique({
     where: { slug: fundSlug },
@@ -387,6 +391,7 @@ export async function createDonationSubscriptionIntentAction(
     }
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
     if (message) meta.message = message
+    if (company) meta.donorCompany = company
 
     const reqOpts = { apiVersion: SUB_API_VERSION }
     const customer = await stripe.customers.create({ email, name }, reqOpts)

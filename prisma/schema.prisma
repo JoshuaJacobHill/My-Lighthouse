@@ -655,6 +655,7 @@ model Donation {
   userId              String? // null until matched to an account by email
   donorEmail          String
   donorName           String?
+  donorCompany        String? // optional company / organisation on the gift
   message             String?        @db.Text // optional public message shown on the donor wall
   amount              Decimal        @db.Decimal(10, 2)
   currency            String         @default("AUD")

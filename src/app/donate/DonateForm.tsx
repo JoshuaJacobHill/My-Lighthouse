@@ -49,6 +49,7 @@ export function DonateForm({
   const [name, setName] = React.useState(initialName ?? '')
   const [email, setEmail] = React.useState(initialEmail ?? '')
   const [message, setMessage] = React.useState('')
+  const [company, setCompany] = React.useState('')
   const [frequency, setFrequency] = React.useState<Frequency>('once')
   const [error, setError] = React.useState<string | null>(null)
 
@@ -169,6 +170,13 @@ export function DonateForm({
           onChange={(e) => setEmail(e.target.value)}
         />
         <Input
+          label="Company / organisation (optional)"
+          maxLength={120}
+          placeholder="e.g. Acme Pty Ltd"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+        />
+        <Input
           label="Leave a message of support (optional)"
           maxLength={250}
           placeholder="e.g. Great cause — keep it up!"
@@ -192,6 +200,7 @@ export function DonateForm({
           name={name}
           email={email}
           message={message}
+          company={company}
           frequency={frequency}
           freqLabel={freqLabel}
           onError={setError}
@@ -215,6 +224,7 @@ function CardSection({
   name,
   email,
   message,
+  company,
   frequency,
   freqLabel,
   onError,
@@ -226,6 +236,7 @@ function CardSection({
   name: string
   email: string
   message: string
+  company: string
   frequency: Frequency
   freqLabel: string
   onError: (msg: string | null) => void
@@ -261,8 +272,9 @@ function CardSection({
           frequency: frequency as 'weekly' | 'fortnightly' | 'monthly',
           fundraiserId,
           message,
+          company,
         })
-      : await createDonationIntentAction({ fundSlug, amount, name, email, fundraiserId, message })
+      : await createDonationIntentAction({ fundSlug, amount, name, email, fundraiserId, message, company })
     if (!res.success || !res.clientSecret || !res.accountKey) {
       onError(res.error ?? 'Something went wrong. Please try again.')
       setLoading(false)

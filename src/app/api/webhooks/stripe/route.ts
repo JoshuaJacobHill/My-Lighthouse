@@ -229,6 +229,7 @@ async function finalizeDonation(params: {
       userId: user?.id ?? null,
       donorEmail,
       donorName,
+      donorCompany: meta.donorCompany || null,
       message: meta.message || null,
       amount,
       currency,
