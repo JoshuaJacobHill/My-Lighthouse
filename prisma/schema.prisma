@@ -54,6 +54,33 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// ─── Donor migration (e.g. from Shout for Good) ───────────────────────────────
+//
+// A pending "re-confirm your card" intent for a recurring donor we're moving
+// across from another platform. Cards can't be transferred, so we email the
+// donor a tokenised link that pre-fills their name/company/amount/frequency and
+// asks only for their card. Completing it creates a normal Stripe subscription.
+model MigrationIntent {
+  id             String    @id @default(cuid())
+  token          String    @unique // for the re-confirm link (no PII in URL)
+  email          String
+  donorName      String?
+  donorCompany   String?
+  amountCents    Int
+  frequency      String // weekly | fortnightly | monthly
+  fundSlug       String
+  source         String    @default("shout_for_good")
+  status         String    @default("PENDING") // PENDING | COMPLETED | CANCELLED
+  emailSentAt    DateTime? // when the re-confirm email was last sent
+  completedAt    DateTime?
+  subscriptionId String? // Stripe subscription created on completion
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  @@index([email])
+  @@index([status])
+}
+
 // ─── Users & Roles ────────────────────────────────────────────────────────────
 
 enum UserRole {
@@ -479,6 +506,7 @@ enum EmailTemplateType {
   DONATION_RECEIPT
   DONOR_ACCOUNT_SETUP
   TICKET_CONFIRMATION
+  DONOR_MIGRATION
   CUSTOM
 }
 
@@ -669,6 +697,9 @@ model Donation {
   sponsorshipId       String?
   isRecurring         Boolean        @default(false)
   source              DonationSource @default(DONATE_PAGE)
+  // Set when a gift originates from re-confirming a migrated recurring donor
+  // (e.g. "shout_for_good"). Lets reporting tell migrated donors from new ones.
+  migratedFrom        String?
   taxReceiptEligible  Boolean        @default(true)
   taxReceiptIssued    Boolean        @default(false)
   createdAt           DateTime       @default(now())

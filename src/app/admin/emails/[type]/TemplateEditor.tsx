@@ -31,6 +31,12 @@ const SAMPLE_VARS: Record<string, string> = {
   portal_link: APP_URL,
   org_name: 'Lighthouse Care',
   organisation_name: 'Lighthouse Care',
+  amount: '$50.00',
+  frequency: 'monthly',
+  fund_name: 'Lighthouse Care',
+  receipt_no: 'LC-1A2B3C4D',
+  set_password_link: `${APP_URL}/account/setup?token=sample`,
+  resume_link: `${APP_URL}/give/resume/sample`,
 }
 
 const AVAILABLE_VARS = [
@@ -42,6 +48,10 @@ const AVAILABLE_VARS = [
   { key: '{{portal_link}}', desc: 'Volunteer portal URL' },
   { key: '{{organisation_name}}', desc: 'Organisation name' },
   { key: '{{set_password_link}}', desc: 'Password setup link (import welcome)' },
+  { key: '{{amount}}', desc: 'Gift amount (donor emails)' },
+  { key: '{{frequency}}', desc: 'Recurring frequency (migration)' },
+  { key: '{{fund_name}}', desc: 'Fund / appeal name (donor emails)' },
+  { key: '{{resume_link}}', desc: 'Re-confirm card link (migration)' },
 ]
 
 function replaceSampleVars(text: string): string {

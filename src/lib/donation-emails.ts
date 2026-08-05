@@ -47,3 +47,36 @@ export async function sendAccountSetupEmail(opts: {
   })
   await sendEmail({ to: opts.to, subject, html, text, templateType: 'DONOR_ACCOUNT_SETUP' })
 }
+
+const FREQ_LABELS: Record<string, string> = {
+  weekly: 'weekly',
+  fortnightly: 'fortnightly',
+  monthly: 'monthly',
+}
+
+/**
+ * Ask a migrated recurring donor (e.g. from Shout for Good) to re-confirm their
+ * card via a tokenised link that pre-fills their gift. Uses the editable
+ * DONOR_MIGRATION template.
+ */
+export async function sendDonorMigrationEmail(opts: {
+  to: string
+  name?: string | null
+  amountCents: number
+  frequency: string
+  fundName?: string | null
+  token: string
+}): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
+  const firstName = opts.name?.trim().split(/\s+/)[0] || 'friend'
+  const link = `${appUrl}/give/resume/${opts.token}`
+  const { subject, html, text } = await renderTemplate('DONOR_MIGRATION', {
+    first_name: firstName,
+    amount: aud.format(opts.amountCents / 100),
+    frequency: FREQ_LABELS[opts.frequency] ?? opts.frequency,
+    fund_name: opts.fundName ?? 'our work',
+    resume_link: link,
+    organisation_name: ORG.name,
+  })
+  await sendEmail({ to: opts.to, subject, html, text, templateType: 'DONOR_MIGRATION' })
+}

@@ -38,6 +38,7 @@ const donateSchema = z.object({
   fundraiserId: z.string().optional(), // tag the gift to a fundraiser page
   message: z.string().trim().max(250).optional(), // optional public message
   company: z.string().trim().max(120).optional(), // optional company / organisation
+  migrationIntentId: z.string().optional(), // set when re-confirming a migrated donor
 })
 
 export type DonateInput = z.input<typeof donateSchema>
@@ -392,6 +393,19 @@ export async function createDonationSubscriptionIntentAction(
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
     if (message) meta.message = message
     if (company) meta.donorCompany = company
+
+    // If this is a migrated donor re-confirming their card, tag it so the
+    // webhook can mark the migration complete and flag the gift in reporting.
+    if (parsed.data.migrationIntentId) {
+      const mi = await prisma.migrationIntent.findUnique({
+        where: { id: parsed.data.migrationIntentId },
+        select: { status: true, source: true },
+      })
+      if (mi && mi.status === 'PENDING') {
+        meta.migrationIntentId = parsed.data.migrationIntentId
+        meta.migratedFrom = mi.source
+      }
+    }
 
     const reqOpts = { apiVersion: SUB_API_VERSION }
     const customer = await stripe.customers.create({ email, name }, reqOpts)

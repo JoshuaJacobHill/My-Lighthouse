@@ -41,6 +41,8 @@ Three areas today:
 - Design language (new): white canvas, `rounded-[28px]` cards, two-weight headings, orange (`#f97316`) + black + pill buttons. Pages inside `PortalShell` use `-m-4 lg:-m-6 min-h-full bg-white` to fill the shell's grey main.
 
 ## Recently changed (this session, newest first)
+- **Donor migration (Shout for Good).** `MigrationIntent` model + `Donation.migratedFrom`. Admin importer at `/admin/migrations` (finance-gated): paste CSV (name,email,company,amount,frequency), preview/validate, create intents, send/resend/bulk-send the tokenised "re-confirm your card" email (`DONOR_MIGRATION` template, Donors tab). Public `/give/resume/[token]` pre-fills name/company/amount/frequency (confirmed + editable), donor just re-enters card → `createDonationSubscriptionIntentAction({migrationIntentId})` → subscription (charge on confirm). Webhook tags `migratedFrom` + marks intent COMPLETED. Account-setup email fires automatically after. **Operational rule for the user: cancel the Shout for Good recurring the moment a donor re-confirms, to avoid double-charging.**
+- Role-ordered unified dashboard: volunteers get full volunteer dashboard up top (induction/stats/upcoming shifts/quick actions), giving+appeals minimal below; donors get giving up top, volunteer invite at the bottom.
 - `recurring.actions.ts`, `CancelRecurringButton.tsx`, `/donor/recurring` — view/cancel recurring gifts (live Stripe lookup by email; cancel verifies ownership). Linked from `/donor/giving`.
 - `/donor/page.tsx` — giving module always shows (data or invitation).
 - `PortalShell.tsx` + `/donor/layout.tsx` + `/volunteer/layout.tsx` — shared capability sidebar.

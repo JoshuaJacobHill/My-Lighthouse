@@ -25,6 +25,7 @@ const TEMPLATE_NAMES: Record<string, string> = {
   DONATION_RECEIPT: 'Donation Receipt / Thank-You',
   DONOR_ACCOUNT_SETUP: 'Donor Account Setup',
   TICKET_CONFIRMATION: 'Event Ticket Confirmation',
+  DONOR_MIGRATION: 'Donor Migration (Re-confirm Card)',
   CUSTOM: 'Custom / One-Off',
 }
 

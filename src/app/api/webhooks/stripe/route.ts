@@ -172,6 +172,8 @@ async function recordRecurringDonationFromInvoice(
     return
   }
   if (meta.kind !== 'donation') return
+  // Carry the subscription id through so a migration intent can record it.
+  meta.subscriptionId = subId
 
   const paymentIntentId =
     typeof inv.payment_intent === 'string'
@@ -239,10 +241,24 @@ async function finalizeDonation(params: {
       fundraiserId,
       isRecurring: isRecurring ?? false,
       source: fundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
+      migratedFrom: meta.migratedFrom || null,
       taxReceiptEligible: true,
     },
     select: { id: true },
   })
+
+  // If this gift re-confirmed a migrated recurring donor, close out the intent
+  // so we don't email them again or create a second subscription.
+  if (meta.migrationIntentId) {
+    try {
+      await prisma.migrationIntent.updateMany({
+        where: { id: meta.migrationIntentId, status: 'PENDING' },
+        data: { status: 'COMPLETED', completedAt: new Date(), subscriptionId: meta.subscriptionId || null },
+      })
+    } catch (err) {
+      console.error('Could not complete migration intent', err)
+    }
+  }
 
   // Best-effort receipt email — never let a send failure fail the webhook (the
   // gift is already safely recorded; retrying would only re-send).

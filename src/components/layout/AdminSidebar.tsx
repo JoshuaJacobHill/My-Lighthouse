@@ -16,6 +16,7 @@ import {
   Megaphone,
   Newspaper,
   Receipt,
+  ArrowLeftRight,
   Mail,
   Settings,
   ChevronLeft,
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { href: '/admin/events', label: 'Events', icon: Ticket, finance: true },
   { href: '/admin/stories', label: 'Good News', icon: Newspaper, finance: true },
   { href: '/admin/transactions', label: 'Transactions', icon: Receipt, finance: true },
+  { href: '/admin/migrations', label: 'Donor Migration', icon: ArrowLeftRight, finance: true },
   { href: '/admin/emails', label: 'Emails', icon: Mail },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
