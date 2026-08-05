@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import prisma from '@/lib/prisma'
+import { isMigrationFrequency, type MigrationFrequency } from '@/lib/migration-csv'
 
 /**
  * Donor migration intents (e.g. moving recurring givers across from Shout for
@@ -8,13 +9,12 @@ import prisma from '@/lib/prisma'
  * `MigrationIntent` in the schema and `/give/resume/[token]`.
  */
 
+// Re-exported so server callers can keep importing these from '@/lib/migration'.
+// They live in migration-csv.ts because that module is client-safe (no prisma),
+// which keeps the Postgres adapter out of the admin importer's browser bundle.
+export { isMigrationFrequency, type MigrationFrequency }
+
 const MIGRATION_EXPIRY_DAYS = 60
-
-export type MigrationFrequency = 'weekly' | 'fortnightly' | 'monthly'
-
-export function isMigrationFrequency(v: string): v is MigrationFrequency {
-  return v === 'weekly' || v === 'fortnightly' || v === 'monthly'
-}
 
 export interface CreateMigrationInput {
   email: string

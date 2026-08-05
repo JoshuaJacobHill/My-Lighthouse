@@ -1,9 +1,14 @@
-import { isMigrationFrequency, type MigrationFrequency } from '@/lib/migration'
-
 /**
  * CSV parsing for the donor-migration importer. Kept separate from the server
- * actions so the admin UI can reuse it for a live preview before submitting.
+ * actions (and free of any server-only imports like prisma) so the admin UI
+ * can import it into a Client Component for a live preview before submitting.
  */
+
+export type MigrationFrequency = 'weekly' | 'fortnightly' | 'monthly'
+
+export function isMigrationFrequency(v: string): v is MigrationFrequency {
+  return v === 'weekly' || v === 'fortnightly' || v === 'monthly'
+}
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
