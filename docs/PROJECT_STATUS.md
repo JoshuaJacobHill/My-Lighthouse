@@ -52,10 +52,11 @@ Three areas today:
 
 ## Current bugs / unfinished (EXACT next steps)
 1. **Appeals not visible on dashboard** — root cause: **no Fund has `showOnDashboard=true`** (all false in prod). Fix: in Admin → Funds → edit each of Disaster Relief / Christmas Appeal / Good Food Festival → tick **"Feature as an appeal on the donor dashboard"** (and ideally add a goal amount + tagline + image for a nicer card) → Save. (Tried to enable via DB script but Supabase writes were timing out from the dev env.) Verify the toggle actually persists (form → `fund.actions.ts` update → `Fund.showOnDashboard`).
-2. **Prefill volunteer signup** — when a logged-in donor signs up to volunteer, prefill name/email/phone from their `User`/`DonorProfile`. Signup lives at `src/app/(public)/signup/` (`SignupClient.tsx`). Not started.
-3. **Optional company field on ALL donation forms** — add an optional "Company / organisation" field to `DonateForm.tsx`; thread through `donateSchema`/`subscriptionSchema` (`donation.actions.ts`) into PaymentIntent/subscription metadata; webhook writes it to a new `Donation.donorCompany` column (additive schema change → push → generate). Not started.
+2. **Prefill volunteer signup** — ✅ DONE. Signup prefills name/email/mobile/address for logged-in donors (`SignupClient` `prefill` prop + `signup/page.tsx`).
+3. **Optional company field on donation forms** — ✅ DONE. `Donation.donorCompany` column added; captured on one-off + recurring via metadata → webhook. (Not yet surfaced in admin Transactions or the fundraiser donor wall — nice follow-up.)
 4. **Step 4 of unification** — route all non-admin logins to the one dashboard (`loginAction` in `auth.actions.ts` currently sends volunteers→/volunteer, donors→/donor) and fold the old `/volunteer` dashboard into `/donor`. Not started.
 5. **Recurring "edit amount"** — currently cancel-and-resetup; add in-place amount change (Stripe subscription item price update). Not started.
+6. **Appeals cards** — after enabling `showOnDashboard` (item 1), add goal/tagline/image per fund for nicer cards.
 
 ## Build / test / deploy status
 - `npx tsc --noEmit` — **clean** as of last commit.
