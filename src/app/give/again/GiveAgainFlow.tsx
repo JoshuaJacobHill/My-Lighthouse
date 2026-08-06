@@ -76,6 +76,7 @@ export function GiveAgainFlow({
           .ga-scroll { animation: ga-scroll 18s linear infinite; }
         `}</style>
 
+        <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-md flex-col">
         {/* Back */}
         <button
           type="button"
@@ -141,7 +142,7 @@ export function GiveAgainFlow({
         </div>
 
         {/* Next */}
-        <div className="mt-14 flex justify-center">
+        <div className="mt-auto flex justify-center pt-12">
           <button
             type="button"
             disabled={!validAmount}
@@ -154,6 +155,7 @@ export function GiveAgainFlow({
         {!validAmount && amountText !== '' && (
           <p className="mt-3 text-center text-sm text-orange-100">Minimum gift is ${MIN}.</p>
         )}
+        </div>
       </main>
     )
   }
