@@ -94,7 +94,7 @@ export function GiveAgainFlow({ userName, fundName }: { userName: string; fundNa
               onChange={(e) => onAmountChange(e.target.value)}
               placeholder="0"
               aria-label="Donation amount"
-              className="w-full min-w-0 bg-transparent text-[5.5rem] font-extrabold leading-none tracking-tighter placeholder-white/30 caret-white outline-none sm:text-8xl"
+              className="ml-3 w-full min-w-0 appearance-none border-0 bg-transparent text-[5.5rem] font-extrabold leading-none tracking-tighter placeholder-white/30 caret-white outline-none focus:outline-none focus:ring-0 sm:text-8xl"
             />
           </div>
 
