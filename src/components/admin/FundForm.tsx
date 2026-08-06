@@ -24,6 +24,10 @@ export interface FundFormValues {
   tagline: string
   showOnDashboard: boolean
   depositAccount: string
+  presetAmounts: string
+  suggestedAmount: string
+  impactLabels: string
+  defaultFrequency: string
 }
 
 const EMPTY: FundFormValues = {
@@ -40,6 +44,10 @@ const EMPTY: FundFormValues = {
   tagline: '',
   showOnDashboard: false,
   depositAccount: 'CARE',
+  presetAmounts: '',
+  suggestedAmount: '',
+  impactLabels: '',
+  defaultFrequency: '',
 }
 
 export function FundForm({ fund }: { fund?: FundFormValues }) {
@@ -75,6 +83,10 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
       tagline: (fd.get('tagline') as string) ?? '',
       showOnDashboard,
       depositAccount: ((fd.get('depositAccount') as string) ?? 'CARE') as 'CARE' | 'CHURCH',
+      presetAmounts: (fd.get('presetAmounts') as string) ?? '',
+      suggestedAmount: (fd.get('suggestedAmount') as string) ?? '',
+      impactLabels: (fd.get('impactLabels') as string) ?? '',
+      defaultFrequency: (fd.get('defaultFrequency') as string) ?? '',
     }
 
     const result = isEdit
@@ -201,6 +213,60 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
             placeholder="https://…"
             hint="Optional. Image shown on the appeal card."
           />
+        </div>
+
+        <div className="border-t border-gray-100 pt-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Giving amounts</h3>
+            <p className="text-xs text-gray-500">
+              Controls the buttons on the donate form for this fund. Leave blank to use the defaults ($25, $50, $100,
+              $250).
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Preset amounts (AUD)"
+              name="presetAmounts"
+              defaultValue={fund?.presetAmounts}
+              placeholder="25, 50, 100, 250"
+              hint="Comma-separated. Shown as buttons, low to high."
+            />
+            <Input
+              label="Suggested amount (AUD)"
+              name="suggestedAmount"
+              type="number"
+              min="1"
+              step="1"
+              defaultValue={fund?.suggestedAmount}
+              placeholder="e.g. 25"
+              hint="Highlighted as the recommended gift."
+            />
+          </div>
+          <Textarea
+            label="Impact labels"
+            name="impactLabels"
+            rows={4}
+            defaultValue={fund?.impactLabels}
+            placeholder={'25: a full trolley for a family\n50: two families fed this week'}
+            hint="Optional. One per line as ‘amount: what it does’. Shown under the amount as the donor types."
+          />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="defaultFrequency" className="text-sm font-medium text-gray-700">
+              Default frequency
+            </label>
+            <select
+              id="defaultFrequency"
+              name="defaultFrequency"
+              defaultValue={fund?.defaultFrequency ?? ''}
+              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">Give once (default)</option>
+              <option value="weekly">Weekly</option>
+              <option value="fortnightly">Fortnightly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            <p className="text-xs text-gray-500">Which option is pre-selected on the donate form.</p>
+          </div>
         </div>
 
         <div className="border-t border-gray-100 pt-5">

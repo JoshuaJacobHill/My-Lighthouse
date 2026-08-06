@@ -14,9 +14,9 @@ import {
 } from '@/lib/actions/donation.actions'
 import { stripePromiseFor } from '@/lib/stripe-public'
 
-// $25 leads deliberately — it's the price of a full $25 Trolley.
-const PRESETS = [25, 50, 100, 250, 500, 1000]
-const SUGGESTED = 25
+// Fallback amounts when a fund hasn't configured its own ($25 = a full Trolley).
+const DEFAULT_PRESETS = [25, 50, 100, 250]
+const DEFAULT_SUGGESTED = 25
 
 type AccountKey = 'CARE' | 'CHURCH'
 type Frequency = 'once' | 'weekly' | 'fortnightly' | 'monthly'
@@ -37,6 +37,10 @@ export function DonateForm({
   accountKey,
   initialName,
   initialEmail,
+  presets,
+  suggested,
+  impactLabels,
+  defaultFrequency,
 }: {
   fundSlug: string
   fundName: string
@@ -44,14 +48,28 @@ export function DonateForm({
   accountKey: AccountKey
   initialName?: string
   initialEmail?: string
+  presets?: number[]
+  suggested?: number | null
+  impactLabels?: Record<string, string> | null
+  defaultFrequency?: string | null
 }) {
+  const ladder = presets && presets.length ? presets : DEFAULT_PRESETS
+  const suggestedAmount = suggested ?? DEFAULT_SUGGESTED
+  const initialFrequency = (['once', 'weekly', 'fortnightly', 'monthly'] as const).includes(
+    (defaultFrequency ?? '') as Frequency
+  )
+    ? (defaultFrequency as Frequency)
+    : 'once'
+
   const [amountText, setAmountText] = React.useState('')
   const [name, setName] = React.useState(initialName ?? '')
   const [email, setEmail] = React.useState(initialEmail ?? '')
   const [message, setMessage] = React.useState('')
   const [company, setCompany] = React.useState('')
-  const [frequency, setFrequency] = React.useState<Frequency>('once')
+  const [frequency, setFrequency] = React.useState<Frequency>(initialFrequency)
   const [error, setError] = React.useState<string | null>(null)
+
+  const impact = impactLabels?.[String(Number(amountText))] ?? null
 
   const amount = Number(amountText)
   const validAmount = Number.isFinite(amount) && amount > 0
@@ -113,7 +131,7 @@ export function DonateForm({
 
       {/* Presets */}
       <div className="grid grid-cols-3 gap-3">
-        {PRESETS.map((p) => {
+        {ladder.map((p) => {
           const active = presetActive(p)
           return (
             <button
@@ -127,7 +145,7 @@ export function DonateForm({
               }
             >
               ${p}
-              {p === SUGGESTED && (
+              {p === suggestedAmount && (
                 <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                   Suggested
                 </span>
@@ -152,6 +170,9 @@ export function DonateForm({
           className="w-full min-w-0 appearance-none border-0 bg-transparent text-right text-4xl font-extrabold text-neutral-900 placeholder-neutral-300 outline-none focus:outline-none focus:ring-0"
         />
       </div>
+      {impact && (
+        <p className="-mt-2 text-center text-sm font-medium text-orange-600">= {impact}</p>
+      )}
 
       {/* Donor details */}
       <div className="space-y-4">

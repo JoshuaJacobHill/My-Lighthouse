@@ -37,6 +37,14 @@ export default async function EditFundPage({
     tagline: fund.tagline ?? '',
     showOnDashboard: fund.showOnDashboard,
     depositAccount: fund.depositAccount,
+    presetAmounts: fund.presetAmounts.join(', '),
+    suggestedAmount: fund.suggestedAmount ? String(fund.suggestedAmount) : '',
+    impactLabels: fund.impactLabels
+      ? Object.entries(fund.impactLabels as Record<string, string>)
+          .map(([a, l]) => `${a}: ${l}`)
+          .join('\n')
+      : '',
+    defaultFrequency: fund.defaultFrequency ?? '',
   }
 
   return (

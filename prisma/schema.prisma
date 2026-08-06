@@ -652,6 +652,13 @@ model Fund {
   // the chosen account isn't configured yet.
   depositAccount String @default("CARE")
   goalAmount  Decimal?  @db.Decimal(10, 2)
+  // Per-fund giving amounts shown on the donate/give forms. Empty = use the
+  // app defaults. suggestedAmount is the highlighted anchor; impactLabels maps
+  // "amount" -> a short impact line (e.g. {"25":"a full trolley for a family"}).
+  presetAmounts   Int[]   @default([])
+  suggestedAmount Int?
+  impactLabels    Json?
+  defaultFrequency String? // once | weekly | fortnightly | monthly
   // Optional image + short tagline for the appeal card on the donor dashboard.
   imageUrl    String?
   tagline     String?

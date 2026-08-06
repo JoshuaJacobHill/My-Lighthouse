@@ -1,5 +1,6 @@
 'use server'
 
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { fundSchema, type FundInput } from '@/lib/validations'
@@ -95,6 +96,10 @@ export async function createFundAction(input: FundInput): Promise<ActionResult> 
         tagline: data.tagline ?? null,
         showOnDashboard: data.showOnDashboard ?? false,
         depositAccount: data.depositAccount ?? 'CARE',
+        presetAmounts: data.presetAmounts ?? [],
+        suggestedAmount: data.suggestedAmount ?? null,
+        impactLabels: data.impactLabels ?? Prisma.JsonNull,
+        defaultFrequency: data.defaultFrequency ?? null,
       },
       select: { id: true },
     })
@@ -150,6 +155,10 @@ export async function updateFundAction(
         tagline: data.tagline ?? null,
         showOnDashboard: data.showOnDashboard ?? false,
         depositAccount: data.depositAccount ?? 'CARE',
+        presetAmounts: data.presetAmounts ?? [],
+        suggestedAmount: data.suggestedAmount ?? null,
+        impactLabels: data.impactLabels ?? Prisma.JsonNull,
+        defaultFrequency: data.defaultFrequency ?? null,
       },
     })
 

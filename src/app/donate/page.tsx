@@ -29,7 +29,7 @@ export default async function DonatePage({
         select: {
           id: true,
           title: true,
-          fund: { select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true } },
+          fund: { select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true, presetAmounts: true, suggestedAmount: true, impactLabels: true, defaultFrequency: true } },
         },
       })
     : null
@@ -40,12 +40,12 @@ export default async function DonatePage({
     : fundSlug
       ? await prisma.fund.findFirst({
           where: { slug: fundSlug, isActive: true },
-          select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true },
+          select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true, presetAmounts: true, suggestedAmount: true, impactLabels: true, defaultFrequency: true },
         })
       : await prisma.fund.findFirst({
           where: { isActive: true },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-          select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true },
+          select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true, presetAmounts: true, suggestedAmount: true, impactLabels: true, defaultFrequency: true },
         })
 
   if (!fund) {
@@ -128,6 +128,10 @@ export default async function DonatePage({
               accountKey={resolveAccount(fund.depositAccount)}
               initialName={currentUser?.name ?? undefined}
               initialEmail={currentUser?.email ?? undefined}
+              presets={fund.presetAmounts}
+              suggested={fund.suggestedAmount}
+              impactLabels={(fund.impactLabels as Record<string, string> | null) ?? undefined}
+              defaultFrequency={fund.defaultFrequency}
             />
           </div>
         </div>

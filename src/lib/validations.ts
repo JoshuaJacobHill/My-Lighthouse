@@ -196,6 +196,42 @@ export const fundSchema = z.object({
   showOnDashboard: z.boolean().optional().default(false),
   // Which Stripe account this fund's gifts deposit to.
   depositAccount: z.enum(['CARE', 'CHURCH']).optional().default('CARE'),
+  // Per-fund giving amounts (comma list from the form → sorted unique ints).
+  presetAmounts: z
+    .union([z.string(), z.array(z.number())])
+    .optional()
+    .transform((v) => {
+      if (v === undefined || v === '') return [] as number[]
+      const arr = Array.isArray(v) ? v : String(v).split(',')
+      const nums = arr
+        .map((x) => Math.round(Number(String(x).replace(/[^0-9.]/g, ''))))
+        .filter((n) => Number.isFinite(n) && n > 0)
+      return [...new Set(nums)].sort((a, b) => a - b)
+    }),
+  suggestedAmount: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : Math.round(Number(v))))
+    .refine((v) => v === undefined || (Number.isFinite(v) && v > 0), {
+      message: 'Suggested amount must be positive',
+    }),
+  impactLabels: z
+    .union([z.string(), z.record(z.string(), z.string())])
+    .optional()
+    .transform((v) => {
+      if (!v) return undefined
+      if (typeof v !== 'string') return v
+      const map: Record<string, string> = {}
+      for (const line of v.split('\n')) {
+        const m = /^\s*\$?\s*(\d+)\s*[:=]\s*(.+?)\s*$/.exec(line)
+        if (m) map[m[1]] = m[2].trim()
+      }
+      return Object.keys(map).length ? map : undefined
+    }),
+  defaultFrequency: z
+    .string()
+    .optional()
+    .transform((v) => (['once', 'weekly', 'fortnightly', 'monthly'].includes(v ?? '') ? v : undefined)),
 })
 
 // Input type (pre-transform): forms send strings for numbers/dates.
