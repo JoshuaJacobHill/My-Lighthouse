@@ -81,6 +81,20 @@ model MigrationIntent {
   @@index([status])
 }
 
+// A reusable Stripe customer per donor, per Stripe account (CARE/CHURCH), so we
+// can save their card on file and offer one-tap giving next time. We never store
+// card data — only Stripe's customer id; the card lives in Stripe's vault.
+model StripeCustomer {
+  id         String   @id @default(cuid())
+  userId     String
+  account    String // CARE | CHURCH — customers are scoped to a Stripe account
+  customerId String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, account])
+  @@index([userId])
+}
+
 // ─── Users & Roles ────────────────────────────────────────────────────────────
 
 enum UserRole {
