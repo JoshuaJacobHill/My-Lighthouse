@@ -48,6 +48,9 @@ export type DonorGift = {
   fundName: string | null
   isRecurring: boolean
   taxReceiptEligible: boolean
+  description: string | null
+  frequency: string | null
+  paymentMethod: string | null
 }
 
 /** A donor's gifts, newest first, with the fund name resolved. */
@@ -62,6 +65,9 @@ export async function getDonorGifts(userId: string): Promise<DonorGift[]> {
       createdAt: true,
       isRecurring: true,
       taxReceiptEligible: true,
+      description: true,
+      frequency: true,
+      paymentMethod: true,
       fund: { select: { name: true } },
     },
   })
@@ -73,6 +79,9 @@ export async function getDonorGifts(userId: string): Promise<DonorGift[]> {
     fundName: g.fund?.name ?? null,
     isRecurring: g.isRecurring,
     taxReceiptEligible: g.taxReceiptEligible,
+    description: g.description,
+    frequency: g.frequency,
+    paymentMethod: g.paymentMethod,
   }))
 }
 

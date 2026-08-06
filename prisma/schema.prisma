@@ -714,6 +714,11 @@ model Donation {
   // Set when a gift originates from re-confirming a migrated recurring donor
   // (e.g. "shout_for_good"). Lets reporting tell migrated donors from new ones.
   migratedFrom        String?
+  // Richer detail for the giving-history view (backfilled for imported gifts,
+  // set on new gifts where known). All optional.
+  description         String? // what the gift was for, e.g. "$25 Trolley"
+  frequency           String? // One-off | Weekly | Fortnightly | Monthly
+  paymentMethod       String? // e.g. Visa, Mastercard, Apple Pay, PayPal
   taxReceiptEligible  Boolean        @default(true)
   taxReceiptIssued    Boolean        @default(false)
   createdAt           DateTime       @default(now())
