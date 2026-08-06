@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { Heart, ArrowRight, ImageIcon } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { Markdown } from '@/components/ui/Markdown'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,16 @@ export default async function FundPage({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const fund = await prisma.fund.findFirst({
     where: { slug, isActive: true },
-    select: { id: true, slug: true, name: true, description: true, tagline: true, imageUrl: true, goalAmount: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      description: true,
+      tagline: true,
+      imageUrl: true,
+      goalAmount: true,
+      showPublicProgress: true,
+    },
   })
   if (!fund) notFound()
 
@@ -30,6 +40,8 @@ export default async function FundPage({ params }: { params: Promise<{ slug: str
   const raised = Number(_sum.amount ?? 0)
   const goal = fund.goalAmount ? Number(fund.goalAmount) : null
   const pct = goal && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : null
+  // Only reveal the raised total when the fund opts into public progress.
+  const showProgress = fund.showPublicProgress
 
   // Logged-in donors get the fast on-page flow; everyone else the full form.
   const giveHref = session ? `/give/again?fund=${fund.slug}` : `/donate?fund=${fund.slug}`
@@ -61,16 +73,24 @@ export default async function FundPage({ params }: { params: Promise<{ slug: str
         <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-neutral-950 sm:text-4xl">{fund.name}</h1>
         {fund.tagline && <p className="mt-2 text-lg text-neutral-500">{fund.tagline}</p>}
 
-        {/* Progress */}
+        {/* Give (with progress only when the fund opts in) */}
         <div className="mt-6 rounded-[28px] border border-neutral-200 bg-white p-6">
-          <p className="text-3xl font-extrabold tabular-nums text-neutral-950">
-            {aud0.format(raised)}
-            {goal && <span className="text-base font-medium text-neutral-400"> raised of {aud0.format(goal)} goal</span>}
-          </p>
-          {pct !== null && (
-            <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-neutral-100">
-              <div className="h-full rounded-full bg-orange-500" style={{ width: `${pct}%` }} />
-            </div>
+          {showProgress ? (
+            <>
+              <p className="text-3xl font-extrabold tabular-nums text-neutral-950">
+                {aud0.format(raised)}
+                {goal && <span className="text-base font-medium text-neutral-400"> raised of {aud0.format(goal)} goal</span>}
+              </p>
+              {pct !== null && (
+                <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-neutral-100">
+                  <div className="h-full rounded-full bg-orange-500" style={{ width: `${pct}%` }} />
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-neutral-600">
+              Your gift helps families doing it tough across South East Queensland.
+            </p>
           )}
           <Link
             href={giveHref}
@@ -84,7 +104,7 @@ export default async function FundPage({ params }: { params: Promise<{ slug: str
         {fund.description && (
           <div className="mt-8">
             <h2 className="text-xl font-bold tracking-tight text-neutral-950">About this appeal</h2>
-            <p className="mt-3 whitespace-pre-line leading-relaxed text-neutral-600">{fund.description}</p>
+            <Markdown source={fund.description} className="mt-3 text-neutral-600" />
           </div>
         )}
 

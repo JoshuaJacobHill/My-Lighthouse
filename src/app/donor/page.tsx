@@ -135,7 +135,7 @@ export default async function DonorHomePage() {
   const funds = await prisma.fund.findMany({
     where: { isActive: true, showOnDashboard: true },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    select: { id: true, slug: true, name: true, tagline: true, goalAmount: true, imageUrl: true },
+    select: { id: true, slug: true, name: true, tagline: true, goalAmount: true, imageUrl: true, showPublicProgress: true },
   })
   const raised = new Map<string, number>()
   if (funds.length) {
@@ -150,9 +150,10 @@ export default async function DonorHomePage() {
     slug: f.slug,
     name: f.name,
     tagline: f.tagline,
-    goal: f.goalAmount ? Number(f.goalAmount) : null,
+    // Only reveal raised/goal progress when the fund opts into public progress.
+    goal: f.showPublicProgress && f.goalAmount ? Number(f.goalAmount) : null,
     imageUrl: f.imageUrl,
-    raised: raised.get(f.id) ?? 0,
+    raised: f.showPublicProgress ? raised.get(f.id) ?? 0 : 0,
   }))
 
   const stories = await prisma.story.findMany({

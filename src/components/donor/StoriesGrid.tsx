@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { ImageIcon, X, ArrowUpRight } from 'lucide-react'
+import { Markdown } from '@/components/ui/Markdown'
 
 export interface StoryCard {
   id: string
@@ -80,7 +81,7 @@ export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
             <div className="flex-1 overflow-y-auto p-6">
               <h3 className="text-2xl font-bold tracking-tight">{active.title}</h3>
               {active.excerpt ? (
-                <p className="mt-3 whitespace-pre-line leading-relaxed text-neutral-600">{active.excerpt}</p>
+                <Markdown source={active.excerpt} className="mt-3 leading-relaxed text-neutral-600" />
               ) : (
                 <p className="mt-3 text-neutral-400">No further details.</p>
               )}
