@@ -29,7 +29,7 @@ export default async function DonatePage({
         select: {
           id: true,
           title: true,
-          fund: { select: { name: true, slug: true, description: true, depositAccount: true } },
+          fund: { select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true } },
         },
       })
     : null
@@ -40,12 +40,12 @@ export default async function DonatePage({
     : fundSlug
       ? await prisma.fund.findFirst({
           where: { slug: fundSlug, isActive: true },
-          select: { name: true, slug: true, description: true, depositAccount: true },
+          select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true },
         })
       : await prisma.fund.findFirst({
           where: { isActive: true },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-          select: { name: true, slug: true, description: true, depositAccount: true },
+          select: { id: true, name: true, slug: true, description: true, depositAccount: true, goalAmount: true, showPublicProgress: true },
         })
 
   if (!fund) {
@@ -66,40 +66,79 @@ export default async function DonatePage({
       })
     : null
 
+  // GoFundMe-style progress — only when this fund opts into public progress.
+  const goal = fund.goalAmount ? Number(fund.goalAmount) : null
+  let progress: { raised: number; goal: number; pct: number; toGo: number } | null = null
+  if (!fundraiser && fund.showPublicProgress && goal && goal > 0) {
+    const { _sum } = await prisma.donation.aggregate({ where: { fundId: fund.id }, _sum: { amount: true } })
+    const raised = Number(_sum.amount ?? 0)
+    progress = { raised, goal, pct: Math.min(100, Math.round((raised / goal) * 100)), toGo: Math.max(0, goal - raised) }
+  }
+
   return (
-    <div className="min-h-screen bg-white px-6 py-12">
-      <div className="mx-auto max-w-lg">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
+    <main className="min-h-screen bg-neutral-50">
+      <header className="border-b border-neutral-200 bg-white">
+        <div className="mx-auto flex max-w-xl items-center justify-between px-5 py-4">
+          <a href="https://lighthousecare.org.au">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-inline-black.png" alt="Lighthouse Care" className="h-7 w-auto" />
+          </a>
+          <a href="/login" className="text-sm text-neutral-500">
+            Already have an account? <span className="font-semibold text-orange-600">Sign in</span>
+          </a>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-xl px-4 py-8">
+        <div className="rounded-[28px] border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
+          <h1 className="text-2xl font-extrabold tracking-tight text-neutral-950 sm:text-3xl">
             {fundraiser ? `Donate to ${fundraiser.title}` : `Donate to ${fund.name}`}
           </h1>
-          <p className="mt-2 text-gray-500">
+          <p className="mt-2 text-neutral-500">
             {fundraiser
               ? 'Your gift supports this fundraiser for Lighthouse Care.'
-              : (fund.description ??
-                'Your gift helps families doing it tough across South East Queensland.')}
+              : 'Your gift helps families doing it tough across South East Queensland.'}
           </p>
+
+          {progress && (
+            <div className="mt-5">
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div className="h-full rounded-full bg-orange-500" style={{ width: `${progress.pct}%` }} />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-neutral-700">
+                {aud0.format(progress.raised)} raised
+                {progress.toGo > 0 && (
+                  <span className="font-normal text-neutral-500"> · still {aud0.format(progress.toGo)} to go</span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {cancelled && (
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+              No payment was made — your donation was cancelled. You’re welcome to try again below.
+            </div>
+          )}
+
+          <div className="mt-6">
+            <DonateForm
+              fundSlug={fund.slug}
+              fundName={fundraiser ? fundraiser.title : fund.name}
+              fundraiserId={fundraiser?.id}
+              accountKey={resolveAccount(fund.depositAccount)}
+              initialName={currentUser?.name ?? undefined}
+              initialEmail={currentUser?.email ?? undefined}
+            />
+          </div>
         </div>
 
-        {cancelled && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-            No payment was made — your donation was cancelled. You’re welcome to try again below.
-          </div>
-        )}
-
-        <DonateForm
-          fundSlug={fund.slug}
-          fundName={fundraiser ? fundraiser.title : fund.name}
-          fundraiserId={fundraiser?.id}
-          accountKey={resolveAccount(fund.depositAccount)}
-          initialName={currentUser?.name ?? undefined}
-          initialEmail={currentUser?.email ?? undefined}
-        />
-
-        <p className="mt-6 text-center text-xs text-gray-400">
-          Payments are processed securely by Stripe. Lighthouse Care never sees your card details.
+        <p className="mx-auto mt-5 max-w-sm text-center text-xs text-neutral-400">
+          Lighthouse Care is an ACNC-registered charity. Payments are processed securely by Stripe —
+          we never see your card details.
         </p>
       </div>
-    </div>
+    </main>
   )
 }
+
+const aud0 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 })
