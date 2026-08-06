@@ -350,7 +350,7 @@ export default async function DonorHomePage() {
                     </p>
                     <div className="mt-9">
                       <Link
-                        href="/donate"
+                        href="/give/again"
                         className="inline-flex items-center gap-2 rounded-full bg-neutral-950 px-6 py-3 text-sm font-semibold text-white"
                       >
                         Give again <ArrowRight className="h-4 w-4" />
@@ -388,7 +388,7 @@ export default async function DonorHomePage() {
                     </p>
                   </div>
                   <Link
-                    href="/donate"
+                    href="/give/again"
                     className="inline-flex shrink-0 items-center gap-2 rounded-full bg-neutral-950 px-6 py-3 text-sm font-semibold text-white"
                   >
                     Make a gift <ArrowRight className="h-4 w-4" />
@@ -440,7 +440,7 @@ export default async function DonorHomePage() {
             <Heart className="mx-auto h-8 w-8 text-orange-400" />
             <p className="mt-3 text-neutral-600">Welcome to Lighthouse Care.</p>
             <Link
-              href="/donate"
+              href="/give/again"
               className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
             >
               Make a donation <ArrowRight className="h-4 w-4" />
@@ -494,7 +494,7 @@ function GivingStrip({ hasGifts, allTime }: { hasGifts: boolean; allTime: number
           </Link>
         )}
         <Link
-          href="/donate"
+          href="/give/again"
           className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
         >
           {hasGifts ? 'Give again' : 'Make a gift'} <ArrowRight className="h-4 w-4" />

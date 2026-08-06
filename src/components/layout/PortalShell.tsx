@@ -52,7 +52,7 @@ export function PortalShell({
 
   const items: NavItem[] = [
     { href: '/donor', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-    { href: '/donate', label: 'Give', icon: Heart },
+    { href: '/give/again', label: 'Give', icon: Heart },
     ...(hasGiven ? [{ href: '/donor/giving', label: 'My giving', icon: Receipt }] : []),
     ...(isVolunteer
       ? [
