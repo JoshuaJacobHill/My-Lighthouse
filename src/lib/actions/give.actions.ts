@@ -25,8 +25,8 @@ interface StartResult {
   accountKey?: 'CARE' | 'CHURCH'
 }
 
-// Fund all give-again gifts support (fast flow defaults to Lighthouse Care).
-const GIVE_AGAIN_FUND_SLUG = 'lighthouse-care'
+// The fast flow defaults to Lighthouse Care, but can target any active fund.
+const DEFAULT_FUND_SLUG = 'lighthouse-care'
 
 /**
  * Start the fast "give again" payment for a logged-in donor. Intent-first (we
@@ -37,6 +37,7 @@ const GIVE_AGAIN_FUND_SLUG = 'lighthouse-care'
 export async function startGiveAgainPaymentAction(input: {
   amount: number
   frequency: Frequency
+  fundSlug?: string
 }): Promise<StartResult> {
   if (!isStripeConfigured()) {
     return { success: false, error: 'Donations aren’t configured yet. Please try again soon.' }
@@ -61,7 +62,7 @@ export async function startGiveAgainPaymentAction(input: {
   }
 
   const fund = await prisma.fund.findUnique({
-    where: { slug: GIVE_AGAIN_FUND_SLUG },
+    where: { slug: input.fundSlug || DEFAULT_FUND_SLUG },
     select: { id: true, name: true, slug: true, isActive: true, depositAccount: true },
   })
   if (!fund || !fund.isActive) {

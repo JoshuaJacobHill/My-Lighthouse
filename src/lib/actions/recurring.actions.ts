@@ -17,6 +17,10 @@ export interface RecurringGift {
   frequencyLabel: string
   fundName: string | null
   nextChargeAt: number | null // unix seconds
+  status: string // raw Stripe status
+  statusLabel: string // human label
+  active: boolean // still charging (can be cancelled)
+  endedAt: number | null // unix seconds — when it was cancelled/ended
 }
 
 function freqLabel(interval: string, count: number): string {
@@ -25,6 +29,21 @@ function freqLabel(interval: string, count: number): string {
   if (interval === 'month' && count === 1) return 'Monthly'
   return `Every ${count} ${interval}${count > 1 ? 's' : ''}`
 }
+
+const STATUS_LABELS: Record<string, string> = {
+  active: 'Active',
+  trialing: 'Active',
+  past_due: 'Payment failed',
+  unpaid: 'Unpaid',
+  paused: 'Paused',
+  canceled: 'Cancelled',
+}
+// Statuses that are still live (donor can cancel). Everything else is inactive.
+const ACTIVE_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'paused'])
+// Noise we never surface (abandoned setups).
+const HIDDEN_STATUSES = new Set(['incomplete', 'incomplete_expired'])
+// Rank for sorting: live gifts first, cancelled last.
+const rank = (s: string) => (ACTIVE_STATUSES.has(s) ? 0 : 1)
 
 /** A donor's active recurring gifts, looked up live in Stripe by their email. */
 export async function listMyRecurringGifts(): Promise<RecurringGift[]> {
@@ -44,11 +63,13 @@ export async function listMyRecurringGifts(): Promise<RecurringGift[]> {
       const customers = await stripe.customers.list({ email, limit: 20 }, opts)
       for (const customer of customers.data) {
         const subs = await stripe.subscriptions.list(
-          { customer: customer.id, status: 'active', limit: 50, expand: ['data.items.data.price'] },
+          { customer: customer.id, status: 'all', limit: 50, expand: ['data.items.data.price'] },
           opts
         )
         for (const s of subs.data) {
+          if (HIDDEN_STATUSES.has(s.status)) continue
           const price = s.items.data[0]?.price
+          const active = ACTIVE_STATUSES.has(s.status)
           gifts.push({
             id: s.id,
             account,
@@ -56,8 +77,13 @@ export async function listMyRecurringGifts(): Promise<RecurringGift[]> {
             frequencyLabel: freqLabel(price?.recurring?.interval ?? 'month', price?.recurring?.interval_count ?? 1),
             fundName: null,
             fundSlug: s.metadata?.fundSlug,
-            nextChargeAt:
-              (s as unknown as { current_period_end?: number }).current_period_end ?? null,
+            nextChargeAt: active
+              ? (s as unknown as { current_period_end?: number }).current_period_end ?? null
+              : null,
+            status: s.status,
+            statusLabel: STATUS_LABELS[s.status] ?? s.status,
+            active,
+            endedAt: (s.canceled_at ?? s.ended_at) as number | null,
           })
         }
       }
@@ -74,6 +100,8 @@ export async function listMyRecurringGifts(): Promise<RecurringGift[]> {
     for (const g of gifts) g.fundName = g.fundSlug ? bySlug.get(g.fundSlug) ?? null : null
   }
 
+  // Live gifts first, then cancelled/inactive (most recent first within each).
+  gifts.sort((a, b) => rank(a.status) - rank(b.status) || (b.nextChargeAt ?? b.endedAt ?? 0) - (a.nextChargeAt ?? a.endedAt ?? 0))
   return gifts.map(({ fundSlug: _drop, ...g }) => g)
 }
 
@@ -101,6 +129,12 @@ export async function cancelMyRecurringGift(
       customerEmail.toLowerCase() === email ||
       (sub.metadata?.donorEmail ?? '').toLowerCase() === email
     if (!owns) return { success: false, error: 'That recurring gift isn’t on your account.' }
+
+    // Already cancelled — nothing to do (avoid a Stripe error on re-cancel).
+    if (sub.status === 'canceled') {
+      revalidatePath('/donor/recurring')
+      return { success: true }
+    }
 
     await stripe.subscriptions.cancel(subscriptionId, {}, opts)
     revalidatePath('/donor/recurring')

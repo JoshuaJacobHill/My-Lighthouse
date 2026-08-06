@@ -37,8 +37,17 @@ const IMPACTS = [
 
 const MIN = 2
 
-export function GiveAgainFlow({ userName, fundName }: { userName: string; fundName: string }) {
+export function GiveAgainFlow({
+  userName,
+  fundName,
+  fundSlug = 'lighthouse-care',
+}: {
+  userName: string
+  fundName: string
+  fundSlug?: string
+}) {
   const router = useRouter()
+  const specificFund = fundSlug !== 'lighthouse-care'
   const [step, setStep] = React.useState<1 | 2>(1)
   const [amountText, setAmountText] = React.useState('')
   const [frequency, setFrequency] = React.useState<Frequency>('once')
@@ -78,6 +87,7 @@ export function GiveAgainFlow({ userName, fundName }: { userName: string; fundNa
 
           {/* Giving as */}
           <div className="mt-10">
+            {specificFund && <p className="text-sm font-semibold text-orange-100">Giving to {fundName}</p>}
             <p className="text-lg font-extrabold tracking-tight">Giving as {userName}</p>
             <Link href="/donor/account" className="text-sm font-medium text-orange-100 underline underline-offset-2">
               Not you? Change
@@ -156,6 +166,7 @@ export function GiveAgainFlow({ userName, fundName }: { userName: string; fundNa
       frequency={frequency}
       freqLabel={freqLabel}
       fundName={fundName}
+      fundSlug={fundSlug}
       onBack={() => setStep(1)}
     />
   )
@@ -167,6 +178,7 @@ function PayStep({
   frequency,
   freqLabel,
   fundName,
+  fundSlug,
   onBack,
 }: {
   amount: number
@@ -174,6 +186,7 @@ function PayStep({
   frequency: Frequency
   freqLabel: string
   fundName: string
+  fundSlug: string
   onBack: () => void
 }) {
   const [init, setInit] = React.useState<{
@@ -187,7 +200,7 @@ function PayStep({
   React.useEffect(() => {
     if (started.current) return
     started.current = true
-    startGiveAgainPaymentAction({ amount, frequency }).then((res) => {
+    startGiveAgainPaymentAction({ amount, frequency, fundSlug }).then((res) => {
       if (res.success && res.clientSecret && res.accountKey) {
         setInit({
           clientSecret: res.clientSecret,
@@ -198,7 +211,7 @@ function PayStep({
         setInitError(res.error ?? 'Could not start payment. Please try again.')
       }
     })
-  }, [amount, frequency])
+  }, [amount, frequency, fundSlug])
 
   const stripePromise = React.useMemo(
     () => (init ? stripePromiseFor(init.accountKey) : null),

@@ -122,7 +122,7 @@ function AppealCard({ appeal, tone }: { appeal: AppealItem; tone: (typeof TONES)
           </>
         )}
         <Link
-          href={`/donate?fund=${slug}`}
+          href={`/funds/${slug}`}
           className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold ${s.btn}`}
         >
           Give <ArrowRight className="h-4 w-4" />
