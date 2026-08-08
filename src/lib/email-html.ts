@@ -75,6 +75,50 @@ export function wrapEmailHtml(bodyContent: string, appUrl = 'https://my.lighthou
 </html>`
 }
 
+// ─── Church-branded wrapper (tithes to Lighthouse Family Church) ──────────────
+// Same layout as the Care wrapper but with the church wordmark + footer, and no
+// Lighthouse Care tagline/ABN.
+
+export function wrapChurchEmailHtml(bodyContent: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Lighthouse Family Church</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background:#ffffff;padding:28px 40px 24px;text-align:center;border-bottom:3px solid ${ORANGE};">
+              <span style="font-size:20px;font-weight:800;letter-spacing:-0.02em;color:#111827;">Lighthouse Family Church</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 40px 28px;color:${TEXT_BODY};font-size:15px;line-height:1.7;">
+              ${bodyContent}
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:${TEXT_LIGHT};line-height:1.7;">
+                Lighthouse Family Church &middot; Logan, South East Queensland<br>
+                <a href="https://lighthousefamilychurch.org.au" style="color:${ORANGE};text-decoration:none;">lighthousefamilychurch.org.au</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
 // ─── Build HTML from plain text ───────────────────────────────────────────────
 // Converts the plain-text version of a template into styled HTML using the
 // email wrapper above. Handles paragraphs, line breaks, portal link buttons,

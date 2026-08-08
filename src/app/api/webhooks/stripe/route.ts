@@ -3,7 +3,12 @@ import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { configuredWebhookSecrets, getStripeFor } from '@/lib/stripe-accounts'
-import { sendDonationReceiptEmail, sendAccountSetupEmail } from '@/lib/donation-emails'
+import {
+  sendDonationReceiptEmail,
+  sendAccountSetupEmail,
+  sendTitheReceiptEmail,
+  sendTitheAccountSetupEmail,
+} from '@/lib/donation-emails'
 import { createAccountSetupToken } from '@/lib/account-setup'
 import { createOrderWithTickets, type Selection } from '@/lib/tickets'
 import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
@@ -266,24 +271,31 @@ async function finalizeDonation(params: {
     }
   }
 
-  // Best-effort receipt email — never let a send failure fail the webhook (the
-  // gift is already safely recorded; retrying would only re-send).
+  const isTithe = meta.isTithe === 'true'
+
+  // Best-effort receipt/confirmation email — tithes come from the church, all
+  // other gifts from Lighthouse Care. Never let a send failure fail the webhook.
   try {
-    const fund = fundId
-      ? await prisma.fund.findUnique({ where: { id: fundId }, select: { name: true } })
-      : null
-    await sendDonationReceiptEmail({
-      to: donorEmail,
-      name: donorName,
-      amount,
-      fundName: fund?.name ?? null,
-      receiptNo: `LC-${donation.id.slice(-8).toUpperCase()}`,
-    })
+    const receiptNo = `LC-${donation.id.slice(-8).toUpperCase()}`
+    if (isTithe) {
+      await sendTitheReceiptEmail({ to: donorEmail, name: donorName, amount, receiptNo })
+    } else {
+      const fund = fundId
+        ? await prisma.fund.findUnique({ where: { id: fundId }, select: { name: true } })
+        : null
+      await sendDonationReceiptEmail({
+        to: donorEmail,
+        name: donorName,
+        amount,
+        fundName: fund?.name ?? null,
+        receiptNo,
+      })
+    }
   } catch (err) {
     console.error('Donation receipt email failed', err)
   }
 
-  // First-time donor with no account yet → invite them to set one up. Never
+  // First-time giver with no account yet → invite them to set one up. Never
   // required to give; best-effort so it can't fail the webhook.
   try {
     if (!user) {
@@ -293,7 +305,11 @@ async function finalizeDonation(params: {
       })
       if (!existing) {
         const token = await createAccountSetupToken(donorEmail)
-        await sendAccountSetupEmail({ to: donorEmail, name: donorName, token })
+        if (isTithe) {
+          await sendTitheAccountSetupEmail({ to: donorEmail, name: donorName, token })
+        } else {
+          await sendAccountSetupEmail({ to: donorEmail, name: donorName, token })
+        }
       }
     }
   } catch (err) {

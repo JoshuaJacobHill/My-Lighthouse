@@ -361,7 +361,7 @@ function CardSection({
       elements,
       clientSecret: res.clientSecret,
       confirmParams: {
-        return_url: `${window.location.origin}/donate/success?acct=${res.accountKey}`,
+        return_url: `${window.location.origin}/donate/success?acct=${res.accountKey}${isTithe ? '&tithe=1' : ''}`,
         receipt_email: email,
       },
     })

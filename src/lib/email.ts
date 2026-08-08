@@ -14,6 +14,7 @@ interface SendEmailOptions {
   text?: string
   templateType?: EmailTemplateType
   volunteerId?: string
+  from?: string // override the default sender (e.g. Lighthouse Family Church for tithes)
   attachments?: { filename: string; content: string; contentType: string }[]
   /** Pass true to CC volunteer@lighthousecare.org.au — admin/coordinator emails only */
   ccAdmin?: boolean
@@ -90,7 +91,7 @@ async function sendViaResend(
   const resend = new Resend(apiKey)
 
   const { data, error } = await resend.emails.send({
-    from: resolveFromAddress(settings),
+    from: options.from ?? resolveFromAddress(settings),
     to: options.to,
     ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
@@ -130,7 +131,7 @@ async function sendViaSMTP(
   })
 
   const info = await transporter.sendMail({
-    from: resolveFromAddress(settings),
+    from: options.from ?? resolveFromAddress(settings),
     to: options.to,
     ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
     subject: options.subject,

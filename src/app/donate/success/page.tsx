@@ -18,11 +18,13 @@ export default async function DonateSuccessPage({
     session_id?: string
     payment_intent?: string
     acct?: string
+    tithe?: string
   }>
 }) {
   if (!isDonorPortalEnabled()) notFound()
 
-  const { session_id: sessionId, payment_intent: paymentIntentId, acct } = await searchParams
+  const { session_id: sessionId, payment_intent: paymentIntentId, acct, tithe } = await searchParams
+  const isTithe = tithe === '1'
 
   let amountLabel: string | null = null
   let donorName: string | null = null
@@ -54,21 +56,38 @@ export default async function DonateSuccessPage({
         <h1 className="mt-5 text-2xl font-bold text-gray-900">
           Thank you{donorName ? `, ${donorName}` : ''}.
         </h1>
-        <p className="mt-3 text-gray-600">
-          {amountLabel
-            ? `Your gift of ${amountLabel} will help families doing it tough across South East Queensland.`
-            : 'Your gift will help families doing it tough across South East Queensland.'}
-        </p>
-        <p className="mt-3 text-sm text-gray-500">
-          A receipt is on its way to your inbox. From all of us at Lighthouse Care — thank you for
-          standing with our community.
-        </p>
-        <Link
-          href="/donate"
-          className="mt-6 inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Back to donations
-        </Link>
+        {isTithe ? (
+          <>
+            <p className="mt-3 text-gray-600">
+              {amountLabel ? `Your gift of ${amountLabel} has been received.` : 'Your gift has been received.'}
+            </p>
+            <p className="mt-3 text-sm text-gray-500">A confirmation is on its way to your inbox.</p>
+            <a
+              href="https://lighthousefamilychurch.org.au"
+              className="mt-6 inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Back to Lighthouse Family Church
+            </a>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-gray-600">
+              {amountLabel
+                ? `Your gift of ${amountLabel} will help families doing it tough across South East Queensland.`
+                : 'Your gift will help families doing it tough across South East Queensland.'}
+            </p>
+            <p className="mt-3 text-sm text-gray-500">
+              A receipt is on its way to your inbox. From all of us at Lighthouse Care — thank you for standing with
+              our community.
+            </p>
+            <Link
+              href="/donate"
+              className="mt-6 inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Back to donations
+            </Link>
+          </>
+        )}
       </div>
     </div>
   )
