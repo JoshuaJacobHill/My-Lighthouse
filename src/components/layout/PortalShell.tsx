@@ -80,10 +80,17 @@ export function PortalShell({
 
   // Mobile bottom-tab destinations (same for everyone; content adapts).
   const accountHref = isVolunteer ? '/volunteer/profile' : '/donor/account'
+  const onAccount = pathname.startsWith('/donor/account') || pathname.startsWith('/volunteer/profile')
   const tabs = [
     { href: '/donor', label: 'Home', icon: LayoutDashboard, active: pathname === '/donor' },
-    { href: '/volunteer', label: 'Volunteer', icon: HandHeart, active: pathname.startsWith('/volunteer') },
-    { href: accountHref, label: 'Account', icon: User, active: pathname.startsWith(accountHref) },
+    {
+      href: '/volunteer',
+      label: 'Volunteer',
+      icon: HandHeart,
+      active: pathname.startsWith('/volunteer') && !pathname.startsWith('/volunteer/profile'),
+    },
+    { href: '/donor/give', label: 'Give', icon: Heart, active: pathname === '/donor/give' || pathname.startsWith('/give') },
+    { href: accountHref, label: 'Account', icon: User, active: onAccount },
   ]
 
   const handleSignOut = async () => {
@@ -192,28 +199,14 @@ export function PortalShell({
           {children}
         </main>
 
-        {/* Mobile bottom tab bar — Home · Volunteer · Give (raised) · Account */}
+        {/* Mobile bottom tab bar — Home · Volunteer · Give · Account */}
         <nav
           aria-label="Primary"
           className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
         >
-          <TabLink {...tabs[0]} />
-          <TabLink {...tabs[1]} />
-          {/* Raised centre Give button */}
-          <Link href="/give/again" className="flex flex-col items-center justify-end pb-1.5" aria-label="Give">
-            <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg ring-4 ring-white">
-              <Heart className="h-6 w-6" />
-            </span>
-            <span
-              className={clsx(
-                'mt-0.5 text-[11px] font-semibold',
-                pathname.startsWith('/give') ? 'text-orange-600' : 'text-gray-500'
-              )}
-            >
-              Give
-            </span>
-          </Link>
-          <TabLink {...tabs[2]} />
+          {tabs.map((t) => (
+            <TabLink key={t.href} {...t} />
+          ))}
         </nav>
       </div>
     </div>
