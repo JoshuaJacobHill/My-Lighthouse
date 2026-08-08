@@ -717,6 +717,9 @@ model Donation {
   fundraiserId        String?
   sponsorshipId       String?
   isRecurring         Boolean        @default(false)
+  // Church tithe gift — kept separate from regular giving (excluded from the
+  // dashboard total; managed in its own "Tithes" area). Deposits to CHURCH.
+  isTithe             Boolean        @default(false)
   source              DonationSource @default(DONATE_PAGE)
   // Set when a gift originates from re-confirming a migrated recurring donor
   // (e.g. "shout_for_good"). Lets reporting tell migrated donors from new ones.

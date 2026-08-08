@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
+  Church,
   Repeat,
 } from 'lucide-react'
 import { getSession } from '@/lib/auth'
@@ -156,6 +157,13 @@ export default async function DonorHomePage() {
     raised: f.showPublicProgress ? raised.get(f.id) ?? 0 : 0,
   }))
 
+  // Tithe widget (church givers only) — shown separately from regular giving.
+  const tithePlan = await prisma.donation.findFirst({
+    where: { userId: session.userId, isTithe: true, isRecurring: true },
+    orderBy: { createdAt: 'desc' },
+    select: { amount: true, frequency: true },
+  })
+
   const stories = await prisma.story.findMany({
     where: { isPublished: true },
     orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
@@ -185,6 +193,32 @@ export default async function DonorHomePage() {
           </div>
           {vp && <StatusBadge status={vp.status} />}
         </header>
+
+        {/* Tithe widget — church givers only; kept separate from giving totals */}
+        {tithePlan && (
+          <section className="mb-8">
+            <Link
+              href="/donor/tithes"
+              className="flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 bg-white p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+            >
+              <div className="flex items-center gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
+                  <Church className="h-6 w-6" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-neutral-400">Your tithe</p>
+                  <p className="text-xl font-bold text-neutral-950">
+                    {aud(Number(tithePlan.amount))}
+                    {tithePlan.frequency && <span className="font-normal text-neutral-500"> · {tithePlan.frequency}</span>}
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600">
+                Manage <ArrowRight className="h-4 w-4" />
+              </span>
+            </Link>
+          </section>
+        )}
 
         {isVolunteer && vp ? (
           <>

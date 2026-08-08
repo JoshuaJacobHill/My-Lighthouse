@@ -39,6 +39,7 @@ const donateSchema = z.object({
   message: z.string().trim().max(250).optional(), // optional public message
   company: z.string().trim().max(120).optional(), // optional company / organisation
   migrationIntentId: z.string().optional(), // set when re-confirming a migrated donor
+  isTithe: z.boolean().optional(), // church tithe gift (kept separate from giving)
 })
 
 export type DonateInput = z.input<typeof donateSchema>
@@ -201,6 +202,7 @@ export async function createDonationIntentAction(input: DonateInput): Promise<In
     if (validFundraiserId) meta.fundraiserId = validFundraiserId
     if (message) meta.message = message
     if (company) meta.donorCompany = company
+    if (parsed.data.isTithe) meta.isTithe = 'true'
 
     const intent = await getStripeFor(accountKey).paymentIntents.create({
       amount: toCents(amount),
@@ -406,6 +408,7 @@ export async function createDonationSubscriptionIntentAction(
         meta.migratedFrom = mi.source
       }
     }
+    if (parsed.data.isTithe) meta.isTithe = 'true'
 
     const reqOpts = { apiVersion: SUB_API_VERSION }
     const customer = await stripe.customers.create({ email, name }, reqOpts)

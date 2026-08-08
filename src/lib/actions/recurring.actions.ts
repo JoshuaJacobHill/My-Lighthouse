@@ -68,6 +68,7 @@ export async function listMyRecurringGifts(): Promise<RecurringGift[]> {
         )
         for (const s of subs.data) {
           if (HIDDEN_STATUSES.has(s.status)) continue
+          if (s.metadata?.isTithe === 'true') continue // tithes are managed separately
           const price = s.items.data[0]?.price
           const active = ACTIVE_STATUSES.has(s.status)
           gifts.push({

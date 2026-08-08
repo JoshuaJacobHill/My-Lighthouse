@@ -56,7 +56,8 @@ export type DonorGift = {
 /** A donor's gifts, newest first, with the fund name resolved. */
 export async function getDonorGifts(userId: string): Promise<DonorGift[]> {
   const gifts = await prisma.donation.findMany({
-    where: { userId },
+    // Tithes are kept separate — excluded from the giving total & history.
+    where: { userId, isTithe: false },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,

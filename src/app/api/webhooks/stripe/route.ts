@@ -240,6 +240,12 @@ async function finalizeDonation(params: {
       fundId,
       fundraiserId,
       isRecurring: isRecurring ?? false,
+      isTithe: meta.isTithe === 'true',
+      frequency: meta.frequency
+        ? meta.frequency.charAt(0).toUpperCase() + meta.frequency.slice(1)
+        : isRecurring
+          ? null
+          : 'One-off',
       source: fundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
       migratedFrom: meta.migratedFrom || null,
       taxReceiptEligible: true,

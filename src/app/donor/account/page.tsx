@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, KeyRound, HandHeart, ArrowRight } from 'lucide-react'
+import { ArrowLeft, KeyRound, HandHeart, ArrowRight, Church } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AccountSettingsForm } from '@/components/donor/AccountSettingsForm'
@@ -25,6 +25,12 @@ export default async function DonorAccountPage() {
   if (!user) redirect('/login')
 
   const isVolunteer = Boolean(user.volunteerProfile)
+  const hasTithe = Boolean(
+    await prisma.donation.findFirst({
+      where: { userId: session.userId, isTithe: true },
+      select: { id: true },
+    })
+  )
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -49,6 +55,25 @@ export default async function DonorAccountPage() {
           }}
         />
       </div>
+
+      {/* My tithes (church givers only) */}
+      {hasTithe && (
+        <Link
+          href="/donor/tithes"
+          className="mt-5 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+              <Church className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-semibold text-gray-900">My tithes</p>
+              <p className="text-sm text-gray-500">Manage your regular tithe to Lighthouse Family Church.</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-gray-400" />
+        </Link>
+      )}
 
       {/* Password */}
       <div className="mt-5 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">

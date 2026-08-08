@@ -41,6 +41,7 @@ export function DonateForm({
   suggested,
   impactLabels,
   defaultFrequency,
+  isTithe,
 }: {
   fundSlug: string
   fundName: string
@@ -52,6 +53,7 @@ export function DonateForm({
   suggested?: number | null
   impactLabels?: Record<string, string> | null
   defaultFrequency?: string | null
+  isTithe?: boolean
 }) {
   const ladder = presets && presets.length ? presets : DEFAULT_PRESETS
   const suggestedAmount = suggested ?? DEFAULT_SUGGESTED
@@ -233,6 +235,7 @@ export function DonateForm({
           frequency={frequency}
           freqLabel={freqLabel}
           recurring={recurring}
+          isTithe={isTithe}
           onError={setError}
         />
       </Elements>
@@ -281,6 +284,7 @@ function CardSection({
   frequency,
   freqLabel,
   recurring,
+  isTithe,
   onError,
 }: {
   fundSlug: string
@@ -294,6 +298,7 @@ function CardSection({
   frequency: Frequency
   freqLabel: string
   recurring: boolean
+  isTithe?: boolean
   onError: (msg: string | null) => void
 }) {
   const stripe = useStripe()
@@ -331,8 +336,9 @@ function CardSection({
           fundraiserId,
           message,
           company,
+          isTithe,
         })
-      : await createDonationIntentAction({ fundSlug, amount, name, email, fundraiserId, message, company })
+      : await createDonationIntentAction({ fundSlug, amount, name, email, fundraiserId, message, company, isTithe })
     if (!res.success || !res.clientSecret || !res.accountKey) {
       onError(res.error ?? 'Something went wrong. Please try again.')
       setLoading(false)
