@@ -39,6 +39,15 @@ export default async function DonorHomePage() {
   const gifts = await getDonorGifts(session.userId)
   const summary = summariseGifts(gifts)
   const hasGifts = gifts.length > 0
+
+  // Church givers get their tithe surfaced up top (separate from donations).
+  const tithePlan = await prisma.donation.findFirst({
+    where: { userId: session.userId, isTithe: true, isRecurring: true },
+    orderBy: { createdAt: 'desc' },
+    select: { amount: true, frequency: true },
+  })
+  const hasTithe = Boolean(tithePlan)
+
   const vp = user.volunteerProfile
   const isVolunteer = Boolean(vp)
   const firstName = user.name?.split(' ')[0] ?? 'there'
@@ -71,18 +80,37 @@ export default async function DonorHomePage() {
           {vp && <StatusBadge status={vp.status} />}
         </header>
 
-        {/* Quick glances into Give + Volunteer */}
-        <section className="mb-14 grid gap-5 sm:grid-cols-2">
+        {/* Glances — tithe (church givers) · giving · volunteering */}
+        <section className="mb-14 space-y-5">
+          {tithePlan && (
+            <Link
+              href="/donor/tithes"
+              className="flex items-center justify-between gap-4 rounded-[28px] bg-neutral-950 p-7 text-white transition-transform active:scale-[0.99]"
+            >
+              <div>
+                <p className="text-sm font-medium text-white/60">Lighthouse Family Church Tithes</p>
+                <p className="mt-1 text-3xl font-extrabold tracking-tight">
+                  {aud(Number(tithePlan.amount))}
+                  {tithePlan.frequency && <span className="text-lg font-semibold text-white/70"> {tithePlan.frequency}</span>}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white">
+                Manage
+              </span>
+            </Link>
+          )}
+
           <Link
             href="/donor/give"
-            className="group flex flex-col justify-between rounded-[28px] bg-orange-500 p-7 text-white transition-transform active:scale-[0.99]"
+            className="flex items-center justify-between gap-4 rounded-[28px] bg-orange-500 p-7 text-white transition-transform active:scale-[0.99]"
           >
-            <Heart className="h-7 w-7" />
-            <div className="mt-8">
+            <div>
               {hasGifts ? (
                 <>
-                  <p className="text-sm font-medium text-orange-100">Your giving so far</p>
-                  <p className="mt-1 text-3xl font-extrabold tracking-tight">{aud(summary.allTime)}</p>
+                  <p className="text-3xl font-extrabold tracking-tight tabular-nums sm:text-4xl">{aud(summary.allTime)}</p>
+                  <p className="mt-1 text-sm text-orange-100">
+                    {hasTithe ? 'Your charitable donations' : 'Your giving so far'}
+                  </p>
                 </>
               ) : (
                 <>
@@ -90,15 +118,15 @@ export default async function DonorHomePage() {
                   <p className="mt-1 text-sm text-orange-100">A $25 gift is a full trolley for a family.</p>
                 </>
               )}
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold">
-                {hasGifts ? 'Go to giving' : 'Give now'} <ArrowRight className="h-4 w-4" />
-              </span>
             </div>
+            <span className="shrink-0 rounded-full bg-neutral-950 px-6 py-3 text-sm font-semibold text-white">
+              {hasGifts ? 'Go to giving' : 'Give now'}
+            </span>
           </Link>
 
           <Link
             href="/volunteer"
-            className="group flex flex-col justify-between rounded-[28px] border border-neutral-200 p-7 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+            className="group block rounded-[28px] border border-neutral-200 p-7 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
           >
             <HandHeart className="h-7 w-7 text-orange-500" />
             <div className="mt-8">
