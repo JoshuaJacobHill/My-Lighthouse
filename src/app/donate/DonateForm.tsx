@@ -42,6 +42,9 @@ export function DonateForm({
   impactLabels,
   defaultFrequency,
   isTithe,
+  showPresets = true,
+  showCompany = true,
+  showMessage = true,
 }: {
   fundSlug: string
   fundName: string
@@ -54,6 +57,9 @@ export function DonateForm({
   impactLabels?: Record<string, string> | null
   defaultFrequency?: string | null
   isTithe?: boolean
+  showPresets?: boolean
+  showCompany?: boolean
+  showMessage?: boolean
 }) {
   const ladder = presets && presets.length ? presets : DEFAULT_PRESETS
   const suggestedAmount = suggested ?? DEFAULT_SUGGESTED
@@ -132,30 +138,32 @@ export function DonateForm({
       </div>
 
       {/* Presets */}
-      <div className="grid grid-cols-3 gap-3">
-        {ladder.map((p) => {
-          const active = presetActive(p)
-          return (
-            <button
-              type="button"
-              key={p}
-              onClick={() => setAmountText(String(p))}
-              aria-pressed={active}
-              className={
-                'relative rounded-2xl border-2 py-4 text-lg font-bold transition-colors ' +
-                (active ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-neutral-200 text-neutral-900 hover:border-orange-300')
-              }
-            >
-              ${p}
-              {p === suggestedAmount && (
-                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                  Suggested
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {showPresets && (
+        <div className="grid grid-cols-3 gap-3">
+          {ladder.map((p) => {
+            const active = presetActive(p)
+            return (
+              <button
+                type="button"
+                key={p}
+                onClick={() => setAmountText(String(p))}
+                aria-pressed={active}
+                className={
+                  'relative rounded-2xl border-2 py-4 text-lg font-bold transition-colors ' +
+                  (active ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-neutral-200 text-neutral-900 hover:border-orange-300')
+                }
+              >
+                ${p}
+                {p === suggestedAmount && (
+                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                    Suggested
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Big amount box */}
       <div className="flex items-center gap-3 rounded-2xl border-2 border-neutral-200 px-5 py-4 focus-within:border-orange-500">
@@ -195,25 +203,29 @@ export function DonateForm({
             className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
           />
         </Field>
-        <Field label="Company / organisation (optional)">
-          <input
-            maxLength={120}
-            placeholder="e.g. Acme Pty Ltd"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-            className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-          />
-        </Field>
-        <Field label="Leave a message of support (optional)">
-          <textarea
-            maxLength={250}
-            rows={2}
-            placeholder="e.g. Great cause — keep it up!"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-          />
-        </Field>
+        {showCompany && (
+          <Field label="Company / organisation (optional)">
+            <input
+              maxLength={120}
+              placeholder="e.g. Acme Pty Ltd"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            />
+          </Field>
+        )}
+        {showMessage && (
+          <Field label="Leave a message of support (optional)">
+            <textarea
+              maxLength={250}
+              rows={2}
+              placeholder="e.g. Great cause — keep it up!"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            />
+          </Field>
+        )}
       </div>
 
       {error && (

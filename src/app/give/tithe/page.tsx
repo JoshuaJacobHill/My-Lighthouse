@@ -45,8 +45,9 @@ export default async function TithePage({
     <main className="min-h-screen bg-neutral-50">
       <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-xl items-center justify-between px-5 py-4">
-          <a href="https://lighthousefamilychurch.org.au" className="font-extrabold tracking-tight text-neutral-900">
-            Lighthouse Family Church
+          <a href="https://lighthousefamilychurch.org.au">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-inline-black.png" alt="Lighthouse" className="h-7 w-auto" />
           </a>
           <a href="/login" className="text-sm text-neutral-500">
             Have an account? <span className="font-semibold text-orange-600">Sign in</span>
@@ -80,6 +81,9 @@ export default async function TithePage({
               impactLabels={(fund.impactLabels as Record<string, string> | null) ?? undefined}
               defaultFrequency={fund.defaultFrequency ?? 'weekly'}
               isTithe
+              showPresets={false}
+              showCompany={false}
+              showMessage={false}
             />
           </div>
         </div>
