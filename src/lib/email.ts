@@ -68,7 +68,7 @@ function resolveFromAddress(settings: Record<string, string>, nameOverride?: str
   const address =
     settings.email_from_address ??
     process.env.EMAIL_FROM_ADDRESS ??
-    'volunteers@lighthousecare.org.au'
+    'no-reply@my.lighthousecare.org.au' // verified Resend domain
   return `${name} <${address}>`
 }
 
