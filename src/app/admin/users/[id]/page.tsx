@@ -19,6 +19,7 @@ import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { formatDate } from '@/lib/utils'
 import { getDonationsAccess } from '@/lib/permissions'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
+import { listRecurringForEmail } from '@/lib/admin-recurring'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,6 +73,8 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
   const gifts = canSeeDonations ? await getDonorGifts(user.id) : []
   const summary = canSeeDonations && gifts.length > 0 ? summariseGifts(gifts) : null
   const hasRecurring = gifts.some((g) => g.isRecurring)
+  // Live recurring subscriptions (active + cancelled) for this donor.
+  const recurring = canSeeDonations ? await listRecurringForEmail(user.email) : []
 
   const displayName = user.name || (vp ? `${vp.firstName} ${vp.lastName}` : user.email)
   const phone = vp?.mobile || user.donorProfile?.phone || null
@@ -125,13 +128,11 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
             label="Joined"
             value={formatDate(vp?.joinedAt ?? user.createdAt)}
           />
-          {user.lastLoginAt && (
-            <Field
-              icon={<Clock className="h-4 w-4" />}
-              label="Last login"
-              value={formatDate(user.lastLoginAt)}
-            />
-          )}
+          <Field
+            icon={<Clock className="h-4 w-4" />}
+            label="Last login"
+            value={user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
+          />
         </dl>
       </section>
 
@@ -232,6 +233,46 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
             No gifts recorded for this account yet.
           </section>
         ))}
+
+      {/* Recurring giving — live status from Stripe */}
+      {canSeeDonations && recurring.length > 0 && (
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Recurring giving</h2>
+          <div className="space-y-3">
+            {recurring.map((r) => {
+              const badge =
+                r.active && (r.status === 'active' || r.status === 'trialing')
+                  ? 'bg-green-100 text-green-700'
+                  : r.active
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-gray-100 text-gray-600'
+              return (
+                <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-4">
+                  <div>
+                    <p className="flex flex-wrap items-center gap-2 font-semibold text-gray-900">
+                      {aud2.format(r.amount)}
+                      <span className="font-normal text-gray-500">· {r.frequencyLabel}</span>
+                      {r.isTithe && (
+                        <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-semibold text-white">Tithe</span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-sm text-gray-500">
+                      {r.active && r.nextChargeAt
+                        ? `Next gift ${formatDate(new Date(r.nextChargeAt * 1000))}`
+                        : r.endedAt
+                          ? `Cancelled ${formatDate(new Date(r.endedAt * 1000))}`
+                          : ''}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge}`}>
+                    {r.statusLabel}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { financialYearRange } from '@/lib/donations'
 import { STRIPE_ACCOUNTS } from '@/lib/stripe-accounts'
+import { listActiveRecurringEmails } from '@/lib/admin-recurring'
 import { AttendeesCsvButton } from '@/components/admin/AttendeesCsvButton'
 
 export const dynamic = 'force-dynamic'
@@ -72,6 +73,11 @@ export default async function TransactionsPage({
 
   const allTime = Number(totals._sum.amount ?? 0)
   const fyTotal = Number(fyAgg._sum.amount ?? 0)
+
+  // For recurring rows, flag whether that donor still has a live subscription.
+  const hasRecurringRows = rows.some((r) => r.isRecurring)
+  const activeEmails = hasRecurringRows ? await listActiveRecurringEmails() : new Set<string>()
+  const isActiveRecurring = (email: string | null) => (email ? activeEmails.has(email.toLowerCase()) : false)
 
   const csv = [
     ['Date', 'Name', 'Email', 'Amount', 'Type', 'Frequency', 'Fund', 'Fundraiser', 'Source', 'Account', 'Provider'].join(','),
@@ -177,8 +183,19 @@ export default async function TransactionsPage({
                   </td>
                   <td className="px-4 py-3">
                     {r.isRecurring ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
-                        ↻ {r.frequency ?? 'Recurring'}
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
+                          ↻ {r.frequency ?? 'Recurring'}
+                        </span>
+                        {isActiveRecurring(r.donorEmail) ? (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
+                            Inactive
+                          </span>
+                        )}
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400">One-off</span>
