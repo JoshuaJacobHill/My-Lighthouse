@@ -1,7 +1,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, ArrowUpRight, Heart, HandHeart } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Heart, HandHeart, CalendarDays, MapPin } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
@@ -61,6 +61,16 @@ export default async function DonorHomePage() {
     take: 6,
     select: { id: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true },
   })
+
+  // Upcoming events (church members also see church-only ones).
+  const events = await prisma.event.findMany({
+    where: { isPublished: true, startsAt: { gte: new Date() }, ...(user.isChurchMember ? {} : { churchOnly: false }) },
+    orderBy: { startsAt: 'asc' },
+    take: 4,
+    select: { id: true, slug: true, title: true, venue: true, startsAt: true },
+  })
+  const fmtEvent = (d: Date) =>
+    d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Australia/Brisbane' })
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
@@ -152,6 +162,40 @@ export default async function DonorHomePage() {
             </div>
           </Link>
         </section>
+
+        {/* Upcoming events */}
+        {events.length > 0 && (
+          <section className="mb-14">
+            <h2 className="mb-6 text-3xl font-normal tracking-tight sm:text-[2rem]">
+              Upcoming <span className="font-extrabold">events</span>
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {events.map((e) => (
+                <Link
+                  key={e.id}
+                  href={`/events/${e.slug}`}
+                  className="group flex items-center gap-4 rounded-[28px] border border-neutral-200 p-5 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white">
+                    <CalendarDays className="h-6 w-6" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-bold tracking-tight">{e.title}</p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-neutral-500">
+                      <span>{fmtEvent(e.startsAt)}</span>
+                      {e.venue && (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" /> {e.venue}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <ArrowRight className="ml-auto h-5 w-5 shrink-0 text-neutral-300 transition-colors group-hover:text-orange-500" />
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Good News & updates — the heart of Home */}
         {stories.length > 0 ? (

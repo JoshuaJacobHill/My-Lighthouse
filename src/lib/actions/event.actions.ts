@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { eventSchema, type EventInput } from '@/lib/validations'
@@ -215,4 +216,61 @@ export async function toggleEventPublishedAction(
     console.error('toggleEventPublishedAction failed', err)
     return { success: false, error: 'Could not update the event. Please try again.' }
   }
+}
+
+// ─── Offline sponsors (admin adds a business that sponsored offline) ──────────
+
+export async function addOfflineSponsorAction(input: {
+  eventId: string
+  businessName: string
+  tier: 'BRONZE' | 'SILVER' | 'GOLD'
+  amount: number | string
+  logoUrl?: string
+  contactName?: string
+  contactEmail?: string
+}): Promise<ActionResult> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+  const amount = Number(input.amount)
+  if (!input.businessName?.trim()) return { success: false, error: 'Business name is required' }
+  if (!['BRONZE', 'SILVER', 'GOLD'].includes(input.tier)) return { success: false, error: 'Invalid tier' }
+  if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: 'Amount must be a positive number' }
+
+  const event = await prisma.event.findUnique({ where: { id: input.eventId }, select: { slug: true } })
+  if (!event) return { success: false, error: 'Event not found' }
+
+  await prisma.eventSponsor.create({
+    data: {
+      eventId: input.eventId,
+      businessName: input.businessName.trim(),
+      tier: input.tier,
+      amount,
+      logoUrl: input.logoUrl?.trim() || null,
+      contactName: input.contactName?.trim() || null,
+      contactEmail: input.contactEmail?.trim() || null,
+      paid: true,
+    },
+  })
+  revalidatePath(`/events/${event.slug}`)
+  revalidatePath(`/admin/events/${input.eventId}/attendees`)
+  return { success: true }
+}
+
+export async function removeEventSponsorAction(id: string): Promise<ActionResult> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+  const sp = await prisma.eventSponsor.findUnique({
+    where: { id },
+    select: { eventId: true, event: { select: { slug: true } } },
+  })
+  await prisma.eventSponsor.delete({ where: { id } }).catch(() => {})
+  if (sp?.event?.slug) revalidatePath(`/events/${sp.event.slug}`)
+  if (sp?.eventId) revalidatePath(`/admin/events/${sp.eventId}/attendees`)
+  return { success: true }
 }
