@@ -14,7 +14,8 @@ interface SendEmailOptions {
   text?: string
   templateType?: EmailTemplateType
   volunteerId?: string
-  from?: string // override the default sender (e.g. Lighthouse Family Church for tithes)
+  from?: string // full sender override "Name <addr>" (advanced)
+  fromName?: string // override only the display name, keeping the verified address (e.g. tithes)
   attachments?: { filename: string; content: string; contentType: string }[]
   /** Pass true to CC volunteer@lighthousecare.org.au — admin/coordinator emails only */
   ccAdmin?: boolean
@@ -58,8 +59,9 @@ function resolveProvider(settings: Record<string, string>): EmailProvider {
   return 'mock'
 }
 
-function resolveFromAddress(settings: Record<string, string>): string {
+function resolveFromAddress(settings: Record<string, string>, nameOverride?: string): string {
   const name =
+    nameOverride ??
     settings.email_from_name ??
     process.env.EMAIL_FROM_NAME ??
     'Lighthouse Care Volunteers'
@@ -91,7 +93,7 @@ async function sendViaResend(
   const resend = new Resend(apiKey)
 
   const { data, error } = await resend.emails.send({
-    from: options.from ?? resolveFromAddress(settings),
+    from: options.from ?? resolveFromAddress(settings, options.fromName),
     to: options.to,
     ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
@@ -131,7 +133,7 @@ async function sendViaSMTP(
   })
 
   const info = await transporter.sendMail({
-    from: options.from ?? resolveFromAddress(settings),
+    from: options.from ?? resolveFromAddress(settings, options.fromName),
     to: options.to,
     ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
     subject: options.subject,

@@ -5,8 +5,9 @@ import { ORG } from '@/lib/org'
 
 const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
 
-// Tithe emails come from the church, not Lighthouse Care.
-const CHURCH_FROM = 'Lighthouse Family Church <no-reply@lighthousecare.org.au>'
+// Tithe emails come "from" the church — same verified sending address as every
+// other email, only the display name differs (avoids an unverified-domain send).
+const CHURCH_FROM_NAME = 'Lighthouse Family Church'
 const P = 'margin:0 0 18px 0;line-height:1.7;color:#374151;font-size:15px;'
 
 /**
@@ -73,7 +74,7 @@ export async function sendTitheReceiptEmail(opts: {
   const text = `Hi ${firstName},\n\nThank you for your gift of ${aud.format(opts.amount)} to Lighthouse Family Church. We're grateful for your faithfulness and generosity.\n\nThis email is your confirmation. Reference ${opts.receiptNo}.\n\nWith thanks and blessings,\nLighthouse Family Church`
   await sendEmail({
     to: opts.to,
-    from: CHURCH_FROM,
+    fromName: CHURCH_FROM_NAME,
     subject: 'Thank you for your gift to Lighthouse Family Church',
     html,
     text,
@@ -100,7 +101,7 @@ export async function sendTitheAccountSetupEmail(opts: {
     <p style="${P};margin-bottom:0;">With thanks and blessings,<br>Lighthouse Family Church</p>
   `)
   const text = `Hi ${firstName},\n\nThank you again for your generosity. Set a password to manage your giving to Lighthouse Family Church online:\n${link}\n\n(Valid for 14 days. No obligation.)\n\nWith thanks and blessings,\nLighthouse Family Church`
-  await sendEmail({ to: opts.to, from: CHURCH_FROM, subject: 'Manage your giving — Lighthouse Family Church', html, text })
+  await sendEmail({ to: opts.to, fromName: CHURCH_FROM_NAME, subject: 'Manage your giving — Lighthouse Family Church', html, text })
 }
 
 const FREQ_LABELS: Record<string, string> = {
