@@ -17,6 +17,7 @@ import {
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
+import { ServingTeams } from '@/components/donor/ServingTeams'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Volunteer — Lighthouse Care' }
@@ -43,6 +44,7 @@ export default async function VolunteerTabPage() {
       where: { id: session.userId },
       select: {
         name: true,
+        isChurchMember: true,
         volunteerProfile: { select: { id: true, firstName: true, status: true } },
       },
     }),
@@ -58,6 +60,26 @@ export default async function VolunteerTabPage() {
   const isVolunteer = Boolean(vp)
   const firstName = vp?.firstName ?? user.name?.split(' ')[0] ?? 'there'
   const company = corporate?.donorCompany ?? null
+
+  // Church members can join serving teams (distinct from Care volunteering).
+  const servingTeams = user.isChurchMember
+    ? await prisma.servingTeam.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          interests: { where: { userId: session.userId }, select: { id: true } },
+        },
+      })
+    : []
+  const teamCards = servingTeams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    joined: t.interests.length > 0,
+  }))
 
   const upcoming = vp
     ? await prisma.shiftAssignment.findMany({
@@ -86,6 +108,26 @@ export default async function VolunteerTabPage() {
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
       <div className="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-12">
+        {/* Church serving teams — church members only */}
+        {teamCards.length > 0 && (
+          <section className="mb-12">
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Serving at <span className="text-orange-600">Lighthouse Family Church</span>
+            </h1>
+            <p className="mt-1.5 text-neutral-500">
+              Join a team and use your gifts — tap the ones you&rsquo;re interested in and our team will be in touch.
+            </p>
+            <div className="mt-6">
+              <ServingTeams teams={teamCards} />
+            </div>
+            <div className="mt-10 border-t border-neutral-100 pt-8">
+              <p className="text-sm font-semibold uppercase tracking-wide text-neutral-400">
+                Lighthouse Care volunteering
+              </p>
+            </div>
+          </section>
+        )}
+
         {isVolunteer && vp ? (
           <>
             {/* ── Volunteer hub ── */}

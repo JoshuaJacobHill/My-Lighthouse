@@ -32,6 +32,7 @@ export default async function EditStoryPage({ params }: { params: Promise<{ id: 
           imageUrl: story.imageUrl,
           externalUrl: story.externalUrl,
           isPublished: story.isPublished,
+          churchOnly: story.churchOnly,
           sortOrder: story.sortOrder,
         }}
       />

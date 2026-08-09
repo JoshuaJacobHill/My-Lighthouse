@@ -37,6 +37,11 @@ export async function claimDonationsForUser(
     where: { userId: null, donorEmail: { equals: email, mode: 'insensitive' } },
     data: { userId },
   })
+  // Anyone who has tithed is a church member (sees church-only content).
+  if (result.count > 0) {
+    const tithe = await prisma.donation.findFirst({ where: { userId, isTithe: true }, select: { id: true } })
+    if (tithe) await prisma.user.update({ where: { id: userId }, data: { isChurchMember: true } })
+  }
   return result.count
 }
 

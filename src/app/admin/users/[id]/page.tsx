@@ -20,6 +20,7 @@ import { formatDate } from '@/lib/utils'
 import { getDonationsAccess } from '@/lib/permissions'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
 import { listRecurringForEmail } from '@/lib/admin-recurring'
+import { ChurchMemberToggle } from '@/components/admin/ChurchMemberToggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
       email: true,
       role: true,
       isActive: true,
+      isChurchMember: true,
       createdAt: true,
       lastLoginAt: true,
       volunteerProfile: {
@@ -107,11 +109,19 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                 {user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
               </span>
             )}
+            {user.isChurchMember && (
+              <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">
+                Church member
+              </span>
+            )}
             {!user.isActive && (
               <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
                 Inactive
               </span>
             )}
+          </div>
+          <div className="mt-3">
+            <ChurchMemberToggle userId={user.id} initial={user.isChurchMember} />
           </div>
         </div>
       </div>

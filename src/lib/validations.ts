@@ -253,6 +253,7 @@ export const storySchema = z.object({
   imageUrl: optionalTrimmed,
   externalUrl: optionalTrimmed,
   isPublished: z.boolean().optional().default(false),
+  churchOnly: z.boolean().optional().default(false),
   sortOrder: z
     .union([z.string(), z.number()])
     .optional()
@@ -284,6 +285,7 @@ const ticketTypeInputSchema = z.object({
 })
 
 export const eventSchema = z.object({
+  churchOnly: z.boolean().optional().default(false),
   title: z.string().trim().min(1, 'Event title is required').max(200),
   slug: z
     .string()

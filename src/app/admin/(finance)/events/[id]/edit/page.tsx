@@ -45,6 +45,7 @@ export default async function EditEventPage({
     capacity: event.capacity != null ? String(event.capacity) : '',
     fundId: event.fundId ?? '',
     isPublished: event.isPublished,
+    churchOnly: event.churchOnly,
     ticketTypes: event.ticketTypes.map((t) => ({
       id: t.id,
       name: t.name,

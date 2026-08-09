@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { CalendarDays, MapPin } from 'lucide-react'
 import prisma from '@/lib/prisma'
+import { getSession } from '@/lib/auth'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { getEventAvailability } from '@/lib/tickets'
 import { formatDateTime } from '@/lib/utils'
@@ -38,6 +39,7 @@ export default async function EventPage({
       venue: true,
       startsAt: true,
       capacity: true,
+      churchOnly: true,
       ticketTypes: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, name: true, price: true, quantityAvailable: true, maxPerOrder: true },
@@ -45,6 +47,16 @@ export default async function EventPage({
     },
   })
   if (!event) notFound()
+
+  // Church-only events are hidden from everyone but church members.
+  if (event.churchOnly) {
+    const session = await getSession()
+    const churchMember = session
+      ? (await prisma.user.findUnique({ where: { id: session.userId }, select: { isChurchMember: true } }))
+          ?.isChurchMember
+      : false
+    if (!churchMember) notFound()
+  }
 
   const availability = await getEventAvailability(event.id)
   const overallRemaining =

@@ -29,6 +29,7 @@ export interface EventFormValues {
   capacity: string
   fundId: string
   isPublished: boolean
+  churchOnly: boolean
   ticketTypes: TicketTypeValues[]
 }
 
@@ -46,6 +47,7 @@ export function EventForm({
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [isPublished, setIsPublished] = React.useState(event?.isPublished ?? false)
+  const [churchOnly, setChurchOnly] = React.useState(event?.churchOnly ?? false)
   const [tickets, setTickets] = React.useState<TicketTypeValues[]>(
     event?.ticketTypes?.length ? event.ticketTypes : [{ ...EMPTY_TICKET }]
   )
@@ -76,6 +78,7 @@ export function EventForm({
       capacity: (fd.get('capacity') as string) ?? '',
       fundId: (fd.get('fundId') as string) ?? '',
       isPublished,
+      churchOnly,
       ticketTypes: tickets.map((t) => ({
         id: t.id,
         name: t.name,
@@ -140,6 +143,12 @@ export function EventForm({
           description="Unpublished events are hidden from the public. You can publish later."
           checked={isPublished}
           onCheckedChange={(v) => setIsPublished(v === true)}
+        />
+        <Checkbox
+          label="Church only"
+          description="Only church members can view this event."
+          checked={churchOnly}
+          onCheckedChange={(v) => setChurchOnly(v === true)}
         />
       </section>
 

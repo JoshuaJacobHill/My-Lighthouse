@@ -68,6 +68,7 @@ export async function createStoryAction(input: StoryInput): Promise<ActionResult
         imageUrl: data.imageUrl ?? null,
         externalUrl: data.externalUrl ?? null,
         isPublished: data.isPublished ?? false,
+        churchOnly: data.churchOnly ?? false,
         publishedAt: data.isPublished ? new Date() : null,
         sortOrder: data.sortOrder ?? 0,
       },
@@ -112,6 +113,7 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
         imageUrl: data.imageUrl ?? null,
         externalUrl: data.externalUrl ?? null,
         isPublished: data.isPublished ?? false,
+        churchOnly: data.churchOnly ?? false,
         // Stamp publishedAt the first time it goes live; keep it thereafter.
         publishedAt: data.isPublished ? existing.publishedAt ?? new Date() : null,
         sortOrder: data.sortOrder ?? 0,

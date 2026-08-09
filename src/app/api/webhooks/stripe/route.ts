@@ -273,6 +273,15 @@ async function finalizeDonation(params: {
 
   const isTithe = meta.isTithe === 'true'
 
+  // A tithe marks the giver as a church member (sees church-only content).
+  if (isTithe && user) {
+    try {
+      await prisma.user.update({ where: { id: user.id }, data: { isChurchMember: true } })
+    } catch (err) {
+      console.error('Could not set church member flag', err)
+    }
+  }
+
   // Best-effort receipt/confirmation email — tithes come from the church, all
   // other gifts from Lighthouse Care. Never let a send failure fail the webhook.
   try {

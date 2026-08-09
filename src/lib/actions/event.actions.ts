@@ -82,6 +82,7 @@ export async function createEventAction(input: EventInput): Promise<ActionResult
         capacity: data.capacity ?? null,
         fundId: data.fundId ?? null,
         isPublished: data.isPublished ?? false,
+        churchOnly: data.churchOnly ?? false,
         ticketTypes: {
           create: data.ticketTypes.map((t, i) => ({
             name: t.name,
@@ -150,6 +151,7 @@ export async function updateEventAction(
           capacity: data.capacity ?? null,
           fundId: data.fundId ?? null,
           isPublished: data.isPublished ?? false,
+          churchOnly: data.churchOnly ?? false,
         },
       }),
       ...(toDelete.length

@@ -115,6 +115,9 @@ model User {
   // Admin permission: may see donations, donors, funds, fundraisers & events
   // (the money/PII side). SUPER_ADMIN always can; grant to specific ADMINs.
   canViewDonations Boolean @default(false)
+  // Church member — sees church-only news, events & serving teams (in addition
+  // to all Lighthouse Care content). Auto-set when they tithe; admin-toggleable.
+  isChurchMember Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
@@ -131,6 +134,7 @@ model User {
   donations    Donation[]
   sponsorships Sponsorship[]
   ticketOrders TicketOrder[]
+  teamInterests TeamInterest[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -689,12 +693,47 @@ model Story {
   imageUrl    String?
   externalUrl String? // link to the full article (e.g. the WordPress blog)
   isPublished Boolean   @default(false)
+  // When true, only church members see this story.
+  churchOnly  Boolean   @default(false)
   publishedAt DateTime?
   sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([isPublished])
+}
+
+// ─── Church serving teams ("join a team") ─────────────────────────────────────
+// Church volunteer opportunities (Creative/Worship, Host/Welcome, Kids Church…).
+// Distinct from the Lighthouse Care volunteer roster. Church members can express
+// interest in joining a team.
+model ServingTeam {
+  id          String         @id @default(cuid())
+  name        String
+  description String?        @db.Text
+  imageUrl    String?
+  isActive    Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  interests   TeamInterest[]
+
+  @@index([isActive])
+}
+
+model TeamInterest {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  note      String?  @db.Text
+  status    String   @default("INTERESTED") // INTERESTED | ACTIVE | DECLINED
+  createdAt DateTime @default(now())
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team ServingTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
 }
 
 // ─── Donation (one row per completed gift) ────────────────────────────────────
@@ -811,6 +850,8 @@ model Event {
   fundId      String?
   capacity    Int?
   isPublished Boolean   @default(false)
+  // When true, only church members see this event.
+  churchOnly  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

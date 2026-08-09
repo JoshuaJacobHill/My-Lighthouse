@@ -27,6 +27,7 @@ export default async function DonorHomePage() {
       name: true,
       email: true,
       emailVerified: true,
+      isChurchMember: true,
       volunteerProfile: {
         select: { status: true, _count: { select: { attendanceRecords: true } } },
       },
@@ -53,8 +54,9 @@ export default async function DonorHomePage() {
   const firstName = user.name?.split(' ')[0] ?? 'there'
   const live = isDonorPortalEnabled()
 
+  // Church members see church-only stories too; everyone else only public ones.
   const stories = await prisma.story.findMany({
-    where: { isPublished: true },
+    where: { isPublished: true, ...(user.isChurchMember ? {} : { churchOnly: false }) },
     orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
     take: 6,
     select: { id: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true },
