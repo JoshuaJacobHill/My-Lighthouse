@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { UserPlus, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { UserPlus, ChevronLeft, ChevronRight, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { Avatar } from '@/components/ui/avatar'
@@ -15,11 +15,13 @@ const PAGE_SIZE = 25
 const aud0 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 })
 
 type UserType = 'all' | 'volunteers' | 'donors'
+type SortKey = 'activity' | 'name' | 'joined' | 'total'
+type Dir = 'asc' | 'desc'
 
 export default async function UsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; type?: string; page?: string }>
+  searchParams: Promise<{ search?: string; type?: string; page?: string; sort?: string; dir?: string }>
 }) {
   const params = await searchParams
   const canSeeDonations = await getDonationsAccess()
@@ -28,7 +30,11 @@ export default async function UsersPage({
   const skip = (page - 1) * PAGE_SIZE
   const search = params.search?.trim() || ''
 
-  // Volunteer-only managers never see donor-type filtering or donor-only users.
+  const sort: SortKey = (['activity', 'name', 'joined', 'total'] as const).includes(params.sort as SortKey)
+    ? (params.sort as SortKey)
+    : 'activity'
+  const dir: Dir = params.dir === 'asc' ? 'asc' : params.dir === 'desc' ? 'desc' : sort === 'name' ? 'asc' : 'desc'
+
   let type = (params.type as UserType) || 'all'
   if (!canSeeDonations) type = 'volunteers'
 
@@ -57,50 +63,66 @@ export default async function UsersPage({
       ? { volunteerProfile: { isNot: null } }
       : type === 'donors'
         ? { donations: { some: {} } }
-        : {} // 'all' (finance admins only)
+        : {}
 
   const where: Prisma.UserWhereInput = { AND: [searchWhere, typeWhere] }
 
-  const [users, total] = await Promise.all([
-    prisma.user.findMany({
-      where,
-      skip,
-      take: PAGE_SIZE,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        volunteerProfile: {
-          select: { id: true, status: true, firstName: true, lastName: true, joinedAt: true },
-        },
-        _count: { select: { donations: true } },
+  // Fetch all matching users (light select), then sort by giving/activity in
+  // memory — Prisma can't order by a donation sum — and paginate the result.
+  const allUsers = await prisma.user.findMany({
+    where,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      createdAt: true,
+      volunteerProfile: {
+        select: { id: true, status: true, firstName: true, lastName: true, joinedAt: true },
       },
-    }),
-    prisma.user.count({ where }),
-  ])
+      _count: { select: { donations: true } },
+    },
+  })
 
-  // Giving totals for the users on this page (finance admins only).
+  // Per-user giving total + most recent gift date (finance admins only).
   const totals = new Map<string, { total: number; count: number }>()
-  if (canSeeDonations) {
-    const ids = users.map((u) => u.id)
-    if (ids.length) {
-      const grouped = await prisma.donation.groupBy({
-        by: ['userId'],
-        where: { userId: { in: ids } },
-        _sum: { amount: true },
-        _count: true,
-      })
-      for (const g of grouped) {
-        if (g.userId) totals.set(g.userId, { total: Number(g._sum.amount ?? 0), count: g._count })
-      }
+  const lastGift = new Map<string, number>()
+  if (canSeeDonations && allUsers.length) {
+    const grouped = await prisma.donation.groupBy({
+      by: ['userId'],
+      where: { userId: { in: allUsers.map((u) => u.id) } },
+      _sum: { amount: true },
+      _max: { createdAt: true },
+      _count: true,
+    })
+    for (const g of grouped) {
+      if (!g.userId) continue
+      totals.set(g.userId, { total: Number(g._sum.amount ?? 0), count: g._count })
+      if (g._max.createdAt) lastGift.set(g.userId, g._max.createdAt.getTime())
     }
   }
 
+  const displayNameOf = (u: (typeof allUsers)[number]) =>
+    u.name || (u.volunteerProfile ? `${u.volunteerProfile.firstName} ${u.volunteerProfile.lastName}` : u.email)
+  const joinedOf = (u: (typeof allUsers)[number]) => (u.volunteerProfile?.joinedAt ?? u.createdAt).getTime()
+  const activityOf = (u: (typeof allUsers)[number]) => lastGift.get(u.id) ?? u.createdAt.getTime()
+
+  const sign = dir === 'asc' ? 1 : -1
+  allUsers.sort((a, b) => {
+    let cmp = 0
+    if (sort === 'name') cmp = displayNameOf(a).localeCompare(displayNameOf(b))
+    else if (sort === 'joined') cmp = joinedOf(a) - joinedOf(b)
+    else if (sort === 'total') cmp = (totals.get(a.id)?.total ?? 0) - (totals.get(b.id)?.total ?? 0)
+    else cmp = activityOf(a) - activityOf(b) // 'activity'
+    if (cmp === 0) cmp = b.createdAt.getTime() - a.createdAt.getTime() // tiebreak: newest signup
+    return cmp * sign
+  })
+
+  const total = allUsers.length
+  const users = allUsers.slice(skip, skip + PAGE_SIZE)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
   const tabs: { key: UserType; label: string }[] = canSeeDonations
     ? [
         { key: 'all', label: 'All' },
@@ -109,6 +131,20 @@ export default async function UsersPage({
       ]
     : [{ key: 'volunteers', label: 'Volunteers' }]
 
+  const baseQuery = (over: Record<string, string>) => {
+    const q = new URLSearchParams()
+    if (type !== 'all') q.set('type', type)
+    if (search) q.set('search', search)
+    if (sort !== 'activity') q.set('sort', sort)
+    if (params.sort && dir !== (sort === 'name' ? 'asc' : 'desc')) q.set('dir', dir)
+    for (const [k, v] of Object.entries(over)) {
+      if (v) q.set(k, v)
+      else q.delete(k)
+    }
+    const s = q.toString()
+    return `/admin/users${s ? `?${s}` : ''}`
+  }
+
   const tabHref = (t: UserType) => {
     const q = new URLSearchParams()
     if (t !== 'all') q.set('type', t)
@@ -116,6 +152,29 @@ export default async function UsersPage({
     const s = q.toString()
     return `/admin/users${s ? `?${s}` : ''}`
   }
+
+  // A sortable column header — clicking sets/toggles the sort.
+  const sortHref = (col: SortKey) => {
+    const nextDir: Dir = sort === col ? (dir === 'asc' ? 'desc' : 'asc') : col === 'name' ? 'asc' : 'desc'
+    const q = new URLSearchParams()
+    if (type !== 'all') q.set('type', type)
+    if (search) q.set('search', search)
+    q.set('sort', col)
+    q.set('dir', nextDir)
+    return `/admin/users?${q.toString()}`
+  }
+  const SortHead = ({ col, label, align }: { col: SortKey; label: string; align?: 'right' }) => (
+    <th className={`px-5 py-3 ${align === 'right' ? 'text-right' : ''}`}>
+      <Link href={sortHref(col)} className="inline-flex items-center gap-1 hover:text-gray-800">
+        {label}
+        {sort === col ? (
+          dir === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 text-gray-300" />
+        )}
+      </Link>
+    </th>
+  )
 
   return (
     <div className="space-y-6">
@@ -136,7 +195,6 @@ export default async function UsersPage({
         </Link>
       </div>
 
-      {/* Filter tabs */}
       {tabs.length > 1 && (
         <div className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
           {tabs.map((t) => {
@@ -157,7 +215,6 @@ export default async function UsersPage({
         </div>
       )}
 
-      {/* Search */}
       <form method="GET" className="relative max-w-md">
         {type !== 'all' && <input type="hidden" name="type" value={type} />}
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -169,15 +226,14 @@ export default async function UsersPage({
         />
       </form>
 
-      {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <th className="px-5 py-3">Name</th>
+              <SortHead col="name" label="Name" />
               <th className="px-5 py-3">Type</th>
-              <th className="px-5 py-3">Joined</th>
-              {canSeeDonations && <th className="px-5 py-3 text-right">Given</th>}
+              <SortHead col="joined" label="Joined" />
+              {canSeeDonations && <SortHead col="total" label="Given" align="right" />}
               <th className="px-5 py-3" />
             </tr>
           </thead>
@@ -191,8 +247,7 @@ export default async function UsersPage({
             )}
             {users.map((u) => {
               const vp = u.volunteerProfile
-              const displayName =
-                u.name || (vp ? `${vp.firstName} ${vp.lastName}` : u.email)
+              const displayName = displayNameOf(u)
               const giving = totals.get(u.id)
               const isDonor = (u._count.donations ?? 0) > 0
               const isAdmin = u.role === 'ADMIN' || u.role === 'SUPER_ADMIN'
@@ -220,14 +275,10 @@ export default async function UsersPage({
                           Admin
                         </span>
                       )}
-                      {!vp && !isDonor && !isAdmin && (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
+                      {!vp && !isDonor && !isAdmin && <span className="text-xs text-gray-400">—</span>}
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-gray-600">
-                    {formatDate(vp?.joinedAt ?? u.createdAt)}
-                  </td>
+                  <td className="px-5 py-3 text-gray-600">{formatDate(vp?.joinedAt ?? u.createdAt)}</td>
                   {canSeeDonations && (
                     <td className="px-5 py-3 text-right tabular-nums text-gray-900">
                       {giving ? (
@@ -252,56 +303,39 @@ export default async function UsersPage({
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
             {total} {total === 1 ? 'user' : 'users'} · page {page} of {totalPages}
           </p>
           <div className="flex gap-2">
-            <PageLink type={type} search={search} page={page - 1} disabled={page <= 1}>
-              <ChevronLeft className="h-4 w-4" />
-            </PageLink>
-            <PageLink type={type} search={search} page={page + 1} disabled={page >= totalPages}>
-              <ChevronRight className="h-4 w-4" />
-            </PageLink>
+            {page <= 1 ? (
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-300">
+                <ChevronLeft className="h-4 w-4" />
+              </span>
+            ) : (
+              <Link
+                href={baseQuery({ page: String(page - 1) })}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Link>
+            )}
+            {page >= totalPages ? (
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-300">
+                <ChevronRight className="h-4 w-4" />
+              </span>
+            ) : (
+              <Link
+                href={baseQuery({ page: String(page + 1) })}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            )}
           </div>
         </div>
       )}
     </div>
-  )
-}
-
-function PageLink({
-  type,
-  search,
-  page,
-  disabled,
-  children,
-}: {
-  type: string
-  search: string
-  page: number
-  disabled: boolean
-  children: React.ReactNode
-}) {
-  if (disabled) {
-    return (
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-300">
-        {children}
-      </span>
-    )
-  }
-  const q = new URLSearchParams()
-  if (type && type !== 'all') q.set('type', type)
-  if (search) q.set('search', search)
-  q.set('page', String(page))
-  return (
-    <Link
-      href={`/admin/users?${q.toString()}`}
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
-    >
-      {children}
-    </Link>
   )
 }

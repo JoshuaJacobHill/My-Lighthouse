@@ -158,8 +158,19 @@ export default async function TransactionsPage({
                 <tr key={r.id} className="border-b border-gray-100 last:border-0">
                   <td className="px-4 py-3 whitespace-nowrap text-gray-600">{formatDate(r.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <span className="text-gray-900">{r.donorName || 'Anonymous'}</span>
-                    {r.donorEmail && <p className="text-xs text-gray-400">{r.donorEmail}</p>}
+                    {r.userId ? (
+                      <Link href={`/admin/users/${r.userId}`} className="group">
+                        <span className="font-medium text-gray-900 group-hover:text-orange-600">
+                          {r.donorName || 'Anonymous'}
+                        </span>
+                        {r.donorEmail && <p className="text-xs text-gray-400">{r.donorEmail}</p>}
+                      </Link>
+                    ) : (
+                      <>
+                        <span className="text-gray-900">{r.donorName || 'Anonymous'}</span>
+                        {r.donorEmail && <p className="text-xs text-gray-400">{r.donorEmail}</p>}
+                      </>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {r.fundraiser?.title ?? r.fund?.name ?? 'General'}
