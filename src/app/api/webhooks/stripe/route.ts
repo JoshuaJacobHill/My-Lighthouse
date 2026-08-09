@@ -251,7 +251,7 @@ async function finalizeDonation(params: {
         : isRecurring
           ? null
           : 'One-off',
-      source: fundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
+      source: meta.eventSponsorId ? 'EVENT' : fundraiserId ? 'FUNDRAISER' : 'DONATE_PAGE',
       migratedFrom: meta.migratedFrom || null,
       taxReceiptEligible: true,
     },
@@ -268,6 +268,22 @@ async function finalizeDonation(params: {
       })
     } catch (err) {
       console.error('Could not complete migration intent', err)
+    }
+  }
+
+  // Event sponsorship: mark the sponsor paid (logo goes live) + set their avatar.
+  if (meta.eventSponsorId) {
+    try {
+      const sp = await prisma.eventSponsor.update({
+        where: { id: meta.eventSponsorId },
+        data: { paid: true, donationId: donation.id },
+        select: { userId: true, logoUrl: true },
+      })
+      if (sp.userId && sp.logoUrl) {
+        await prisma.user.update({ where: { id: sp.userId }, data: { imageUrl: sp.logoUrl } }).catch(() => {})
+      }
+    } catch (err) {
+      console.error('event sponsor finalize failed', err)
     }
   }
 

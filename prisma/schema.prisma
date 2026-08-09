@@ -115,6 +115,8 @@ model User {
   // Admin permission: may see donations, donors, funds, fundraisers & events
   // (the money/PII side). SUPER_ADMIN always can; grant to specific ADMINs.
   canViewDonations Boolean @default(false)
+  // Display picture / avatar (may be a data URL, e.g. an uploaded sponsor logo).
+  imageUrl      String?   @db.Text
   // Church member — sees church-only news, events & serving teams (in addition
   // to all Lighthouse Care content). Auto-set when they tithe; admin-toggleable.
   isChurchMember Boolean @default(false)
@@ -852,15 +854,65 @@ model Event {
   isPublished Boolean   @default(false)
   // When true, only church members see this event.
   churchOnly  Boolean   @default(false)
+  // Optional per-event sections (e.g. the Good Food Festival).
+  allowVolunteers   Boolean @default(false)
+  volunteerCapacity Int?
+  allowDonations    Boolean @default(false)
+  allowSponsors     Boolean @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   fund        Fund?         @relation(fields: [fundId], references: [id], onDelete: SetNull)
   ticketTypes TicketType[]
   orders      TicketOrder[]
+  volunteers  EventVolunteer[]
+  sponsors    EventSponsor[]
 
   @@index([fundId])
   @@index([isPublished])
+}
+
+enum SponsorTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+// Someone who signed up to volunteer at an event (distinct from the roster).
+model EventVolunteer {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String?
+  name      String
+  email     String
+  phone     String?
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, email])
+  @@index([eventId])
+}
+
+// A business sponsoring an event (Bronze/Silver/Gold). Logo shows on the event
+// page once paid. logoUrl may be a data URL uploaded at checkout.
+model EventSponsor {
+  id           String      @id @default(cuid())
+  eventId      String
+  userId       String?
+  businessName String
+  tier         SponsorTier
+  amount       Decimal     @db.Decimal(10, 2)
+  logoUrl      String?     @db.Text
+  contactName  String?
+  contactEmail String?
+  donationId   String?
+  paid         Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 model TicketType {

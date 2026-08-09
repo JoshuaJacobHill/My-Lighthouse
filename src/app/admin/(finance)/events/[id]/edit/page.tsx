@@ -46,6 +46,10 @@ export default async function EditEventPage({
     fundId: event.fundId ?? '',
     isPublished: event.isPublished,
     churchOnly: event.churchOnly,
+    allowVolunteers: event.allowVolunteers,
+    volunteerCapacity: event.volunteerCapacity != null ? String(event.volunteerCapacity) : '',
+    allowDonations: event.allowDonations,
+    allowSponsors: event.allowSponsors,
     ticketTypes: event.ticketTypes.map((t) => ({
       id: t.id,
       name: t.name,

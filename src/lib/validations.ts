@@ -301,6 +301,10 @@ export const eventSchema = z.object({
   capacity: optInt('Capacity must be at least 1', 1), // null = unlimited
   fundId: optionalTrimmed,
   isPublished: z.boolean().optional().default(false),
+  allowVolunteers: z.boolean().optional().default(false),
+  volunteerCapacity: optInt('Capacity must be at least 1', 1),
+  allowDonations: z.boolean().optional().default(false),
+  allowSponsors: z.boolean().optional().default(false),
   ticketTypes: z.array(ticketTypeInputSchema).min(1, 'Add at least one ticket type'),
 })
 

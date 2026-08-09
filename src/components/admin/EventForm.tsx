@@ -30,6 +30,10 @@ export interface EventFormValues {
   fundId: string
   isPublished: boolean
   churchOnly: boolean
+  allowVolunteers: boolean
+  volunteerCapacity: string
+  allowDonations: boolean
+  allowSponsors: boolean
   ticketTypes: TicketTypeValues[]
 }
 
@@ -48,6 +52,9 @@ export function EventForm({
   const [error, setError] = React.useState<string | null>(null)
   const [isPublished, setIsPublished] = React.useState(event?.isPublished ?? false)
   const [churchOnly, setChurchOnly] = React.useState(event?.churchOnly ?? false)
+  const [allowVolunteers, setAllowVolunteers] = React.useState(event?.allowVolunteers ?? false)
+  const [allowDonations, setAllowDonations] = React.useState(event?.allowDonations ?? false)
+  const [allowSponsors, setAllowSponsors] = React.useState(event?.allowSponsors ?? false)
   const [tickets, setTickets] = React.useState<TicketTypeValues[]>(
     event?.ticketTypes?.length ? event.ticketTypes : [{ ...EMPTY_TICKET }]
   )
@@ -79,6 +86,10 @@ export function EventForm({
       fundId: (fd.get('fundId') as string) ?? '',
       isPublished,
       churchOnly,
+      allowVolunteers,
+      volunteerCapacity: (fd.get('volunteerCapacity') as string) ?? '',
+      allowDonations,
+      allowSponsors,
       ticketTypes: tickets.map((t) => ({
         id: t.id,
         name: t.name,
@@ -150,6 +161,42 @@ export function EventForm({
           checked={churchOnly}
           onCheckedChange={(v) => setChurchOnly(v === true)}
         />
+
+        <div className="border-t border-gray-100 pt-4">
+          <p className="mb-3 text-sm font-semibold text-gray-900">Event sections</p>
+          <div className="space-y-3">
+            <Checkbox
+              label="Volunteer sign-up"
+              description="Let people sign up to volunteer at this event."
+              checked={allowVolunteers}
+              onCheckedChange={(v) => setAllowVolunteers(v === true)}
+            />
+            {allowVolunteers && (
+              <Input
+                label="Volunteer capacity"
+                name="volunteerCapacity"
+                type="number"
+                min="1"
+                step="1"
+                defaultValue={event?.volunteerCapacity}
+                placeholder="Unlimited"
+                hint="How many volunteers you need. Leave blank for no limit."
+              />
+            )}
+            <Checkbox
+              label="Donations"
+              description="Show a 'donate to this event' section (needs a linked fund)."
+              checked={allowDonations}
+              onCheckedChange={(v) => setAllowDonations(v === true)}
+            />
+            <Checkbox
+              label="Sponsorship"
+              description="Show Bronze/Silver/Gold sponsor options and display sponsor logos."
+              checked={allowSponsors}
+              onCheckedChange={(v) => setAllowSponsors(v === true)}
+            />
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

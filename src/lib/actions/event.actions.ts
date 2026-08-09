@@ -83,6 +83,10 @@ export async function createEventAction(input: EventInput): Promise<ActionResult
         fundId: data.fundId ?? null,
         isPublished: data.isPublished ?? false,
         churchOnly: data.churchOnly ?? false,
+        allowVolunteers: data.allowVolunteers ?? false,
+        volunteerCapacity: data.volunteerCapacity ?? null,
+        allowDonations: data.allowDonations ?? false,
+        allowSponsors: data.allowSponsors ?? false,
         ticketTypes: {
           create: data.ticketTypes.map((t, i) => ({
             name: t.name,
@@ -152,6 +156,10 @@ export async function updateEventAction(
           fundId: data.fundId ?? null,
           isPublished: data.isPublished ?? false,
           churchOnly: data.churchOnly ?? false,
+        allowVolunteers: data.allowVolunteers ?? false,
+        volunteerCapacity: data.volunteerCapacity ?? null,
+        allowDonations: data.allowDonations ?? false,
+        allowSponsors: data.allowSponsors ?? false,
         },
       }),
       ...(toDelete.length
