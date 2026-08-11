@@ -8,6 +8,7 @@ import { getEventAvailability } from '@/lib/tickets'
 import { formatDateTime } from '@/lib/utils'
 import { RegistrationForm, type TicketTypeOption } from './RegistrationForm'
 import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
+import { Markdown } from '@/components/ui/Markdown'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,7 @@ export default async function EventPage({
       id: true,
       title: true,
       description: true,
+      imageUrl: true,
       venue: true,
       startsAt: true,
       capacity: true,
@@ -109,6 +111,12 @@ export default async function EventPage({
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-12">
       <div className="mx-auto max-w-2xl">
+        {event.imageUrl && (
+          <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={event.imageUrl} alt={event.title} className="aspect-[16/9] w-full object-cover" />
+          </div>
+        )}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">{event.title}</h1>
           <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
@@ -123,7 +131,7 @@ export default async function EventPage({
           </div>
         </div>
 
-        <p className="mb-8 whitespace-pre-line text-gray-700">{event.description}</p>
+        <Markdown source={event.description} className="mb-8 text-gray-700" />
 
         {cancelled && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">

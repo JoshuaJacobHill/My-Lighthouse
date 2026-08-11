@@ -854,6 +854,8 @@ model Event {
   isPublished Boolean   @default(false)
   // When true, only church members see this event.
   churchOnly  Boolean   @default(false)
+  // Optional feature image shown on the event page (image URL).
+  imageUrl    String?
   // Optional per-event sections (e.g. the Good Food Festival).
   allowVolunteers   Boolean @default(false)
   volunteerCapacity Int?

@@ -23,6 +23,7 @@ export interface EventFormValues {
   title: string
   slug: string
   description: string
+  imageUrl: string
   venue: string
   startsAt: string
   endsAt: string
@@ -79,6 +80,7 @@ export function EventForm({
       title: (fd.get('title') as string) ?? '',
       slug: (fd.get('slug') as string) ?? '',
       description: (fd.get('description') as string) ?? '',
+      imageUrl: (fd.get('imageUrl') as string) ?? '',
       venue: (fd.get('venue') as string) ?? '',
       startsAt: (fd.get('startsAt') as string) ?? '',
       endsAt: (fd.get('endsAt') as string) ?? '',
@@ -126,7 +128,21 @@ export function EventForm({
           <Input label="Event title" name="title" required defaultValue={event?.title} placeholder="e.g. Good Food Festival 2026" />
           <Input label="Link slug" name="slug" defaultValue={event?.slug} placeholder="auto-generated from the title" hint="Used in the event link. Leave blank to auto-generate." />
         </div>
-        <Textarea label="Description" name="description" rows={4} required defaultValue={event?.description} />
+        <Textarea
+          label="Description"
+          name="description"
+          rows={5}
+          required
+          defaultValue={event?.description}
+          hint="Supports Markdown — **bold**, ## headings, - lists, and [links](https://…)."
+        />
+        <Input
+          label="Feature image URL"
+          name="imageUrl"
+          defaultValue={event?.imageUrl}
+          placeholder="https://…"
+          hint="Optional. Shown as a banner at the top of the event page."
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Venue" name="venue" defaultValue={event?.venue} placeholder="Optional" />
           <div className="flex flex-col gap-1">

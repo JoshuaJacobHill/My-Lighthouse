@@ -295,6 +295,7 @@ export const eventSchema = z.object({
     .optional()
     .or(z.literal('')),
   description: z.string().trim().min(1, 'Please add a description'),
+  imageUrl: optionalTrimmed,
   venue: optionalTrimmed,
   startsAt: z.string().min(1, 'Start date and time is required'),
   endsAt: optionalTrimmed,
