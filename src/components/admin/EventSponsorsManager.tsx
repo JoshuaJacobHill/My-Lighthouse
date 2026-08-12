@@ -25,6 +25,7 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
   const [tier, setTier] = React.useState<'BRONZE' | 'SILVER' | 'GOLD'>('BRONZE')
   const [amount, setAmount] = React.useState('')
   const [logoUrl, setLogoUrl] = React.useState('')
+  const [websiteUrl, setWebsiteUrl] = React.useState('')
   const [contactName, setContactName] = React.useState('')
   const [contactEmail, setContactEmail] = React.useState('')
   const [pending, startTransition] = React.useTransition()
@@ -34,7 +35,7 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
     e.preventDefault()
     setError(null)
     startTransition(async () => {
-      const res = await addOfflineSponsorAction({ eventId, businessName, tier, amount, logoUrl, contactName, contactEmail })
+      const res = await addOfflineSponsorAction({ eventId, businessName, tier, amount, logoUrl, websiteUrl, contactName, contactEmail })
       if (!res.success) {
         setError(res.error ?? 'Could not add sponsor.')
         return
@@ -42,6 +43,7 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
       setBusinessName('')
       setAmount('')
       setLogoUrl('')
+      setWebsiteUrl('')
       setContactName('')
       setContactEmail('')
       setOpen(false)
@@ -85,6 +87,7 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
           </select>
           <input className={input} type="number" min="1" step="1" placeholder="Amount (AUD)" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           <input className={input} placeholder="Logo image URL (optional)" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
+          <input className={input} placeholder="Website (optional, e.g. sponsor.com.au)" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
           <input className={input} placeholder="Contact name (optional)" value={contactName} onChange={(e) => setContactName(e.target.value)} />
           <input className={input} type="email" placeholder="Contact email (optional)" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
           {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
@@ -100,12 +103,12 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
         <div className="mt-5 divide-y divide-gray-100">
           {sponsors.map((s) => (
             <div key={s.id} className="flex items-center gap-4 py-3">
-              <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-100 bg-white">
+              <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-black p-1.5">
                 {s.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={s.logoUrl} alt={s.businessName} className="max-h-full max-w-full object-contain" />
                 ) : (
-                  <ImageIcon className="h-5 w-5 text-gray-300" />
+                  <ImageIcon className="h-5 w-5 text-gray-500" />
                 )}
               </span>
               <div className="min-w-0 flex-1">

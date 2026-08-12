@@ -95,7 +95,7 @@ export default async function EventPage({
       ? prisma.eventSponsor.findMany({
           where: { eventId: event.id, paid: true },
           orderBy: [{ tier: 'asc' }, { createdAt: 'asc' }],
-          select: { id: true, businessName: true, logoUrl: true, tier: true },
+          select: { id: true, businessName: true, logoUrl: true, websiteUrl: true, tier: true },
         })
       : Promise.resolve([]),
     event.allowVolunteers
@@ -118,17 +118,24 @@ export default async function EventPage({
           </div>
         )}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">{event.title}</h1>
-          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarDays className="h-4 w-4 text-orange-500" /> {formatDateTime(event.startsAt)}
-            </span>
-            {event.venue && (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-4 w-4 text-orange-500" /> {event.venue}
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">{event.title}</h1>
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                <CalendarDays className="h-5 w-5" />
               </span>
+              <p className="text-sm font-semibold text-gray-900">{formatDateTime(event.startsAt)}</p>
+            </div>
+            {event.venue && (
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                  <MapPin className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-semibold text-gray-900">{event.venue}</p>
+              </div>
             )}
           </div>
+          <hr className="mt-6 border-gray-200" />
         </div>
 
         <Markdown source={event.description} className="mb-8 text-gray-700" />
@@ -185,7 +192,59 @@ export default async function EventPage({
         {/* Sponsors */}
         {event.allowSponsors && (
           <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            {sponsors.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-lg font-bold text-gray-900">
+                  {sponsors.length === 1 ? 'Sponsor' : 'Sponsors'}
+                </h2>
+                <div className="mt-4 space-y-4">
+                  {sponsors.map((s) => {
+                    const inner = (
+                      <>
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black p-2">
+                          {s.logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={s.logoUrl} alt={s.businessName} className="max-h-full max-w-full object-contain" />
+                          ) : (
+                            <ImageIcon className="h-6 w-6 text-gray-500" />
+                          )}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900">{s.businessName}</p>
+                          {s.websiteUrl && (
+                            <span className="text-sm font-medium text-orange-600 group-hover:underline">
+                              Visit website →
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )
+                    return s.websiteUrl ? (
+                      <a
+                        key={s.id}
+                        href={s.websiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-4"
+                      >
+                        {inner}
+                      </a>
+                    ) : (
+                      <div key={s.id} className="flex items-center gap-4">
+                        {inner}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div
+              className={
+                'flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center' +
+                (sponsors.length > 0 ? ' border-t border-gray-100 pt-6' : '')
+              }
+            >
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Sponsor this event</h2>
                 <p className="text-sm text-gray-500">
@@ -199,31 +258,6 @@ export default async function EventPage({
                 Become a sponsor <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-
-            {sponsors.length > 0 && (
-              <>
-                <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-gray-400">Our sponsors</p>
-                <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  {sponsors.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-white p-3"
-                      title={`${s.businessName} · ${s.tier.toLowerCase()} sponsor`}
-                    >
-                      {s.logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={s.logoUrl} alt={s.businessName} className="max-h-full max-w-full object-contain" />
-                      ) : (
-                        <div className="flex flex-col items-center text-gray-400">
-                          <ImageIcon className="h-6 w-6" />
-                          <span className="mt-1 text-xs">{s.businessName}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
           </div>
         )}
 

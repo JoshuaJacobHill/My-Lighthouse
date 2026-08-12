@@ -904,6 +904,7 @@ model EventSponsor {
   tier         SponsorTier
   amount       Decimal     @db.Decimal(10, 2)
   logoUrl      String?     @db.Text
+  websiteUrl   String?
   contactName  String?
   contactEmail String?
   donationId   String?

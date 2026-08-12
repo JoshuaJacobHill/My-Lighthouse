@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { eventSchema, type EventInput } from '@/lib/validations'
+import { normaliseWebsiteUrl } from '@/lib/sponsor-tiers'
 
 interface ActionResult {
   success: boolean
@@ -228,6 +229,7 @@ export async function addOfflineSponsorAction(input: {
   tier: 'BRONZE' | 'SILVER' | 'GOLD'
   amount: number | string
   logoUrl?: string
+  websiteUrl?: string
   contactName?: string
   contactEmail?: string
 }): Promise<ActionResult> {
@@ -251,6 +253,7 @@ export async function addOfflineSponsorAction(input: {
       tier: input.tier,
       amount,
       logoUrl: input.logoUrl?.trim() || null,
+      websiteUrl: normaliseWebsiteUrl(input.websiteUrl),
       contactName: input.contactName?.trim() || null,
       contactEmail: input.contactEmail?.trim() || null,
       paid: true,

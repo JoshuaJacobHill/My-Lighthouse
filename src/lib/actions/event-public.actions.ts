@@ -6,7 +6,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { isStripeConfigured, toCents } from '@/lib/stripe'
 import { getStripeFor, resolveAccount } from '@/lib/stripe-accounts'
-import { SPONSOR_TIERS } from '@/lib/sponsor-tiers'
+import { SPONSOR_TIERS, normaliseWebsiteUrl } from '@/lib/sponsor-tiers'
 
 const schema = z.object({
   eventId: z.string().min(1),
@@ -73,6 +73,7 @@ const sponsorSchema = z.object({
   tier: z.enum(['BRONZE', 'SILVER', 'GOLD']),
   amount: z.coerce.number(),
   businessName: z.string().trim().min(1, 'Please enter your business name').max(160),
+  websiteUrl: z.string().trim().max(200).optional().or(z.literal('')),
   contactName: z.string().trim().max(120).optional().or(z.literal('')),
   contactEmail: z.email('Please enter a valid email'),
   logoUrl: z.string().max(800_000).optional().or(z.literal('')), // data URL (client-compressed)
@@ -93,7 +94,7 @@ export async function startEventSponsorAction(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { eventId, tier, amount, businessName, contactName, contactEmail, logoUrl } = parsed.data
+  const { eventId, tier, amount, businessName, websiteUrl, contactName, contactEmail, logoUrl } = parsed.data
 
   const range = SPONSOR_TIERS[tier]
   if (!Number.isFinite(amount) || amount < range.min || amount > range.max) {
@@ -118,6 +119,7 @@ export async function startEventSponsorAction(
         tier,
         amount,
         logoUrl: logoUrl || null,
+        websiteUrl: normaliseWebsiteUrl(websiteUrl),
         contactName: contactName || null,
         contactEmail,
         paid: false,

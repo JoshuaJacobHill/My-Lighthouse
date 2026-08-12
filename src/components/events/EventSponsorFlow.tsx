@@ -60,6 +60,7 @@ export function EventSponsorFlow({
   const [tier, setTier] = React.useState<SponsorTierKey | null>(null)
   const [amount, setAmount] = React.useState(0)
   const [businessName, setBusinessName] = React.useState('')
+  const [websiteUrl, setWebsiteUrl] = React.useState('')
   const [contactName, setContactName] = React.useState(initialName ?? '')
   const [contactEmail, setContactEmail] = React.useState(initialEmail ?? '')
   const [logo, setLogo] = React.useState<string | null>(null)
@@ -94,7 +95,7 @@ export function EventSponsorFlow({
       return
     }
     setLoading(true)
-    const res = await startEventSponsorAction({ eventId, tier, amount, businessName, contactName, contactEmail, logoUrl: logo })
+    const res = await startEventSponsorAction({ eventId, tier, amount, businessName, websiteUrl, contactName, contactEmail, logoUrl: logo })
     setLoading(false)
     if (!res.success || !res.clientSecret) {
       setError(res.error ?? 'Something went wrong.')
@@ -179,6 +180,12 @@ export function EventSponsorFlow({
             placeholder="Business / organisation name"
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          />
+          <input
+            placeholder="Website (e.g. yourbusiness.com.au)"
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
             className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
           />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

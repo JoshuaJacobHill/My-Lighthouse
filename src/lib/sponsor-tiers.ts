@@ -7,3 +7,10 @@ export const SPONSOR_TIERS = {
 } as const
 
 export type SponsorTierKey = keyof typeof SPONSOR_TIERS
+
+/** Normalise a user-entered website to an absolute URL (adds https:// if missing). */
+export function normaliseWebsiteUrl(raw?: string | null): string | null {
+  const v = (raw ?? '').trim()
+  if (!v) return null
+  return /^https?:\/\//i.test(v) ? v : `https://${v}`
+}
