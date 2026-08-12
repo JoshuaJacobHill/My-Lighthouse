@@ -876,6 +876,7 @@ enum SponsorTier {
   BRONZE
   SILVER
   GOLD
+  FOOD_ACTIVITY
 }
 
 // Someone who signed up to volunteer at an event (distinct from the roster).

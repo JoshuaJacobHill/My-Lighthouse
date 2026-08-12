@@ -226,7 +226,7 @@ export async function toggleEventPublishedAction(
 export async function addOfflineSponsorAction(input: {
   eventId: string
   businessName: string
-  tier: 'BRONZE' | 'SILVER' | 'GOLD'
+  tier: 'BRONZE' | 'SILVER' | 'GOLD' | 'FOOD_ACTIVITY'
   amount: number | string
   logoUrl?: string
   websiteUrl?: string
@@ -240,7 +240,7 @@ export async function addOfflineSponsorAction(input: {
   }
   const amount = Number(input.amount)
   if (!input.businessName?.trim()) return { success: false, error: 'Business name is required' }
-  if (!['BRONZE', 'SILVER', 'GOLD'].includes(input.tier)) return { success: false, error: 'Invalid tier' }
+  if (!['BRONZE', 'SILVER', 'GOLD', 'FOOD_ACTIVITY'].includes(input.tier)) return { success: false, error: 'Invalid tier' }
   if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: 'Amount must be a positive number' }
 
   const event = await prisma.event.findUnique({ where: { id: input.eventId }, select: { slug: true } })
@@ -267,7 +267,7 @@ export async function addOfflineSponsorAction(input: {
 export async function updateEventSponsorAction(input: {
   id: string
   businessName: string
-  tier: 'BRONZE' | 'SILVER' | 'GOLD'
+  tier: 'BRONZE' | 'SILVER' | 'GOLD' | 'FOOD_ACTIVITY'
   amount: number | string
   websiteUrl?: string
   logoUrl?: string
@@ -279,7 +279,7 @@ export async function updateEventSponsorAction(input: {
   }
   const amount = Number(input.amount)
   if (!input.businessName?.trim()) return { success: false, error: 'Business name is required' }
-  if (!['BRONZE', 'SILVER', 'GOLD'].includes(input.tier)) return { success: false, error: 'Invalid tier' }
+  if (!['BRONZE', 'SILVER', 'GOLD', 'FOOD_ACTIVITY'].includes(input.tier)) return { success: false, error: 'Invalid tier' }
   if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: 'Amount must be a positive number' }
 
   const sp = await prisma.eventSponsor.findUnique({

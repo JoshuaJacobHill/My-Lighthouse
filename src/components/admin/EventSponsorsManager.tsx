@@ -8,10 +8,11 @@ import {
   updateEventSponsorAction,
   removeEventSponsorAction,
 } from '@/lib/actions/event.actions'
+import { SPONSOR_TIER_LABEL } from '@/lib/sponsor-tiers'
 
 const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
 
-type Tier = 'BRONZE' | 'SILVER' | 'GOLD'
+type Tier = 'BRONZE' | 'SILVER' | 'GOLD' | 'FOOD_ACTIVITY'
 
 export interface SponsorRow {
   id: string
@@ -23,7 +24,6 @@ export interface SponsorRow {
   paid: boolean
 }
 
-const TIER_LABEL: Record<string, string> = { BRONZE: 'Bronze', SILVER: 'Silver', GOLD: 'Gold' }
 const input =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500'
 
@@ -92,6 +92,7 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
             <option value="BRONZE">Bronze</option>
             <option value="SILVER">Silver</option>
             <option value="GOLD">Gold</option>
+            <option value="FOOD_ACTIVITY">Food/Activity</option>
           </select>
           <input className={input} type="number" min="1" step="1" placeholder="Amount (AUD)" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           <input className={input} placeholder="Website (optional, e.g. sponsor.com.au)" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
@@ -142,7 +143,7 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-gray-900">{s.businessName}</p>
                   <p className="text-xs text-gray-500">
-                    {TIER_LABEL[s.tier]} · {aud.format(s.amount)}
+                    {SPONSOR_TIER_LABEL[s.tier]} · {aud.format(s.amount)}
                     {!s.paid && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">Unpaid</span>}
                   </p>
                   {s.websiteUrl && <p className="truncate text-xs text-orange-600">{s.websiteUrl}</p>}
@@ -197,6 +198,7 @@ function SponsorEditRow({
         <option value="BRONZE">Bronze</option>
         <option value="SILVER">Silver</option>
         <option value="GOLD">Gold</option>
+        <option value="FOOD_ACTIVITY">Food/Activity</option>
       </select>
       <input className={input} type="number" min="1" step="1" placeholder="Amount (AUD)" value={amount} onChange={(e) => setAmount(e.target.value)} required />
       <input className={input} placeholder="Website (e.g. sponsor.com.au)" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />

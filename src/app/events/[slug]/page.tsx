@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/utils'
 import { RegistrationForm, type TicketTypeOption } from './RegistrationForm'
 import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
 import { Markdown } from '@/components/ui/Markdown'
+import { SPONSOR_TIER_ORDER, SPONSOR_TIER_HEADING } from '@/lib/sponsor-tiers'
 
 export const dynamic = 'force-dynamic'
 
@@ -193,49 +194,60 @@ export default async function EventPage({
         {event.allowSponsors && (
           <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             {sponsors.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-lg font-bold text-gray-900">
-                  {sponsors.length === 1 ? 'Sponsor' : 'Sponsors'}
-                </h2>
-                <div className="mt-4 space-y-4">
-                  {sponsors.map((s) => {
-                    const inner = (
-                      <>
-                        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black p-2">
-                          {s.logoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={s.logoUrl} alt={s.businessName} className="max-h-full max-w-full object-contain" />
+              <div className="mb-6 space-y-8">
+                {SPONSOR_TIER_ORDER.map((tierKey) => {
+                  const group = sponsors.filter((s) => s.tier === tierKey)
+                  if (group.length === 0) return null
+                  const isGold = tierKey === 'GOLD'
+                  const box = isGold ? 'h-20 w-20' : 'h-14 w-14'
+                  const nameText = isGold ? 'text-lg font-bold text-gray-900' : 'font-bold text-gray-900'
+                  return (
+                    <div key={tierKey}>
+                      <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        {SPONSOR_TIER_HEADING[tierKey]}
+                      </h2>
+                      <div className="mt-4 space-y-4">
+                        {group.map((s) => {
+                          const inner = (
+                            <>
+                              <span className={`flex ${box} shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black p-2`}>
+                                {s.logoUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={s.logoUrl} alt={s.businessName} className="max-h-full max-w-full object-contain" />
+                                ) : (
+                                  <ImageIcon className="h-6 w-6 text-gray-500" />
+                                )}
+                              </span>
+                              <div className="min-w-0">
+                                <p className={nameText}>{s.businessName}</p>
+                                {s.websiteUrl && (
+                                  <span className="text-sm font-medium text-orange-600 group-hover:underline">
+                                    Visit website →
+                                  </span>
+                                )}
+                              </div>
+                            </>
+                          )
+                          return s.websiteUrl ? (
+                            <a
+                              key={s.id}
+                              href={s.websiteUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group flex items-center gap-4"
+                            >
+                              {inner}
+                            </a>
                           ) : (
-                            <ImageIcon className="h-6 w-6 text-gray-500" />
-                          )}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="font-bold text-gray-900">{s.businessName}</p>
-                          {s.websiteUrl && (
-                            <span className="text-sm font-medium text-orange-600 group-hover:underline">
-                              Visit website →
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    )
-                    return s.websiteUrl ? (
-                      <a
-                        key={s.id}
-                        href={s.websiteUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-4"
-                      >
-                        {inner}
-                      </a>
-                    ) : (
-                      <div key={s.id} className="flex items-center gap-4">
-                        {inner}
+                            <div key={s.id} className="flex items-center gap-4">
+                              {inner}
+                            </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
 
