@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/utils'
 import { RegistrationForm, type TicketTypeOption } from './RegistrationForm'
 import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
 import { Markdown } from '@/components/ui/Markdown'
+import { EventSponsorStrip } from '@/components/events/EventSponsorStrip'
 import { SPONSOR_TIER_ORDER, SPONSOR_TIER_HEADING } from '@/lib/sponsor-tiers'
 
 export const dynamic = 'force-dynamic'
@@ -138,6 +139,8 @@ export default async function EventPage({
           </div>
           <hr className="mt-6 border-gray-200" />
         </div>
+
+        {event.allowSponsors && <EventSponsorStrip sponsors={sponsors} />}
 
         <Markdown source={event.description} className="mb-8 text-gray-700" />
 
