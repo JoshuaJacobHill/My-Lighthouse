@@ -52,11 +52,11 @@ export function EventSponsorStrip({ sponsors }: { sponsors: StripSponsor[] }) {
     <div className="relative mb-8">
       <div
         ref={scroller}
-        className="flex items-center gap-6 overflow-x-auto rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex items-center gap-6 overflow-x-auto rounded-2xl bg-black px-5 py-4 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {groups.map((g) => (
           <div key={g.tier} className="flex shrink-0 items-center gap-3">
-            <span className="shrink-0 text-[11px] font-bold uppercase leading-tight text-gray-500">
+            <span className="shrink-0 text-[11px] font-bold uppercase leading-tight text-white">
               {g.label}
               <br />
               sponsors

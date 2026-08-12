@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { getEventAvailability } from '@/lib/tickets'
-import { formatDateTime } from '@/lib/utils'
+import { formatEventWhen } from '@/lib/utils'
 import { RegistrationForm, type TicketTypeOption } from './RegistrationForm'
 import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
 import { Markdown } from '@/components/ui/Markdown'
@@ -44,6 +44,7 @@ export default async function EventPage({
       imageUrl: true,
       venue: true,
       startsAt: true,
+      endsAt: true,
       capacity: true,
       churchOnly: true,
       allowVolunteers: true,
@@ -126,7 +127,7 @@ export default async function EventPage({
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
                 <CalendarDays className="h-5 w-5" />
               </span>
-              <p className="text-sm font-semibold text-gray-900">{formatDateTime(event.startsAt)}</p>
+              <p className="text-sm font-semibold text-gray-900">{formatEventWhen(event.startsAt, event.endsAt)}</p>
             </div>
             {event.venue && (
               <div className="flex items-center gap-3">

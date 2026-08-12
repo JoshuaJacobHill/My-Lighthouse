@@ -72,6 +72,35 @@ export function formatDateTime(date: Date | string): string {
   }
 }
 
+/**
+ * Format the time only in Australian format (Brisbane time). e.g. 9:00 am
+ */
+export function formatTime(date: Date | string): string {
+  try {
+    return new Intl.DateTimeFormat('en-AU', {
+      timeZone: BRISBANE_TZ,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(toDate(date))
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Format an event's date/time, with an optional end. When both fall on the same
+ * Brisbane day, shows one date with a time range (e.g. "16/08/2026 9:00 am – 11:15 am");
+ * otherwise shows the full start and end. With no end, just the start.
+ */
+export function formatEventWhen(start: Date | string, end?: Date | string | null): string {
+  if (!end) return formatDateTime(start)
+  if (formatDate(start) === formatDate(end)) {
+    return `${formatDateTime(start)} – ${formatTime(end)}`
+  }
+  return `${formatDateTime(start)} – ${formatDateTime(end)}`
+}
+
 // ─── Duration ─────────────────────────────────────────────────────────────────
 
 /**
