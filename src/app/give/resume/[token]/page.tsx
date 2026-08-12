@@ -1,7 +1,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Heart } from 'lucide-react'
+import { Heart, PauseCircle } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { resolveAccount } from '@/lib/stripe-accounts'
 import { getLiveMigrationIntent, isMigrationFrequency } from '@/lib/migration'
@@ -117,11 +117,15 @@ export default async function ResumeGivingPage({ params }: { params: Promise<{ t
   return (
     <Shell>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-700">
+          <PauseCircle className="h-3.5 w-3.5" /> Giving paused
+        </span>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight text-neutral-900">
           Welcome back, {firstName} 👋
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-          We’ve moved to a new home for managing giving. To keep your support going, just re-enter your card below —
+          Your regular giving is currently <strong className="font-semibold text-neutral-800">paused</strong> — we’ve
+          moved to a new home for managing giving. To restart your support, just update your payment details below;
           everything else is already filled in. It takes about a minute.
         </p>
       </div>

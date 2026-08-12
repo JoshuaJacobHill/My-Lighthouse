@@ -230,21 +230,22 @@ export const defaultTemplates: Record<
   },
 
   DONOR_MIGRATION: {
-    subject: 'A quick step to keep your giving going, {{first_name}}',
+    subject: 'Your giving is paused — please update your payment details',
     html: wrap(`
+      <p style="margin:0 0 18px 0;"><span style="display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:999px;padding:5px 14px;font-size:13px;font-weight:700;">&#9208; Giving paused</span></p>
       <p style="${P}">Hi {{first_name}},</p>
-      <p style="${P}">Thank you for being one of our regular givers. We&rsquo;ve moved to a new home for managing giving, and to keep your support flowing we just need you to re-enter your card details once — it takes about a minute.</p>
+      <p style="${P}">Thank you for being one of our regular givers. Your giving is currently <strong>paused</strong> — we&rsquo;ve moved to a new home for managing giving, and for your security card details couldn&rsquo;t come across with us. To restart your support, please take a moment to update your payment details below. It only takes about a minute.</p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;width:100%;margin:20px 0;">
         <tr><td style="${TABLE_CELL} font-weight:600;color:#9a3412;width:110px;">Your gift</td><td style="${TABLE_CELL}">{{amount}} {{frequency}}</td></tr>
         <tr style="border-top:1px solid #fed7aa;"><td style="${TABLE_CELL} font-weight:600;color:#9a3412;">Supporting</td><td style="${TABLE_CELL}">{{fund_name}}</td></tr>
       </table>
       <p style="${P}">Everything is filled in for you — you can adjust the amount if you&rsquo;d like, or simply confirm your card to pick up right where you left off.</p>
-      ${btn('{{resume_link}}', 'Re-confirm my giving &rarr;')}
+      ${btn('{{resume_link}}', 'Update my details &amp; resume giving &rarr;')}
       <p style="${P}">Once that&rsquo;s done, we&rsquo;ll send you a separate email to set a password so you can manage your giving any time. This link is valid for 60 days.</p>
       <p style="${P}">Your generosity means a full trolley of essentials for a family doing it tough — thank you for continuing to make lives better.</p>
       <p style="${P};margin-bottom:0;">With heartfelt thanks,<br>The {{organisation_name}} team</p>
     `),
-    text: `Hi {{first_name}},\n\nThank you for being one of our regular givers. We've moved to a new home for managing giving, and to keep your support flowing we just need you to re-enter your card details once — it takes about a minute.\n\nYour gift: {{amount}} {{frequency}}\nSupporting: {{fund_name}}\n\nEverything is filled in for you — you can adjust the amount if you'd like, or simply confirm your card:\n{{resume_link}}\n\nOnce that's done, we'll send you a separate email to set a password so you can manage your giving any time. (Link valid for 60 days.)\n\nWith heartfelt thanks,\nThe {{organisation_name}} team`,
+    text: `Hi {{first_name}},\n\n[ GIVING PAUSED ]\n\nThank you for being one of our regular givers. Your giving is currently paused — we've moved to a new home for managing giving, and for your security card details couldn't come across with us. To restart your support, please take a moment to update your payment details. It only takes about a minute.\n\nYour gift: {{amount}} {{frequency}}\nSupporting: {{fund_name}}\n\nEverything is filled in for you — you can adjust the amount if you'd like, or simply confirm your card:\n{{resume_link}}\n\nOnce that's done, we'll send you a separate email to set a password so you can manage your giving any time. (Link valid for 60 days.)\n\nWith heartfelt thanks,\nThe {{organisation_name}} team`,
   },
 
   CUSTOM: {

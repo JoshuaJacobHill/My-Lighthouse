@@ -84,7 +84,12 @@ export function ResumeGivingForm({
         {!editing ? (
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-500">Your giving</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-500">Your giving</p>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+                  Paused
+                </span>
+              </div>
               <p className="mt-1 text-2xl font-bold text-gray-900">
                 {aud.format(validAmount ? amount : 0)}{' '}
                 <span className="text-lg font-semibold text-gray-600">{freqLabel}</span>
