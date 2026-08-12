@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { EventForm, type EventFormValues } from '@/components/admin/EventForm'
+import { EventSponsorsManager } from '@/components/admin/EventSponsorsManager'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,13 @@ export default async function EditEventPage({
   const [event, funds] = await Promise.all([
     prisma.event.findUnique({
       where: { id },
-      include: { ticketTypes: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        ticketTypes: { orderBy: { sortOrder: 'asc' } },
+        sponsors: {
+          orderBy: [{ tier: 'asc' }, { createdAt: 'asc' }],
+          select: { id: true, businessName: true, tier: true, amount: true, logoUrl: true, websiteUrl: true, paid: true },
+        },
+      },
     }),
     prisma.fund.findMany({
       where: { isActive: true },
@@ -70,6 +77,19 @@ export default async function EditEventPage({
         <p className="mt-0.5 text-sm text-gray-500">{event.title}</p>
       </div>
       <EventForm event={values} funds={funds} />
+
+      <EventSponsorsManager
+        eventId={event.id}
+        sponsors={event.sponsors.map((s) => ({
+          id: s.id,
+          businessName: s.businessName,
+          tier: s.tier,
+          amount: Number(s.amount),
+          logoUrl: s.logoUrl,
+          websiteUrl: s.websiteUrl,
+          paid: s.paid,
+        }))}
+      />
     </div>
   )
 }

@@ -4,7 +4,6 @@ import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { AttendeesCsvButton } from '@/components/admin/AttendeesCsvButton'
-import { EventSponsorsManager } from '@/components/admin/EventSponsorsManager'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,10 +30,6 @@ export default async function AttendeesPage({
       startsAt: true,
       venue: true,
       capacity: true,
-      sponsors: {
-        orderBy: [{ tier: 'asc' }, { createdAt: 'asc' }],
-        select: { id: true, businessName: true, tier: true, amount: true, logoUrl: true, paid: true },
-      },
       orders: {
         where: { status: 'CONFIRMED' },
         orderBy: { createdAt: 'asc' },
@@ -156,18 +151,6 @@ export default async function AttendeesPage({
           </table>
         </div>
       )}
-
-      <EventSponsorsManager
-        eventId={id}
-        sponsors={event.sponsors.map((s) => ({
-          id: s.id,
-          businessName: s.businessName,
-          tier: s.tier,
-          amount: Number(s.amount),
-          logoUrl: s.logoUrl,
-          paid: s.paid,
-        }))}
-      />
     </div>
   )
 }

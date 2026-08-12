@@ -264,6 +264,49 @@ export async function addOfflineSponsorAction(input: {
   return { success: true }
 }
 
+export async function updateEventSponsorAction(input: {
+  id: string
+  businessName: string
+  tier: 'BRONZE' | 'SILVER' | 'GOLD'
+  amount: number | string
+  websiteUrl?: string
+  logoUrl?: string
+}): Promise<ActionResult> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+  const amount = Number(input.amount)
+  if (!input.businessName?.trim()) return { success: false, error: 'Business name is required' }
+  if (!['BRONZE', 'SILVER', 'GOLD'].includes(input.tier)) return { success: false, error: 'Invalid tier' }
+  if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: 'Amount must be a positive number' }
+
+  const sp = await prisma.eventSponsor.findUnique({
+    where: { id: input.id },
+    select: { eventId: true, event: { select: { slug: true } } },
+  })
+  if (!sp) return { success: false, error: 'Sponsor not found' }
+
+  // Only overwrite the logo when a new value is provided — keeps uploaded
+  // (data-URL) logos from being wiped when the field is left blank.
+  const newLogo = input.logoUrl?.trim()
+
+  await prisma.eventSponsor.update({
+    where: { id: input.id },
+    data: {
+      businessName: input.businessName.trim(),
+      tier: input.tier,
+      amount,
+      websiteUrl: normaliseWebsiteUrl(input.websiteUrl),
+      ...(newLogo ? { logoUrl: newLogo } : {}),
+    },
+  })
+  if (sp.event?.slug) revalidatePath(`/events/${sp.event.slug}`)
+  revalidatePath(`/admin/events/${sp.eventId}/edit`)
+  return { success: true }
+}
+
 export async function removeEventSponsorAction(id: string): Promise<ActionResult> {
   try {
     await requireAdminSession()
