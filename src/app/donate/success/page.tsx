@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import { isDonorPortalEnabled } from '@/lib/features'
+import { getSession } from '@/lib/auth'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { getStripeFor, isAccountKey } from '@/lib/stripe-accounts'
 
@@ -25,6 +26,7 @@ export default async function DonateSuccessPage({
 
   const { session_id: sessionId, payment_intent: paymentIntentId, acct, tithe } = await searchParams
   const isTithe = tithe === '1'
+  const session = await getSession()
 
   let amountLabel: string | null = null
   let donorName: string | null = null
@@ -80,12 +82,21 @@ export default async function DonateSuccessPage({
               A receipt is on its way to your inbox. From all of us at Lighthouse Care — thank you for standing with
               our community.
             </p>
-            <Link
-              href="/donate"
-              className="mt-6 inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Back to donations
-            </Link>
+            {session ? (
+              <Link
+                href="/donor"
+                className="mt-6 inline-flex items-center justify-center rounded-full bg-orange-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                Back to my dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/donate"
+                className="mt-6 inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Back to donations
+              </Link>
+            )}
           </>
         )}
       </div>
