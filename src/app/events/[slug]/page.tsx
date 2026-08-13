@@ -11,6 +11,7 @@ import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
 import { Markdown } from '@/components/ui/Markdown'
 import { EventSponsorStrip } from '@/components/events/EventSponsorStrip'
 import { SPONSOR_TIER_ORDER, SPONSOR_TIER_HEADING } from '@/lib/sponsor-tiers'
+import { PortalShell } from '@/components/layout/PortalShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,15 +61,24 @@ export default async function EventPage({
   })
   if (!event) notFound()
 
+  // Who's viewing? Signed-in supporters keep the portal shell (nav) wrapped
+  // around the event; anonymous visitors get the standalone public page.
+  const session = await getSession()
+  const viewer = session
+    ? await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: {
+          name: true,
+          email: true,
+          isChurchMember: true,
+          volunteerProfile: { select: { id: true } },
+          _count: { select: { donations: true } },
+        },
+      })
+    : null
+
   // Church-only events are hidden from everyone but church members.
-  if (event.churchOnly) {
-    const session = await getSession()
-    const churchMember = session
-      ? (await prisma.user.findUnique({ where: { id: session.userId }, select: { isChurchMember: true } }))
-          ?.isChurchMember
-      : false
-    if (!churchMember) notFound()
-  }
+  if (event.churchOnly && !viewer?.isChurchMember) notFound()
 
   const availability = await getEventAvailability(event.id)
   const overallRemaining =
@@ -92,7 +102,7 @@ export default async function EventPage({
   const soldOut = overallRemaining === 0 || options.every((o) => o.max === 0)
 
   // Optional sections (Good Food Festival etc.).
-  const [volunteerCount, sponsors, me] = await Promise.all([
+  const [volunteerCount, sponsors] = await Promise.all([
     event.allowVolunteers ? prisma.eventVolunteer.count({ where: { eventId: event.id } }) : Promise.resolve(0),
     event.allowSponsors
       ? prisma.eventSponsor.findMany({
@@ -101,20 +111,14 @@ export default async function EventPage({
           select: { id: true, businessName: true, logoUrl: true, websiteUrl: true, tier: true },
         })
       : Promise.resolve([]),
-    event.allowVolunteers
-      ? getSession().then((s) =>
-          s ? prisma.user.findUnique({ where: { id: s.userId }, select: { name: true, email: true } }) : null
-        )
-      : Promise.resolve(null),
   ])
 
   const canDonate = event.allowDonations && event.fund
   const sponsorHref = `/events/${slug}/sponsor`
 
-  return (
-    <div className="min-h-screen bg-gray-50 px-6 py-12">
-      <div className="mx-auto max-w-2xl">
-        {event.imageUrl && (
+  const content = (
+    <div className="mx-auto max-w-2xl">
+      {event.imageUrl && (
           <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={event.imageUrl} alt={event.title} className="aspect-[16/9] w-full object-cover" />
@@ -167,8 +171,8 @@ export default async function EventPage({
               eventId={event.id}
               signedUp={volunteerCount}
               capacity={event.volunteerCapacity}
-              initialName={me?.name ?? undefined}
-              initialEmail={me?.email ?? undefined}
+              initialName={viewer?.name ?? undefined}
+              initialEmail={viewer?.email ?? undefined}
             />
           </div>
         )}
@@ -280,7 +284,21 @@ export default async function EventPage({
         <p className="mt-6 text-center text-xs text-gray-400">
           Registration by Lighthouse Care. Paid tickets are processed securely by Stripe.
         </p>
-      </div>
     </div>
   )
+
+  // Signed-in supporters keep the portal navigation around the event.
+  if (viewer) {
+    return (
+      <PortalShell
+        userName={viewer.name ?? 'Friend'}
+        isVolunteer={Boolean(viewer.volunteerProfile)}
+        hasGiven={(viewer._count.donations ?? 0) > 0}
+      >
+        <div className="-m-4 min-h-full bg-gray-50 px-5 py-8 lg:-m-6 lg:px-8">{content}</div>
+      </PortalShell>
+    )
+  }
+
+  return <div className="min-h-screen bg-gray-50 px-6 py-12">{content}</div>
 }
