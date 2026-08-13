@@ -18,6 +18,7 @@ export default async function DonorAccountPage() {
     select: {
       name: true,
       email: true,
+      company: true,
       donorProfile: { select: { phone: true, address: true, consentEmailUpdates: true } },
       volunteerProfile: { select: { id: true } },
     },
@@ -49,6 +50,7 @@ export default async function DonorAccountPage() {
           initial={{
             name: user.name ?? '',
             email: user.email,
+            company: user.company ?? '',
             phone: user.donorProfile?.phone ?? '',
             address: user.donorProfile?.address ?? '',
             consentEmailUpdates: user.donorProfile?.consentEmailUpdates ?? false,

@@ -110,6 +110,10 @@ model User {
   emailVerified DateTime?
   passwordHash  String?
   name          String?
+  // Optional company/organisation the supporter represents (unlocks corporate
+  // volunteering). Set explicitly on their profile, or inferred from giving /
+  // corporate volunteer history.
+  company       String?
   role          UserRole  @default(VOLUNTEER)
   isActive      Boolean   @default(true)
   // Admin permission: may see donations, donors, funds, fundraisers & events

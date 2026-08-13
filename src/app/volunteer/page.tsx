@@ -16,6 +16,7 @@ import {
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { companiesMatch } from '@/lib/corporate'
+import { resolveUserCompany } from '@/lib/corporate-server'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { ServingTeams } from '@/components/donor/ServingTeams'
 import { CorporateVolunteering } from '@/components/volunteer/CorporateVolunteering'
@@ -40,7 +41,7 @@ export default async function VolunteerTabPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const [user, corporate] = await Promise.all([
+  const [user, resolved] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.userId },
       select: {
@@ -49,18 +50,14 @@ export default async function VolunteerTabPage() {
         volunteerProfile: { select: { id: true, firstName: true, status: true } },
       },
     }),
-    prisma.donation.findFirst({
-      where: { userId: session.userId, donorCompany: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { donorCompany: true },
-    }),
+    resolveUserCompany(session.userId),
   ])
   if (!user) redirect('/login')
 
   const vp = user.volunteerProfile
   const isVolunteer = Boolean(vp)
   const firstName = vp?.firstName ?? user.name?.split(' ')[0] ?? 'there'
-  const company = corporate?.donorCompany ?? null
+  const company = resolved.company
 
   // Corporate volunteering history for this supporter's company (matched by name).
   const corpSessions = company

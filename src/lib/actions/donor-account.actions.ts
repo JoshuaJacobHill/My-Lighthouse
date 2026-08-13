@@ -97,6 +97,7 @@ export async function completeDonorAccountAction(input: CompleteAccountInput): P
 
 const updateSchema = z.object({
   name: z.string().trim().min(1, 'Please enter your name').max(120),
+  company: z.string().trim().max(160).optional().or(z.literal('')),
   phone: z.string().trim().max(40).optional().or(z.literal('')),
   address: z.string().trim().max(300).optional().or(z.literal('')),
   consentEmailUpdates: z.boolean().optional().default(false),
@@ -111,10 +112,11 @@ export async function updateDonorAccountAction(input: UpdateDonorAccountInput): 
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
-  const { name, phone, address, consentEmailUpdates } = parsed.data
+  const { name, company, phone, address, consentEmailUpdates } = parsed.data
 
   try {
-    await prisma.user.update({ where: { id: session.userId }, data: { name } })
+    await prisma.user.update({ where: { id: session.userId }, data: { name, company: company?.trim() || null } })
+    revalidatePath('/volunteer')
     await prisma.donorProfile.upsert({
       where: { userId: session.userId },
       update: {

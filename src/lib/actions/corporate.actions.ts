@@ -7,6 +7,7 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
 import { companyKeyOf } from '@/lib/corporate'
+import { resolveUserCompany } from '@/lib/corporate-server'
 
 const CORPORATE_INBOX = 'volunteer@lighthousecare.org.au'
 
@@ -15,20 +16,13 @@ interface Result {
   error?: string
 }
 
-/** The signed-in supporter's company (from their most recent gift) + identity. */
+/** The signed-in supporter's resolved company + identity (or null). */
 async function myCompany(
   userId: string
 ): Promise<{ company: string; name: string | null; email: string } | null> {
-  const [gift, user] = await Promise.all([
-    prisma.donation.findFirst({
-      where: { userId, donorCompany: { not: null } },
-      orderBy: { createdAt: 'desc' },
-      select: { donorCompany: true },
-    }),
-    prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
-  ])
-  if (!gift?.donorCompany || !user?.email) return null
-  return { company: gift.donorCompany, name: user.name, email: user.email }
+  const r = await resolveUserCompany(userId)
+  if (!r.company || !r.email) return null
+  return { company: r.company, name: r.name, email: r.email }
 }
 
 // ─── Manually add a past corporate volunteering session ──────────────────────

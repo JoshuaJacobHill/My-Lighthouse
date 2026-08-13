@@ -9,7 +9,7 @@ import { updateDonorAccountAction, type UpdateDonorAccountInput } from '@/lib/ac
 export function AccountSettingsForm({
   initial,
 }: {
-  initial: { name: string; email: string; phone: string; address: string; consentEmailUpdates: boolean }
+  initial: { name: string; email: string; company: string; phone: string; address: string; consentEmailUpdates: boolean }
 }) {
   const router = useRouter()
   const [saving, setSaving] = React.useState(false)
@@ -24,6 +24,7 @@ export function AccountSettingsForm({
     const fd = new FormData(e.currentTarget)
     const input: UpdateDonorAccountInput = {
       name: String(fd.get('name') ?? ''),
+      company: String(fd.get('company') ?? ''),
       phone: String(fd.get('phone') ?? ''),
       address: String(fd.get('address') ?? ''),
       consentEmailUpdates: fd.get('consentEmailUpdates') === 'on',
@@ -55,6 +56,14 @@ export function AccountSettingsForm({
         value={initial.email}
         disabled
         hint="Contact us if you need to change the email on your account."
+      />
+      <Input
+        label="Company / organisation"
+        name="company"
+        defaultValue={initial.company}
+        placeholder="Optional"
+        maxLength={160}
+        hint="If your workplace gives or volunteers with us, add it here to unlock corporate volunteering."
       />
       <Input label="Mobile" name="phone" defaultValue={initial.phone} placeholder="Optional" maxLength={40} />
       <Input label="Address" name="address" defaultValue={initial.address} placeholder="Optional" maxLength={300} />
