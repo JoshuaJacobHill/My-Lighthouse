@@ -4,7 +4,15 @@ import { ArrowLeft, Repeat, Download, Heart, Mail } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
+import { listMyRecurringGifts } from '@/lib/actions/recurring.actions'
 import { formatDate } from '@/lib/utils'
+
+// Colour a recurring badge by the plan's live Stripe status.
+function statusTone(status: string): string {
+  if (status === 'active' || status === 'trialing') return 'bg-green-50 text-green-700'
+  if (status === 'canceled') return 'bg-gray-100 text-gray-600'
+  return 'bg-amber-50 text-amber-700' // past_due / unpaid / paused
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +27,22 @@ export default async function GivingHistoryPage() {
 
   const gifts = await getDonorGifts(session.userId)
   const summary = summariseGifts(gifts)
+
+  // Live recurring plan statuses (from Stripe) so a historical recurring gift
+  // shows whether its plan is now Active / Paused / Cancelled — a bare
+  // "Recurring" tag wrongly implies it's still running. Matched by fund; with a
+  // single plan we can match any recurring gift to it.
+  const recurring = await listMyRecurringGifts()
+  const recByFund = new Map<string, (typeof recurring)[number]>()
+  for (const r of recurring) {
+    const key = r.fundName ?? '__nofund__'
+    if (!recByFund.has(key)) recByFund.set(key, r) // list is sorted active-first
+  }
+  const recStatusFor = (fundName: string | null) => {
+    if (fundName && recByFund.has(fundName)) return recByFund.get(fundName)!
+    if (recurring.length === 1) return recurring[0]
+    return null
+  }
 
   const me = await prisma.user.findUnique({ where: { id: session.userId }, select: { email: true } })
   const contactHref =
@@ -93,6 +117,8 @@ export default async function GivingHistoryPage() {
               <tbody>
                 {gifts.map((g) => {
                   const cadence = g.frequency && g.frequency !== 'One-off' ? g.frequency : g.isRecurring ? 'Recurring' : null
+                  const rec = cadence ? recStatusFor(g.fundName) : null
+                  const recTone = rec ? statusTone(rec.status) : 'bg-orange-50 text-orange-600'
                   const primary = g.description ?? g.fundName ?? 'Donation'
                   const secondary = g.fundName && g.fundName !== primary ? g.fundName : null
                   return (
@@ -102,8 +128,9 @@ export default async function GivingHistoryPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium text-gray-900">{primary}</span>
                           {cadence && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${recTone}`}>
                               <Repeat className="h-3 w-3" /> {cadence}
+                              {rec ? ` · ${rec.statusLabel}` : ''}
                             </span>
                           )}
                         </div>
