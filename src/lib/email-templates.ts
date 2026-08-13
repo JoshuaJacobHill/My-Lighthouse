@@ -205,15 +205,36 @@ export const defaultTemplates: Record<
   },
 
   DONOR_ACCOUNT_SETUP: {
-    subject: 'Set up your {{organisation_name}} account',
+    subject: 'Welcome to the My Lighthouse Portal — activate your account',
     html: wrap(`
+      <div style="margin:-36px -40px 28px -40px;">
+        <img src="https://lighthousecare.org.au/wp-content/uploads/2026/08/Introducing-MyLighthouse-Banner.jpg" alt="Introducing the My Lighthouse Portal" width="600" style="display:block;width:100%;height:auto;border:0;" />
+      </div>
       <p style="${P}">Hi {{first_name}},</p>
-      <p style="${P}">Thank you again for your generosity. Would you like to keep track of your giving with {{organisation_name}}? Set a password and your account is ready — you&rsquo;ll be able to see your giving history and download your receipts any time.</p>
-      ${btn('{{set_password_link}}', 'Set up my account &rarr;')}
-      <p style="${P}">This link is valid for 14 days. There&rsquo;s no obligation — if you&rsquo;d rather not, simply ignore this email; your gift is already received.</p>
-      <p style="${P};margin-bottom:0;">With thanks,<br>The {{organisation_name}} team</p>
+      <p style="${P}">Thank you for being part of {{organisation_name}}.</p>
+      <p style="${P}">Every person who gives, volunteers, shows up at an event, supports an appeal or simply tells someone about what we do becomes part of something much bigger — a community of people helping make life a little easier for families when they need it most.</p>
+      <p style="${P}">That&rsquo;s why we&rsquo;ve created the <strong>My Lighthouse Portal</strong> — a new online home for our supporters. It&rsquo;s a place where you can see your connection with {{organisation_name}}, discover new ways to get involved and stay close to the impact you&rsquo;re helping make.</p>
+      <p style="${P}">Inside the portal, you&rsquo;ll be able to:</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0 20px 0;">
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">View your giving history and download tax-deductible receipts</td></tr>
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">Manage your regular giving and securely update your details</td></tr>
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">Find one-off and regular volunteering opportunities</td></tr>
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">Register to help with special moments like our Christmas Blitz, Good Food Festival and other community events</td></tr>
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">Discover corporate volunteering days for your workplace or team</td></tr>
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">Get involved with appeals like Santa&rsquo;s Little Helpers, Disaster Relief and emergency food relief</td></tr>
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">Keep track of your volunteering and support</td></tr>
+        <tr><td style="width:26px;padding:6px 0;color:${ORANGE};font-weight:bold;font-size:16px;vertical-align:top;">&#10003;</td><td style="padding:6px 0;font-size:15px;line-height:1.5;color:${TEXT};">Hear about new opportunities to help throughout the year</td></tr>
+      </table>
+      <p style="${P}">We&rsquo;ve already loaded your recent giving history into the portal — it&rsquo;s ready and waiting. All you need to do is create a password to unlock your My Lighthouse dashboard.</p>
+      <p style="${P}">It only takes a minute to activate your account.</p>
+      ${btn('{{set_password_link}}', 'Activate my My Lighthouse Portal account &rarr;')}
+      <p style="${P}">Your activation link is valid for 14 days.</p>
+      <p style="${P}">However you choose to be involved, we want you to know how much it means to us. {{organisation_name}} has always been built around people helping people, and we&rsquo;re incredibly grateful that you&rsquo;re part of that story.</p>
+      <p style="${P}">Together, we get to put food on tables, bring hope in difficult moments and remind people that their community is behind them.</p>
+      <p style="${P}">Thank you for helping us make lives better, so that together we can make the world better.</p>
+      <p style="${P};margin-bottom:0;">With heartfelt thanks,<br>The {{organisation_name}} team</p>
     `),
-    text: `Hi {{first_name}},\n\nThank you again for your generosity. Set up your {{organisation_name}} account to see your giving history and receipts any time:\n{{set_password_link}}\n\n(Valid for 14 days. No obligation.)\n\nWith thanks,\nThe {{organisation_name}} team`,
+    text: `Hi {{first_name}},\n\nThank you for being part of {{organisation_name}}.\n\nEvery person who gives, volunteers, shows up at an event, supports an appeal or simply tells someone about what we do becomes part of something much bigger — a community of people helping make life a little easier for families when they need it most.\n\nThat's why we've created the My Lighthouse Portal — a new online home for our supporters. It's a place where you can see your connection with {{organisation_name}}, discover new ways to get involved and stay close to the impact you're helping make.\n\nInside the portal, you'll be able to:\n- View your giving history and download tax-deductible receipts\n- Manage your regular giving and securely update your details\n- Find one-off and regular volunteering opportunities\n- Register to help with special moments like our Christmas Blitz, Good Food Festival and other community events\n- Discover corporate volunteering days for your workplace or team\n- Get involved with appeals like Santa's Little Helpers, Disaster Relief and emergency food relief\n- Keep track of your volunteering and support\n- Hear about new opportunities to help throughout the year\n\nWe've already loaded your recent giving history into the portal — it's ready and waiting. All you need to do is create a password to unlock your My Lighthouse dashboard.\n\nIt only takes a minute to activate your account:\n{{set_password_link}}\n\nYour activation link is valid for 14 days.\n\nHowever you choose to be involved, we want you to know how much it means to us. {{organisation_name}} has always been built around people helping people, and we're incredibly grateful that you're part of that story.\n\nTogether, we get to put food on tables, bring hope in difficult moments and remind people that their community is behind them.\n\nThank you for helping us make lives better, so that together we can make the world better.\n\nWith heartfelt thanks,\nThe {{organisation_name}} team`,
   },
 
   TICKET_CONFIRMATION: {

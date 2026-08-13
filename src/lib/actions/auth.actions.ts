@@ -230,67 +230,84 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
   const data = parsed.data
 
   try {
-    // Check for existing email
+    // An existing account (one that already has a password) can't be re-created —
+    // point them to sign in / reset their password. A passwordless row (e.g. a
+    // donor we created to attach past giving) is fine to upgrade into a full
+    // account in place, so those supporters aren't blocked from signing up.
     const existing = await prisma.user.findUnique({
       where: { email: data.email.toLowerCase() },
+      select: { id: true, passwordHash: true },
     })
-    if (existing) {
+    if (existing?.passwordHash) {
       return {
         success: false,
-        error: 'An account with this email address already exists.',
-        fieldErrors: { email: 'This email address is already registered.' },
+        error: 'This email has already been used. Please sign in, or reset your password if you’ve forgotten it.',
+        fieldErrors: { email: 'This email is already registered — reset your password to sign in.' },
       }
     }
 
     const passwordHash = await hashPassword(data.password)
 
-    // Create user + volunteer profile in a transaction
+    // Shared volunteer-profile payload for both the create and upgrade paths.
+    const volunteerProfileCreate = {
+      create: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email.toLowerCase(),
+        mobile: data.mobile,
+        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+        addressLine1: data.addressLine1 ?? null,
+        addressLine2: data.addressLine2 ?? null,
+        suburb: data.suburb ?? null,
+        state: data.state ?? null,
+        postcode: data.postcode ?? null,
+        emergencyName: data.emergencyName,
+        emergencyPhone: data.emergencyPhone,
+        emergencyRelation: data.emergencyRelation ?? null,
+        preferredLocations: data.preferredLocations ?? [],
+        areasOfInterest: data.areasOfInterest ?? [],
+        medicalNotes: data.medicalNotes ?? null,
+        accessibilityNeeds: data.accessibilityNeeds ?? null,
+        agreedToTerms: data.agreedToTerms,
+        agreedToPrivacy: data.agreedToPrivacy,
+        consentEmailUpdates: data.consentEmailUpdates ?? false,
+        consentSmsUpdates: data.consentSmsUpdates ?? false,
+        agreedAt: new Date(),
+        status: 'PENDING_INDUCTION',
+        availability: {
+          create: (data.availability ?? []).map((a: { dayOfWeek: string; startTime: string; endTime: string }) => ({
+            dayOfWeek: a.dayOfWeek.toUpperCase().replace(/\s+/g, '_') as never,
+            startTime: a.startTime,
+            endTime: a.endTime,
+            timePeriod: (a.startTime < '09:00' ? 'PRE_OPEN' : a.startTime < '12:30' ? 'MORNING' : 'AFTERNOON') as never,
+          })),
+        },
+      },
+    }
+
+    // Create user + volunteer profile in a transaction (or upgrade a passwordless row).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user = await prisma.$transaction(async (tx: any) => {
-      const newUser = await tx.user.create({
+      if (existing) {
+        return tx.user.update({
+          where: { id: existing.id },
+          data: {
+            passwordHash,
+            name: `${data.firstName} ${data.lastName}`,
+            role: 'VOLUNTEER',
+            volunteerProfile: volunteerProfileCreate,
+          },
+        })
+      }
+      return tx.user.create({
         data: {
           email: data.email.toLowerCase(),
           passwordHash,
           name: `${data.firstName} ${data.lastName}`,
           role: 'VOLUNTEER',
-          volunteerProfile: {
-            create: {
-              firstName: data.firstName,
-              lastName: data.lastName,
-              email: data.email.toLowerCase(),
-              mobile: data.mobile,
-              dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-              addressLine1: data.addressLine1 ?? null,
-              addressLine2: data.addressLine2 ?? null,
-              suburb: data.suburb ?? null,
-              state: data.state ?? null,
-              postcode: data.postcode ?? null,
-              emergencyName: data.emergencyName,
-              emergencyPhone: data.emergencyPhone,
-              emergencyRelation: data.emergencyRelation ?? null,
-              preferredLocations: data.preferredLocations ?? [],
-              areasOfInterest: data.areasOfInterest ?? [],
-              medicalNotes: data.medicalNotes ?? null,
-              accessibilityNeeds: data.accessibilityNeeds ?? null,
-              agreedToTerms: data.agreedToTerms,
-              agreedToPrivacy: data.agreedToPrivacy,
-              consentEmailUpdates: data.consentEmailUpdates ?? false,
-              consentSmsUpdates: data.consentSmsUpdates ?? false,
-              agreedAt: new Date(),
-              status: 'PENDING_INDUCTION',
-              availability: {
-                create: (data.availability ?? []).map((a: { dayOfWeek: string; startTime: string; endTime: string }) => ({
-                  dayOfWeek: a.dayOfWeek.toUpperCase().replace(/\s+/g, '_') as never,
-                  startTime: a.startTime,
-                  endTime: a.endTime,
-                  timePeriod: (a.startTime < '09:00' ? 'PRE_OPEN' : a.startTime < '12:30' ? 'MORNING' : 'AFTERNOON') as never,
-                })),
-              },
-            },
-          },
+          volunteerProfile: volunteerProfileCreate,
         },
       })
-      return newUser
     })
 
     // Send confirmation email — fire and forget, don't block registration

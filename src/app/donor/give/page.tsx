@@ -4,6 +4,7 @@ import { ArrowRight, ArrowUpRight, Heart, Repeat, Church } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
+import { listMyRecurringGifts } from '@/lib/actions/recurring.actions'
 import { AppealsCarousel, type AppealItem } from '@/components/donor/AppealsCarousel'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,18 @@ export default async function GiveHubPage() {
   const gifts = await getDonorGifts(session.userId)
   const summary = summariseGifts(gifts)
   const hasGifts = gifts.length > 0
-  const hasRecurring = gifts.some((g) => g.isRecurring)
+
+  // Whether the donor has a *currently active* recurring plan is the live truth
+  // in Stripe — a cancelled plan still leaves isRecurring gifts on record, so we
+  // must not infer "recurring" from past gifts. (Tithes are excluded upstream.)
+  const activeRecurring = (await listMyRecurringGifts()).filter((g) => g.active)
+  const hasActiveRecurring = activeRecurring.length > 0
+  const recurringSummary =
+    activeRecurring.length === 1
+      ? `${aud(activeRecurring[0].amount)} · ${activeRecurring[0].frequencyLabel}`
+      : activeRecurring.length > 1
+        ? `${activeRecurring.length} recurring gifts`
+        : null
 
   const tithePlan = await prisma.donation.findFirst({
     where: { userId: session.userId, isTithe: true, isRecurring: true },
@@ -55,25 +67,25 @@ export default async function GiveHubPage() {
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
       <div className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">Give</h1>
-        <p className="mt-2 text-neutral-500">Change a life this week — a $25 gift is a full trolley of essentials.</p>
+        <p className="mt-2 text-neutral-500">Every dollar donated goes a long way to providing food relief to families who really need it. Thank you so much for your support.</p>
 
         {/* Give now + your giving */}
         <section className="mt-8 grid gap-5 lg:grid-cols-3">
           <div className="rounded-[28px] bg-orange-500 p-8 text-white lg:col-span-2">
             {hasGifts ? (
               <>
-                <div className="flex items-center gap-2.5">
-                  <p className="text-sm font-medium text-orange-100">Your giving so far</p>
-                  {hasRecurring && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">
+                {hasActiveRecurring && (
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold">
                       <Repeat className="h-3 w-3" /> Recurring
                     </span>
-                  )}
-                </div>
-                <p className="mt-3 text-6xl font-extrabold tracking-tighter tabular-nums">{aud(summary.allTime)}</p>
+                    <span className="text-sm font-semibold text-white">{recurringSummary}</span>
+                  </div>
+                )}
+                <p className="text-sm font-medium text-orange-100">Your giving this financial year</p>
+                <p className="mt-2 text-6xl font-extrabold tracking-tighter tabular-nums">{aud(summary.financialYear)}</p>
                 <p className="mt-2 text-sm text-orange-100">
-                  {aud(summary.financialYear)} this financial year · {summary.count}{' '}
-                  {summary.count === 1 ? 'gift' : 'gifts'}
+                  {aud(summary.allTime)} total · {summary.count} {summary.count === 1 ? 'gift' : 'gifts'}
                 </p>
               </>
             ) : (
@@ -102,7 +114,7 @@ export default async function GiveHubPage() {
                 <ArrowUpRight className="h-5 w-5 text-neutral-400" />
               </Link>
             )}
-            {hasRecurring && (
+            {hasActiveRecurring && (
               <Link
                 href="/donor/recurring"
                 className="flex items-center justify-between rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"

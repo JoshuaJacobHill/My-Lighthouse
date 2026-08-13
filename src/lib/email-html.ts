@@ -62,7 +62,7 @@ export function wrapEmailHtml(bodyContent: string, appUrl = 'https://my.lighthou
               <p style="margin:0;font-size:12px;color:${TEXT_LIGHT};line-height:1.7;">
                 Lighthouse Care — making lives better so that together we can make the world better.<br>
                 ABN 87 637 110 948 &middot; Logan, South East Queensland<br>
-                <a href="mailto:volunteer@lighthousecare.org.au" style="color:${ORANGE};text-decoration:none;">volunteer@lighthousecare.org.au</a>
+                <a href="mailto:accounts@lighthousecare.org.au" style="color:${ORANGE};text-decoration:none;">accounts@lighthousecare.org.au</a>
               </p>
             </td>
           </tr>
