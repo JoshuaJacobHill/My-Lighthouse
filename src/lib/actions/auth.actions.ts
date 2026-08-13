@@ -1,7 +1,9 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
 import {
   hashPassword,
   comparePassword,
@@ -101,6 +103,14 @@ export async function loginAction(formData: FormData): Promise<{
   }
 
   const { email, password } = parsed.data
+
+  // Throttle brute-force / credential-stuffing — per IP and per email.
+  const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const ipOk = rateLimit(`login:ip:${ip}`, 20, 60_000).ok
+  const emailOk = rateLimit(`login:email:${email.toLowerCase()}`, 8, 300_000).ok
+  if (!ipOk || !emailOk) {
+    return { success: false, error: 'Too many attempts. Please wait a moment and try again.' }
+  }
 
   try {
     const user = await prisma.user.findUnique({

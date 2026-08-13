@@ -2,10 +2,12 @@
 
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { hashPassword, createSession, setSessionCookie, getSession } from '@/lib/auth'
 import { validateAccountSetupToken, consumeAccountSetupToken } from '@/lib/account-setup'
 import { claimDonationsForUser } from '@/lib/donations'
+import { rateLimit } from '@/lib/rate-limit'
 
 interface Result {
   success: boolean
@@ -33,6 +35,12 @@ export async function completeDonorAccountAction(input: CompleteAccountInput): P
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check your details.' }
   }
   const { token, name, password } = parsed.data
+
+  // Throttle token-guessing / setup abuse per IP.
+  const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (!rateLimit(`setup:ip:${ip}`, 15, 600_000).ok) {
+    return { success: false, error: 'Too many attempts. Please wait a moment and try again.' }
+  }
 
   const valid = await validateAccountSetupToken(token)
   if (!valid) {

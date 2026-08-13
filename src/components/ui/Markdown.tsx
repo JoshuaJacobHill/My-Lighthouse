@@ -24,12 +24,20 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
     if (m.index > last) nodes.push(text.slice(last, m.index))
     if (m[2] !== undefined) nodes.push(<strong key={`${keyBase}-${i}`}>{m[2]}</strong>)
     else if (m[3] !== undefined) nodes.push(<em key={`${keyBase}-${i}`}>{m[3]}</em>)
-    else if (m[4] !== undefined)
+    else if (m[4] !== undefined) {
+      // Only allow safe link protocols — blocks javascript:/data: injection.
+      const raw = (m[5] ?? '').trim()
+      const safe = /^(https?:\/\/|mailto:|\/)/i.test(raw)
       nodes.push(
-        <a key={`${keyBase}-${i}`} href={m[5]} target="_blank" rel="noreferrer" className="font-medium text-orange-600 underline">
-          {m[4]}
-        </a>
+        safe ? (
+          <a key={`${keyBase}-${i}`} href={raw} target="_blank" rel="noreferrer noopener" className="font-medium text-orange-600 underline">
+            {m[4]}
+          </a>
+        ) : (
+          <span key={`${keyBase}-${i}`}>{m[4]}</span>
+        )
       )
+    }
     last = m.index + m[0].length
     i++
   }

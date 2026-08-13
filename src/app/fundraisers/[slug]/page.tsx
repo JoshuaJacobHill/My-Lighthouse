@@ -10,6 +10,14 @@ import { DonationTicker } from '@/components/DonationTicker'
 
 export const dynamic = 'force-dynamic'
 
+/** First name + last initial only, for the public donor wall (e.g. "Joel P."). */
+function maskDonorName(name: string | null): string {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'A supporter'
+  if (parts.length === 1) return parts[0]
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const fr = await prisma.fundraiser.findFirst({ where: { slug, isActive: true }, select: { title: true } })
@@ -79,7 +87,13 @@ export default async function FundraiserPage({ params }: { params: Promise<{ slu
   const pct = goal && goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : null
   const donorCount = agg._count
   const blocks = (Array.isArray(fundraiser.contentBlocks) ? fundraiser.contentBlocks : []) as ContentBlock[]
-  const tickerDonations = donations.map((d) => ({ ...d, amount: Number(d.amount) }))
+  // Privacy: the public donor wall shows first name + last initial only, so full
+  // supporter names aren't exposed/scrapeable (amounts stay, names are masked).
+  const tickerDonations = donations.map((d) => ({
+    ...d,
+    donorName: maskDonorName(d.donorName),
+    amount: Number(d.amount),
+  }))
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const shareUrl = `${base}/fundraisers/${slug}`

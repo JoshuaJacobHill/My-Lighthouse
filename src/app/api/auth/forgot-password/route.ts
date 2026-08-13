@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { createPasswordResetToken } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
+import { rateLimit } from '@/lib/rate-limit'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 
@@ -21,6 +22,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (!email) {
+    return NextResponse.json({ success: true })
+  }
+
+  // Throttle reset-email abuse ("email bombing") — per IP and per target email.
+  // Still returns the same generic success so account existence isn't revealed.
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (!rateLimit(`forgot:ip:${ip}`, 10, 900_000).ok || !rateLimit(`forgot:email:${email}`, 3, 900_000).ok) {
     return NextResponse.json({ success: true })
   }
 
