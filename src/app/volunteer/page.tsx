@@ -9,15 +9,16 @@ import {
   MessageSquare,
   AlertTriangle,
   Calendar,
-  Building2,
   HeartHandshake,
   Users,
   Sparkles,
 } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { companiesMatch } from '@/lib/corporate'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { ServingTeams } from '@/components/donor/ServingTeams'
+import { CorporateVolunteering } from '@/components/volunteer/CorporateVolunteering'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Volunteer — Lighthouse Care' }
@@ -61,6 +62,24 @@ export default async function VolunteerTabPage() {
   const firstName = vp?.firstName ?? user.name?.split(' ')[0] ?? 'there'
   const company = corporate?.donorCompany ?? null
 
+  // Corporate volunteering history for this supporter's company (matched by name).
+  const corpSessions = company
+    ? (
+        await prisma.corporateVolunteerSession.findMany({
+          orderBy: { date: 'desc' },
+          select: { id: true, companyName: true, date: true, timeLabel: true, teamSize: true, source: true },
+        })
+      )
+        .filter((s) => companiesMatch(s.companyName, company))
+        .map((s) => ({
+          id: s.id,
+          date: s.date ? s.date.toISOString() : null,
+          timeLabel: s.timeLabel,
+          teamSize: s.teamSize,
+          source: s.source,
+        }))
+    : []
+
   // Church members can join serving teams (distinct from Care volunteering).
   const servingTeams = user.isChurchMember
     ? await prisma.servingTeam.findMany({
@@ -93,17 +112,6 @@ export default async function VolunteerTabPage() {
         take: 3,
       })
     : []
-
-  const corporateMailto =
-    'mailto:volunteer@lighthousecare.org.au' +
-    '?subject=' +
-    encodeURIComponent('Corporate volunteer day enquiry') +
-    '&body=' +
-    encodeURIComponent(
-      `Hi Lighthouse Care team,\n\nWe'd love to bring our team along for a corporate volunteer day` +
-        (company ? ` (${company})` : '') +
-        `.\n\nRough team size:\nPreferred dates:\n\nThanks!`
-    )
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
@@ -254,29 +262,10 @@ export default async function VolunteerTabPage() {
           </>
         )}
 
-        {/* ── Corporate volunteer days — shown to anyone who gave with a company ── */}
+        {/* ── Corporate volunteering — shown to anyone who gave with a company ── */}
         {company && (
           <section className="mt-8">
-            <div className="flex flex-col items-start justify-between gap-5 rounded-[28px] bg-neutral-950 p-8 text-white sm:flex-row sm:items-center">
-              <div className="flex items-start gap-4">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10">
-                  <Building2 className="h-6 w-6" />
-                </span>
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight">Bring your team, {company}</h2>
-                  <p className="mt-1.5 text-neutral-300">
-                    Corporate volunteer days are a brilliant way to give back together — we&rsquo;ll host your team for a
-                    morning of packing and connecting with the community.
-                  </p>
-                </div>
-              </div>
-              <a
-                href={corporateMailto}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600"
-              >
-                Enquire <ArrowRight className="h-4 w-4" />
-              </a>
-            </div>
+            <CorporateVolunteering companyName={company} sessions={corpSessions} />
           </section>
         )}
       </div>

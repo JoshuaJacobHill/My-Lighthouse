@@ -985,3 +985,23 @@ model WebhookEvent {
   @@index([provider])
   @@index([processedAt])
 }
+
+// A company's corporate volunteering session (past or logged). Matched to a
+// supporter by their company name (see companyKey). Times/team sizes are free
+// text because real rosters are messy ("TBC", "15+ 4 from council").
+model CorporateVolunteerSession {
+  id           String    @id @default(cuid())
+  companyName  String
+  companyKey   String // normalised companyName, for matching
+  date         DateTime?
+  timeLabel    String?
+  teamSize     String?
+  contactName  String?
+  contactEmail String?
+  notes        String?   @db.Text
+  source       String? // e.g. "Christmas Blitz 2025"
+  createdById  String? // user who manually added it (null = imported)
+  createdAt    DateTime  @default(now())
+
+  @@index([companyKey])
+}
