@@ -60,7 +60,7 @@ export default async function ResumeGivingPage({ params }: { params: Promise<{ t
             This giving has already been re-confirmed — thank you. You can manage it any time from your account.
           </p>
           <Link
-            href="/donor"
+            href="/dashboard"
             className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
           >
             Go to my portal

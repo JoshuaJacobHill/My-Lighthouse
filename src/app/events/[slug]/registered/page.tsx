@@ -114,7 +114,7 @@ export default async function RegisteredPage({
         )}
 
         <div className="mt-8 text-center">
-          <Link href="/donor" className="text-sm font-medium text-orange-600 hover:text-orange-700">
+          <Link href="/dashboard" className="text-sm font-medium text-orange-600 hover:text-orange-700">
             Go to my account →
           </Link>
         </div>

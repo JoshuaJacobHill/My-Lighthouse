@@ -86,7 +86,7 @@ export async function completeDonorAccountAction(input: CompleteAccountInput): P
     const session = await createSession(user.id)
     await setSessionCookie(session)
 
-    return { success: true, redirectTo: '/donor' }
+    return { success: true, redirectTo: '/dashboard' }
   } catch (err) {
     console.error('completeDonorAccountAction failed', err)
     return { success: false, error: 'Could not complete your account. Please try again.' }
@@ -132,8 +132,8 @@ export async function updateDonorAccountAction(input: UpdateDonorAccountInput): 
         consentEmailUpdates: Boolean(consentEmailUpdates),
       },
     })
-    revalidatePath('/donor/account')
-    revalidatePath('/donor')
+    revalidatePath('/dashboard/account')
+    revalidatePath('/dashboard')
     return { success: true }
   } catch (err) {
     console.error('updateDonorAccountAction failed', err)

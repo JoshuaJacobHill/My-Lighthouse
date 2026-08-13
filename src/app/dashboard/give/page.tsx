@@ -107,7 +107,7 @@ export default async function GiveHubPage() {
           <div className="flex flex-col gap-3">
             {hasGifts && (
               <Link
-                href="/donor/giving"
+                href="/dashboard/giving"
                 className="flex items-center justify-between rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
               >
                 <span className="font-semibold">Giving &amp; receipts</span>
@@ -116,7 +116,7 @@ export default async function GiveHubPage() {
             )}
             {hasActiveRecurring && (
               <Link
-                href="/donor/recurring"
+                href="/dashboard/recurring"
                 className="flex items-center justify-between rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
               >
                 <span className="inline-flex items-center gap-2 font-semibold">
@@ -127,7 +127,7 @@ export default async function GiveHubPage() {
             )}
             {tithePlan && (
               <Link
-                href="/donor/tithes"
+                href="/dashboard/tithes"
                 className="flex items-center justify-between rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
               >
                 <span className="inline-flex items-center gap-2">

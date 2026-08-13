@@ -136,8 +136,8 @@ export async function updateTitheAmountAction(
       { items: [{ id: item.id, price: price.id }], proration_behavior: 'none' },
       opts
     )
-    revalidatePath('/donor/tithes')
-    revalidatePath('/donor')
+    revalidatePath('/dashboard/tithes')
+    revalidatePath('/dashboard')
     return { success: true }
   } catch (err) {
     console.error('updateTitheAmountAction', err)

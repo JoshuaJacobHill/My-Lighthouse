@@ -133,13 +133,13 @@ export async function cancelMyRecurringGift(
 
     // Already cancelled — nothing to do (avoid a Stripe error on re-cancel).
     if (sub.status === 'canceled') {
-      revalidatePath('/donor/recurring')
+      revalidatePath('/dashboard/recurring')
       return { success: true }
     }
 
     await stripe.subscriptions.cancel(subscriptionId, {}, opts)
-    revalidatePath('/donor/recurring')
-    revalidatePath('/donor')
+    revalidatePath('/dashboard/recurring')
+    revalidatePath('/dashboard')
     return { success: true }
   } catch (err) {
     console.error('cancelMyRecurringGift', err)

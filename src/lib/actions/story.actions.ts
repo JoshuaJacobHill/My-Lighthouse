@@ -41,7 +41,7 @@ async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
 
 function revalidate() {
   revalidatePath('/admin/stories')
-  revalidatePath('/donor')
+  revalidatePath('/dashboard')
 }
 
 export async function createStoryAction(input: StoryInput): Promise<ActionResult> {

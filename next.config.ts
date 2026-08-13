@@ -38,6 +38,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // The portal dashboard moved from /donor to /dashboard — keep old links,
+  // bookmarks and any previously-sent emails working.
+  async redirects() {
+    return [
+      { source: "/donor", destination: "/dashboard", permanent: true },
+      { source: "/donor/:path*", destination: "/dashboard/:path*", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

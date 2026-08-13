@@ -60,7 +60,7 @@ export default async function GivingHistoryPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
       <Link
-        href="/donor"
+        href="/dashboard"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
       >
         <ArrowLeft className="h-4 w-4" /> Back to dashboard
@@ -69,7 +69,7 @@ export default async function GivingHistoryPage() {
       <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900">My giving</h1>
       <p className="mt-1.5 text-gray-500">Every gift on your account, with receipts.</p>
       <Link
-        href="/donor/recurring"
+        href="/dashboard/recurring"
         className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:text-orange-700"
       >
         <Repeat className="h-4 w-4" /> Manage recurring giving
@@ -143,7 +143,7 @@ export default async function GivingHistoryPage() {
                       <td className="px-5 py-3 text-right">
                         {g.taxReceiptEligible ? (
                           <Link
-                            href={`/donor/receipts/${g.id}`}
+                            href={`/dashboard/receipts/${g.id}`}
                             className="inline-flex items-center gap-1 font-medium text-orange-600 hover:text-orange-700"
                           >
                             <Download className="h-3.5 w-3.5" /> View

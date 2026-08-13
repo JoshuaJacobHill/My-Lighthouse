@@ -78,7 +78,7 @@ export function GiveAgainFlow({
           {/* Back */}
           <button
             type="button"
-            onClick={() => router.push('/donor')}
+            onClick={() => router.push('/dashboard')}
             aria-label="Back"
             className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-neutral-900 shadow-sm transition-transform active:scale-95"
           >
@@ -89,7 +89,7 @@ export function GiveAgainFlow({
           <div className="mt-10">
             {specificFund && <p className="text-sm font-semibold text-orange-100">Giving to {fundName}</p>}
             <p className="text-lg font-extrabold tracking-tight">Giving as {userName}</p>
-            <Link href="/donor/account" className="text-sm font-medium text-orange-100 underline underline-offset-2">
+            <Link href="/dashboard/account" className="text-sm font-medium text-orange-100 underline underline-offset-2">
               Not you? Change
             </Link>
           </div>

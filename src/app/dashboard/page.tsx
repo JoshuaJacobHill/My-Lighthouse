@@ -96,7 +96,7 @@ export default async function DonorHomePage() {
         <section className="mb-14 space-y-5">
           {tithePlan && (
             <Link
-              href="/donor/tithes"
+              href="/dashboard/tithes"
               className="flex items-center justify-between gap-4 rounded-[28px] bg-neutral-950 p-7 text-white transition-transform active:scale-[0.99]"
             >
               <div>
@@ -113,7 +113,7 @@ export default async function DonorHomePage() {
           )}
 
           <Link
-            href="/donor/give"
+            href="/dashboard/give"
             className="flex items-center justify-between gap-4 rounded-[28px] bg-orange-500 p-7 text-white transition-transform active:scale-[0.99]"
           >
             <div>
@@ -212,7 +212,7 @@ export default async function DonorHomePage() {
             <Heart className="mx-auto h-8 w-8 text-orange-400" />
             <p className="mt-3 text-neutral-600">Good news stories will appear here soon.</p>
             <Link
-              href="/donor/give"
+              href="/dashboard/give"
               className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
             >
               Make a gift <ArrowUpRight className="h-4 w-4" />

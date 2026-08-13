@@ -45,7 +45,7 @@ export default async function ReceiptPage({
     <div className="mx-auto max-w-2xl px-6 py-10">
       <div className="mb-6 flex items-center justify-between print:hidden">
         <Link
-          href="/donor"
+          href="/dashboard"
           className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-orange-600"
         >
           <ArrowLeft className="h-4 w-4" /> Back to my giving

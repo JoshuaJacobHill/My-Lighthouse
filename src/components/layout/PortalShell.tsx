@@ -52,9 +52,9 @@ export function PortalShell({
   const displayName = userName || 'Friend'
 
   const items: NavItem[] = [
-    { href: '/donor', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
     { href: '/give/again', label: 'Give', icon: Heart },
-    ...(hasGiven ? [{ href: '/donor/giving', label: 'My giving', icon: Receipt }] : []),
+    ...(hasGiven ? [{ href: '/dashboard/giving', label: 'My giving', icon: Receipt }] : []),
     ...(isVolunteer
       ? [
           { href: '/volunteer/shifts', label: 'My shifts', icon: Calendar },
@@ -63,7 +63,7 @@ export function PortalShell({
       : []),
     isVolunteer
       ? { href: '/volunteer/profile', label: 'My profile', icon: User }
-      : { href: '/donor/account', label: 'My account', icon: User },
+      : { href: '/dashboard/account', label: 'My account', icon: User },
   ]
 
   const roleLabel =
@@ -79,17 +79,17 @@ export function PortalShell({
     item.exact ? pathname === item.href : pathname.startsWith(item.href)
 
   // Mobile bottom-tab destinations (same for everyone; content adapts).
-  const accountHref = isVolunteer ? '/volunteer/profile' : '/donor/account'
-  const onAccount = pathname.startsWith('/donor/account') || pathname.startsWith('/volunteer/profile')
+  const accountHref = isVolunteer ? '/volunteer/profile' : '/dashboard/account'
+  const onAccount = pathname.startsWith('/dashboard/account') || pathname.startsWith('/volunteer/profile')
   const tabs = [
-    { href: '/donor', label: 'Home', icon: LayoutDashboard, active: pathname === '/donor' },
+    { href: '/dashboard', label: 'Home', icon: LayoutDashboard, active: pathname === '/dashboard' },
     {
       href: '/volunteer',
       label: 'Volunteer',
       icon: HandHeart,
       active: pathname.startsWith('/volunteer') && !pathname.startsWith('/volunteer/profile'),
     },
-    { href: '/donor/give', label: 'Give', icon: Heart, active: pathname === '/donor/give' || pathname.startsWith('/give') },
+    { href: '/dashboard/give', label: 'Give', icon: Heart, active: pathname === '/dashboard/give' || pathname.startsWith('/give') },
     { href: accountHref, label: 'Account', icon: User, active: onAccount },
   ]
 
