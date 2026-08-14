@@ -54,7 +54,7 @@ export async function sendTicketConfirmationEmailForOrder(orderId: string): Prom
   const { subject, html, text } = await renderTemplate('TICKET_CONFIRMATION', {
     first_name: firstName,
     event_name: order.event.title,
-    when: formatDateTime(order.event.startsAt),
+    when: order.event.startsAt ? formatDateTime(order.event.startsAt) : 'To be advised',
     where: order.event.venue ? `<strong>Where:</strong> ${order.event.venue}<br>` : '',
     paid: total > 0 ? `<strong>Paid:</strong> ${aud.format(total)}` : '<strong>Free registration</strong>',
     tickets: ticketsTable,

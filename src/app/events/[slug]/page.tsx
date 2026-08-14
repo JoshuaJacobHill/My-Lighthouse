@@ -133,14 +133,12 @@ export default async function EventPage({
               </span>
               <p className="text-sm font-semibold text-gray-900">{formatEventWhen(event.startsAt, event.endsAt)}</p>
             </div>
-            {event.venue && (
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
-                  <MapPin className="h-5 w-5" />
-                </span>
-                <p className="text-sm font-semibold text-gray-900">{event.venue}</p>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                <MapPin className="h-5 w-5" />
+              </span>
+              <p className="text-sm font-semibold text-gray-900">{event.venue || 'Location to be advised'}</p>
+            </div>
           </div>
           <hr className="mt-6 border-gray-200" />
         </div>

@@ -851,7 +851,7 @@ model Event {
   description String    @db.Text
   imageUrl    String?
   venue       String?
-  startsAt    DateTime
+  startsAt    DateTime? // null = date To Be Advised (e.g. collecting sponsors early)
   endsAt      DateTime?
   fundId      String?
   capacity    Int?

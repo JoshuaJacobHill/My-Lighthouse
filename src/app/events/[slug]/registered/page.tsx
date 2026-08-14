@@ -79,7 +79,7 @@ export default async function RegisteredPage({
             <div className="mt-6 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
               <p className="font-semibold text-gray-900">{order.event.title}</p>
               <p className="mt-1 inline-flex items-center gap-1.5">
-                <CalendarDays className="h-4 w-4 text-orange-500" /> {formatDateTime(order.event.startsAt)}
+                <CalendarDays className="h-4 w-4 text-orange-500" /> {order.event.startsAt ? formatDateTime(order.event.startsAt) : 'Date to be advised'}
               </p>
               {order.event.venue && (
                 <p className="mt-1 inline-flex items-center gap-1.5">

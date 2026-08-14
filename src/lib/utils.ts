@@ -93,7 +93,8 @@ export function formatTime(date: Date | string): string {
  * Brisbane day, shows one date with a time range (e.g. "16/08/2026 9:00 am – 11:15 am");
  * otherwise shows the full start and end. With no end, just the start.
  */
-export function formatEventWhen(start: Date | string, end?: Date | string | null): string {
+export function formatEventWhen(start?: Date | string | null, end?: Date | string | null): string {
+  if (!start) return 'Date to be advised'
   if (!end) return formatDateTime(start)
   if (formatDate(start) === formatDate(end)) {
     return `${formatDateTime(start)} – ${formatTime(end)}`

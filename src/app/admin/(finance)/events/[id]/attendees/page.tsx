@@ -99,7 +99,7 @@ export default async function AttendeesPage({
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Attendees</h1>
             <p className="mt-0.5 text-sm text-gray-500">
-              {event.title} · {formatDateTime(event.startsAt)}
+              {event.title} · {event.startsAt ? formatDateTime(event.startsAt) : 'TBA'}
               {event.venue ? ` · ${event.venue}` : ''}
             </p>
           </div>

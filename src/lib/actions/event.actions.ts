@@ -68,8 +68,7 @@ export async function createEventAction(input: EventInput): Promise<ActionResult
   }
   const data = parsed.data
 
-  const startsAt = toEventDate(data.startsAt)
-  if (!startsAt) return { success: false, error: 'Start date and time is invalid' }
+  const startsAt = toEventDate(data.startsAt) // null = date To Be Advised
 
   try {
     const slug = await uniqueSlug(data.slug ? slugify(data.slug) : slugify(data.title))
@@ -127,8 +126,7 @@ export async function updateEventAction(
   }
   const data = parsed.data
 
-  const startsAt = toEventDate(data.startsAt)
-  if (!startsAt) return { success: false, error: 'Start date and time is invalid' }
+  const startsAt = toEventDate(data.startsAt) // null = date To Be Advised
 
   try {
     const existing = await prisma.event.findUnique({

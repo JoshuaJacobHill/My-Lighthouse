@@ -297,7 +297,7 @@ export const eventSchema = z.object({
   description: z.string().trim().min(1, 'Please add a description'),
   imageUrl: optionalTrimmed,
   venue: optionalTrimmed,
-  startsAt: z.string().min(1, 'Start date and time is required'),
+  startsAt: optionalTrimmed, // blank = date To Be Advised
   endsAt: optionalTrimmed,
   capacity: optInt('Capacity must be at least 1', 1), // null = unlimited
   fundId: optionalTrimmed,

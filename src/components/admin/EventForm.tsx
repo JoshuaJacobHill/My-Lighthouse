@@ -144,7 +144,7 @@ export function EventForm({
           hint="Optional. Shown as a banner at the top of the event page."
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Venue" name="venue" defaultValue={event?.venue} placeholder="Optional" />
+          <Input label="Venue" name="venue" defaultValue={event?.venue} placeholder="Leave blank if the location is still TBA" />
           <div className="flex flex-col gap-1">
             <label htmlFor="fundId" className="text-sm font-medium text-gray-700">Allocate proceeds to fund</label>
             <select
@@ -161,7 +161,7 @@ export function EventForm({
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Input label="Starts" name="startsAt" type="datetime-local" required defaultValue={event?.startsAt} />
+          <Input label="Starts" name="startsAt" type="datetime-local" defaultValue={event?.startsAt} hint="Leave blank if the date is still TBA." />
           <Input label="Ends" name="endsAt" type="datetime-local" defaultValue={event?.endsAt} hint="Optional" />
           <Input label="Overall capacity" name="capacity" type="number" min="1" step="1" defaultValue={event?.capacity} placeholder="Unlimited" />
         </div>

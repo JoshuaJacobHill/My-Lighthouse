@@ -71,7 +71,7 @@ export default async function EventsPage() {
                     </div>
                     {ev.venue && <p className="mt-0.5 text-xs text-gray-400">{ev.venue}</p>}
                   </td>
-                  <td className="px-5 py-3 text-gray-600">{formatDateTime(ev.startsAt)}</td>
+                  <td className="px-5 py-3 text-gray-600">{ev.startsAt ? formatDateTime(ev.startsAt) : 'TBA'}</td>
                   <td className="px-5 py-3 text-center tabular-nums text-gray-600">{ev._count.ticketTypes}</td>
                   <td className="px-5 py-3 text-center tabular-nums text-gray-600">{ev._count.orders}</td>
                   <td className="px-5 py-3">

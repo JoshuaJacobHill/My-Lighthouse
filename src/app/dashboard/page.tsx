@@ -64,13 +64,20 @@ export default async function DonorHomePage() {
 
   // Upcoming events (church members also see church-only ones).
   const events = await prisma.event.findMany({
-    where: { isPublished: true, startsAt: { gte: new Date() }, ...(user.isChurchMember ? {} : { churchOnly: false }) },
+    // Upcoming (dated in the future) OR date-still-TBA events.
+    where: {
+      isPublished: true,
+      OR: [{ startsAt: { gte: new Date() } }, { startsAt: null }],
+      ...(user.isChurchMember ? {} : { churchOnly: false }),
+    },
     orderBy: { startsAt: 'asc' },
     take: 4,
     select: { id: true, slug: true, title: true, venue: true, startsAt: true },
   })
-  const fmtEvent = (d: Date) =>
-    d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Australia/Brisbane' })
+  const fmtEvent = (d: Date | null) =>
+    d
+      ? d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Australia/Brisbane' })
+      : 'Date TBA'
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
