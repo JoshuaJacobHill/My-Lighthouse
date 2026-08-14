@@ -324,11 +324,14 @@ async function finalizeDonation(params: {
   // required to give; best-effort so it can't fail the webhook.
   try {
     if (!user) {
-      const existing = await prisma.user.findFirst({
-        where: { email: { equals: donorEmail, mode: 'insensitive' } },
+      // Recognise the donor by the email on their donation — if they already
+      // have a set-up account (a password), don't invite them to create one,
+      // even when they donated while logged out.
+      const account = await prisma.user.findFirst({
+        where: { email: { equals: donorEmail, mode: 'insensitive' }, passwordHash: { not: null } },
         select: { id: true },
       })
-      if (!existing) {
+      if (!account) {
         const token = await createAccountSetupToken(donorEmail)
         if (isTithe) {
           await sendTitheAccountSetupEmail({ to: donorEmail, name: donorName, token })
