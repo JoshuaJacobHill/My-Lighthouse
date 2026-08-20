@@ -8,7 +8,12 @@ const inter = Inter({
   display: 'swap',
 })
 
+const OG_IMAGE = 'https://lighthousecare.org.au/wp-content/uploads/2026/08/Introducing-MyLighthouse-Banner.jpg'
+const SHARE_DESCRIPTION =
+  'Give, volunteer and stay connected with Lighthouse Care — affordable groceries and food relief for families across South East Queensland.'
+
 export const metadata: Metadata = {
+  metadataBase: new URL('https://my.lighthousecare.org.au'),
   title: {
     default: 'My Lighthouse Portal',
     template: '%s | Lighthouse Care',
@@ -24,8 +29,18 @@ export const metadata: Metadata = {
   },
   openGraph: {
     siteName: 'My Lighthouse Portal',
+    title: 'My Lighthouse Portal',
+    description: SHARE_DESCRIPTION,
+    url: 'https://my.lighthousecare.org.au',
     locale: 'en_AU',
     type: 'website',
+    images: [{ url: OG_IMAGE, width: 1920, height: 885, alt: 'Introducing the My Lighthouse Portal' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'My Lighthouse Portal',
+    description: SHARE_DESCRIPTION,
+    images: [OG_IMAGE],
   },
 }
 

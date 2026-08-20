@@ -16,7 +16,6 @@ import { stripePromiseFor } from '@/lib/stripe-public'
 
 // Fallback amounts when a fund hasn't configured its own ($25 = a full Trolley).
 const DEFAULT_PRESETS = [25, 50, 100, 250]
-const DEFAULT_SUGGESTED = 25
 
 type AccountKey = 'CARE' | 'CHURCH'
 type Frequency = 'once' | 'weekly' | 'fortnightly' | 'monthly'
@@ -38,7 +37,6 @@ export function DonateForm({
   initialName,
   initialEmail,
   presets,
-  suggested,
   impactLabels,
   defaultFrequency,
   isTithe,
@@ -62,7 +60,6 @@ export function DonateForm({
   showMessage?: boolean
 }) {
   const ladder = presets && presets.length ? presets : DEFAULT_PRESETS
-  const suggestedAmount = suggested ?? DEFAULT_SUGGESTED
   const initialFrequency = (['once', 'weekly', 'fortnightly', 'monthly'] as const).includes(
     (defaultFrequency ?? '') as Frequency
   )
@@ -149,16 +146,11 @@ export function DonateForm({
                 onClick={() => setAmountText(String(p))}
                 aria-pressed={active}
                 className={
-                  'relative rounded-2xl border-2 py-4 text-lg font-bold transition-colors ' +
+                  'rounded-2xl border-2 py-4 text-lg font-bold transition-colors ' +
                   (active ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-neutral-200 text-neutral-900 hover:border-orange-300')
                 }
               >
                 ${p}
-                {p === suggestedAmount && (
-                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                    Suggested
-                  </span>
-                )}
               </button>
             )
           })}
