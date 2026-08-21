@@ -127,7 +127,7 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-8 text-center text-sm text-gray-500">
-        New volunteer?{' '}
+        New here?{' '}
         <Link href="/signup" className="font-medium text-orange-500 hover:underline">
           Sign up here &rarr;
         </Link>

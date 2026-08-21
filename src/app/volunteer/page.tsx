@@ -234,7 +234,7 @@ export default async function VolunteerTabPage() {
                 no one in our community faces hard times alone.
               </p>
               <Link
-                href="/signup"
+                href="/volunteer/apply"
                 className="mt-6 inline-flex items-center gap-2 rounded-full bg-neutral-950 px-6 py-3.5 text-base font-bold text-white transition-transform active:scale-[0.98]"
               >
                 Sign up to volunteer <ArrowRight className="h-5 w-5" />

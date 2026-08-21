@@ -11,6 +11,7 @@ import {
   destroySession,
   setSessionCookie,
   clearSessionCookie,
+  getSession,
 } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
@@ -225,6 +226,16 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
     consentSmsUpdates: formData.get('consentSmsUpdates') === 'true' || formData.get('consentSmsUpdates') === 'on',
   }
 
+  // An already signed-in supporter (e.g. a donor adding volunteering from their
+  // dashboard) doesn't set a password here — they already have one. Satisfy the
+  // shared schema with a throwaway value; it is never written for these users.
+  const session = await getSession()
+  if (session) {
+    const placeholder = `already-signed-in-${session.userId}`
+    raw.password = placeholder
+    raw.confirmPassword = placeholder
+  }
+
   const parsed = volunteerSignupSchema.safeParse(raw)
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {}
@@ -244,11 +255,16 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
     // point them to sign in / reset their password. A passwordless row (e.g. a
     // donor we created to attach past giving) is fine to upgrade into a full
     // account in place, so those supporters aren't blocked from signing up.
-    const existing = await prisma.user.findUnique({
-      where: { email: data.email.toLowerCase() },
-      select: { id: true, passwordHash: true },
-    })
-    if (existing?.passwordHash) {
+    const existing = session
+      ? await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, passwordHash: true } })
+      : await prisma.user.findUnique({
+          where: { email: data.email.toLowerCase() },
+          select: { id: true, passwordHash: true },
+        })
+    // Only block when an *anonymous* visitor tries to re-use an email that is
+    // already a full account. A signed-in supporter is simply adding a
+    // volunteer profile to the account they're already using.
+    if (!session && existing?.passwordHash) {
       return {
         success: false,
         error: 'This email has already been used. Please sign in, or reset your password if you’ve forgotten it.',
@@ -256,7 +272,18 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
       }
     }
 
-    const passwordHash = await hashPassword(data.password)
+    // Already has a volunteer profile? Nothing to create.
+    if (existing) {
+      const alreadyVolunteer = await prisma.volunteerProfile.findUnique({
+        where: { userId: existing.id },
+        select: { id: true },
+      })
+      if (alreadyVolunteer) {
+        return { success: false, error: 'You already have a volunteer profile on this account.' }
+      }
+    }
+
+    const passwordHash = session ? null : await hashPassword(data.password)
 
     // Shared volunteer-profile payload for both the create and upgrade paths.
     const volunteerProfileCreate = {
@@ -302,9 +329,10 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         return tx.user.update({
           where: { id: existing.id },
           data: {
-            passwordHash,
+            // Never overwrite an existing password, and never demote an admin
+            // who is simply adding a volunteer profile to their own account.
+            ...(passwordHash ? { passwordHash, role: 'VOLUNTEER' } : {}),
             name: `${data.firstName} ${data.lastName}`,
-            role: 'VOLUNTEER',
             volunteerProfile: volunteerProfileCreate,
           },
         })

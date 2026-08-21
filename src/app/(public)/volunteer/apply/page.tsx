@@ -30,5 +30,5 @@ export default async function SignupPage() {
     }
   }
 
-  return <SignupClient prefill={prefill} />
+  return <SignupClient prefill={prefill} isLoggedIn={Boolean(session)} />
 }

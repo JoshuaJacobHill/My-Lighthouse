@@ -260,7 +260,7 @@ export default function TermsPage() {
           {/* Back to signup */}
           <p className="text-sm text-gray-500">
             Ready to join?{' '}
-            <Link href="/signup" className="text-orange-500 font-medium hover:underline">
+            <Link href="/volunteer/apply" className="text-orange-500 font-medium hover:underline">
               Sign up as a volunteer
             </Link>
             {' '}or review our{' '}

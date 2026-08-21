@@ -9,7 +9,8 @@ import Image from 'next/image'
 
 const navLinks = [
   { href: '/', label: 'Home' },
-  { href: '/signup', label: 'Volunteer Sign Up' },
+  { href: '/volunteer/apply', label: 'Volunteer' },
+  { href: '/signup', label: 'Sign Up' },
   { href: '/login', label: 'Sign In' },
 ]
 

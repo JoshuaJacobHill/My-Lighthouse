@@ -44,6 +44,10 @@ const nextConfig: NextConfig = {
     return [
       { source: "/donor", destination: "/dashboard", permanent: true },
       { source: "/donor/:path*", destination: "/dashboard/:path*", permanent: true },
+      // /signup is now the universal account sign-up; the volunteer application
+      // lives at /volunteer/apply. /activate was the short-lived earlier name.
+      { source: "/activate", destination: "/signup", permanent: true },
+      { source: "/volunteer-signup", destination: "/volunteer/apply", permanent: true },
     ];
   },
 };

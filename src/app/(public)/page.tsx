@@ -120,7 +120,7 @@ export default function PublicHomePage() {
             Join the Lighthouse Care volunteer family and help us provide affordable food to families across South East Queensland.
           </p>
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/signup">
+            <Link href="/volunteer/apply">
               <Button size="lg" className="bg-white text-orange-600 hover:bg-orange-50 focus-visible:ring-white w-full sm:w-auto">
                 Sign Up to Volunteer
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -300,7 +300,7 @@ export default function PublicHomePage() {
             to families doing it tough across South East Queensland.
           </p>
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/signup">
+            <Link href="/volunteer/apply">
               <Button size="lg" className="bg-white text-orange-600 hover:bg-orange-50 focus-visible:ring-white w-full sm:w-auto">
                 Sign Up to Volunteer
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />

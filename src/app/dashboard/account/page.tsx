@@ -109,7 +109,7 @@ export default async function DonorAccountPage() {
             </div>
           </div>
           <Link
-            href="/signup"
+            href="/volunteer/apply"
             className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
           >
             Sign up to volunteer <ArrowRight className="h-4 w-4" />

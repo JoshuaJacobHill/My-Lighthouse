@@ -595,14 +595,17 @@ function Step4({
   data,
   onChange,
   errors,
+  isLoggedIn,
 }: {
   data: FormData
   onChange: (patch: Partial<FormData>) => void
   errors: Record<string, string>
+  isLoggedIn?: boolean
 }) {
   return (
     <div className="space-y-6">
-      <div>
+      {/* Already signed in? They have a password — don't ask again. */}
+      <div className={isLoggedIn ? 'hidden' : undefined} aria-hidden={isLoggedIn}>
         <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
           Create your account password
         </h3>
@@ -714,7 +717,13 @@ function Step4({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function SignupClient({ prefill }: { prefill?: SignupPrefill }) {
+export default function SignupClient({
+  prefill,
+  isLoggedIn,
+}: {
+  prefill?: SignupPrefill
+  isLoggedIn?: boolean
+}) {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>({ ...INITIAL_FORM, ...prefill })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -759,9 +768,11 @@ export default function SignupClient({ prefill }: { prefill?: SignupPrefill }) {
     }
 
     if (s === 4) {
-      if (!formData.password) errs.password = 'Password is required'
-      else if (formData.password.length < 8) errs.password = 'Password must be at least 8 characters'
-      if (formData.confirmPassword !== formData.password) errs.confirmPassword = 'Passwords do not match'
+      if (!isLoggedIn) {
+        if (!formData.password) errs.password = 'Password is required'
+        else if (formData.password.length < 8) errs.password = 'Password must be at least 8 characters'
+        if (formData.confirmPassword !== formData.password) errs.confirmPassword = 'Passwords do not match'
+      }
       if (!formData.agreedToTerms) errs.agreedToTerms = 'You must agree to the terms and conditions'
       if (!formData.agreedToPrivacy) errs.agreedToPrivacy = 'You must agree to the privacy policy'
       if (!formData.agreedToInduction) errs.agreedToInduction = 'Please acknowledge the induction requirement'
@@ -930,7 +941,7 @@ export default function SignupClient({ prefill }: { prefill?: SignupPrefill }) {
               {step === 1 && <Step1 data={formData} onChange={patch} errors={errors} />}
               {step === 2 && <Step2 data={formData} onChange={patch} errors={errors} />}
               {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} />}
-              {step === 4 && <Step4 data={formData} onChange={patch} errors={errors} />}
+              {step === 4 && <Step4 data={formData} onChange={patch} errors={errors} isLoggedIn={isLoggedIn} />}
 
               {globalError && (
                 <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700" role="alert">
