@@ -12,6 +12,12 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value
 
+  // The volunteer application is public — anyone can apply without an account
+  // (signed-in supporters get the password step skipped instead).
+  if (pathname.startsWith('/volunteer/apply')) {
+    return NextResponse.next()
+  }
+
   // Volunteer portal routes — must be authenticated
   if (pathname.startsWith('/volunteer')) {
     if (!sessionToken) {
