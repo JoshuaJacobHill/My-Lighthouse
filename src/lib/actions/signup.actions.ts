@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
-import { hashPassword, createSession, setSessionCookie, createPasswordResetToken } from '@/lib/auth'
+import { hashPassword, createSession, setSessionCookie } from '@/lib/auth'
 import { createAccountSetupToken } from '@/lib/account-setup'
 import { sendAccountSetupEmail } from '@/lib/donation-emails'
 import { sendEmail } from '@/lib/email'
@@ -32,7 +32,7 @@ export type CheckSignupEmailInput = z.input<typeof emailSchema>
  */
 export async function checkSignupEmailAction(
   input: CheckSignupEmailInput
-): Promise<{ success: boolean; mode?: 'link_sent' | 'new'; error?: string }> {
+): Promise<{ success: boolean; mode?: 'existing_account' | 'link_sent' | 'new'; error?: string }> {
   const parsed = emailSchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Please enter a valid email address.' }
@@ -54,26 +54,10 @@ export async function checkSignupEmailAction(
       prisma.donation.count({ where: { donorEmail: { equals: email, mode: 'insensitive' } } }),
     ])
 
-    // Already set up → send a sign-in / reset link.
+    // Already set up → tell them on screen so they can just sign in. Sending an
+    // email here would leave them waiting for something they don't need.
     if (user?.passwordHash && user.isActive) {
-      const token = await createPasswordResetToken(user.id, 48)
-      const firstName = user.name?.trim().split(/\s+/)[0] || 'there'
-      await sendEmail({
-        to: email,
-        subject: 'You already have a My Lighthouse account',
-        html: wrapEmailHtml(
-          `
-          <p style="${P}">Hi ${firstName},</p>
-          <p style="${P}">Good news — you already have a My Lighthouse Portal account for this email address, so there&rsquo;s nothing to set up.</p>
-          <p style="margin:24px 0;"><a href="${APP_URL}/login" style="${BTN}">Sign in to my portal &rarr;</a></p>
-          <p style="${P}">Forgotten your password? <a href="${APP_URL}/set-password?token=${token}" style="color:${ORANGE};font-weight:600;">Choose a new one here</a> (valid for 48 hours).</p>
-          <p style="${P};margin-bottom:0;">With thanks,<br>The Lighthouse Care team</p>
-        `,
-          APP_URL
-        ),
-        text: `Hi ${firstName},\n\nYou already have a My Lighthouse Portal account for this email address.\n\nSign in: ${APP_URL}/login\n\nForgotten your password? ${APP_URL}/set-password?token=${token} (valid 48 hours)\n\nWith thanks,\nThe Lighthouse Care team`,
-      })
-      return { success: true, mode: 'link_sent' }
+      return { success: true, mode: 'existing_account' }
     }
 
     // Has history (giving, or a record we created for them) → email a setup link

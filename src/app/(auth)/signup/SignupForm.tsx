@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, AlertCircle, Check, MailCheck, ArrowLeft } from 'lucide-react'
+import { Loader2, AlertCircle, Check, MailCheck, ArrowLeft, UserCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { checkSignupEmailAction, createAccountAction } from '@/lib/actions/signup.actions'
@@ -15,7 +15,7 @@ const PERKS = [
   'Hear about events and appeals first',
 ]
 
-type Step = 'email' | 'link_sent' | 'details'
+type Step = 'email' | 'existing_account' | 'link_sent' | 'details'
 
 export function SignupForm() {
   const router = useRouter()
@@ -33,7 +33,9 @@ export function SignupForm() {
     startTransition(async () => {
       const res = await checkSignupEmailAction({ email })
       if (!res.success) return setError(res.error ?? 'Something went wrong. Please try again.')
-      setStep(res.mode === 'new' ? 'details' : 'link_sent')
+      if (res.mode === 'new') setStep('details')
+      else if (res.mode === 'existing_account') setStep('existing_account')
+      else setStep('link_sent')
     })
   }
 
@@ -48,7 +50,41 @@ export function SignupForm() {
     })
   }
 
-  // ── We've emailed them a link (existing supporter or existing account) ──
+  // ── They already have a full account — just point them at signing in ──
+  if (step === 'existing_account') {
+    return (
+      <div>
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-6 py-8 text-center">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 text-white">
+            <UserCheck className="h-6 w-6" />
+          </span>
+          <h1 className="mt-4 text-xl font-bold text-gray-900">You already have an account</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            <strong>{email}</strong> is already set up. Sign in to pick up where you left off.
+          </p>
+          <Link
+            href="/login"
+            className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600"
+          >
+            Sign in
+          </Link>
+          <p className="mt-4 text-sm text-gray-500">
+            Forgotten your password?{' '}
+            <Link href="/forgot-password" className="font-semibold text-orange-500 hover:underline">
+              Reset it here
+            </Link>
+          </p>
+        </div>
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <button type="button" onClick={() => setStep('email')} className="font-medium text-orange-500 hover:underline">
+            &larr; Use a different email
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── We've emailed them a link (existing supporter, no password yet) ──
   if (step === 'link_sent') {
     return (
       <div>
