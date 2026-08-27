@@ -46,15 +46,18 @@ export const defaultTemplates: Record<
     html: wrap(`
       <p style="${P}">Hi {{first_name}},</p>
       <p style="${P}">Thank you so much for signing up to volunteer with Lighthouse Care! We&rsquo;re really glad you&rsquo;re joining us — your time genuinely makes a difference to families doing it tough across South East Queensland.</p>
-      <p style="${P}">Your appointment to meet with our volunteer coordinator is confirmed for:</p>
+      <p style="${P}">Your <strong>volunteer induction appointment</strong> is confirmed for:</p>
       ${shiftTable()}
+      <p style="${P}">Your volunteer induction is a chance to meet the Lighthouse Care team, learn more about who we are and the work we do, and get everything ready for you to begin volunteering.</p>
+      <p style="${P}">During the appointment, we&rsquo;ll walk you through our volunteer opportunities, workplace expectations, safety procedures and answer any questions you may have. We&rsquo;ll also discuss where your skills, interests and availability might best fit within Lighthouse Care.</p>
+      <p style="${P}"><strong>When you arrive, ask to speak with the volunteer coordinator.</strong></p>
       <p style="${P}">We&rsquo;ve attached a calendar invite to help you remember. If this time doesn&rsquo;t suit you, our volunteer coordinator will be in touch to arrange a revised time — so no need to worry if something comes up.</p>
       <p style="${P}">In the meantime, you can get a head start by completing your online induction through the volunteer portal. It only takes 15–20 minutes and covers everything you need to know before your first shift.</p>
       ${btn('{{portal_link}}', 'Start My Induction &rarr;')}
       <p style="${P}">If you have any questions at all, don&rsquo;t hesitate to reach out — we&rsquo;re here to help.</p>
       <p style="${P};margin-bottom:0;">We look forward to meeting you!<br><br>Warm regards,<br>The {{organisation_name}} Team</p>
     `),
-    text: `Hi {{first_name}},\n\nThank you so much for signing up to volunteer with Lighthouse Care! We're really glad you're joining us.\n\nYour appointment to meet with our volunteer coordinator is confirmed for:\nDate: {{shift_date}}\nTime: {{shift_time}}\nLocation: {{location}}\n\nWe've attached a calendar invite to help you remember. If this time doesn't suit you, our volunteer coordinator will be in touch to arrange a revised time.\n\nIn the meantime, you can complete your online induction at: {{portal_link}}\n\nWe look forward to meeting you!\n\nWarm regards,\nThe {{organisation_name}} Team`,
+    text: `Hi {{first_name}},\n\nThank you so much for signing up to volunteer with Lighthouse Care! We're really glad you're joining us.\n\nYour volunteer induction appointment is confirmed for:\nDate: {{shift_date}}\nTime: {{shift_time}}\nLocation: {{location}}\n\nYour volunteer induction is a chance to meet the Lighthouse Care team, learn more about who we are and the work we do, and get everything ready for you to begin volunteering.\n\nDuring the appointment, we'll walk you through our volunteer opportunities, workplace expectations, safety procedures and answer any questions you may have. We'll also discuss where your skills, interests and availability might best fit within Lighthouse Care.\n\nWhen you arrive, ask to speak with the volunteer coordinator.\n\nWe've attached a calendar invite to help you remember. If this time doesn't suit you, our volunteer coordinator will be in touch to arrange a revised time.\n\nIn the meantime, you can complete your online induction at: {{portal_link}}\n\nWe look forward to meeting you!\n\nWarm regards,\nThe {{organisation_name}} Team`,
   },
 
   INDUCTION_REMINDER: {

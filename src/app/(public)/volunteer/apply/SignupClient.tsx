@@ -408,10 +408,19 @@ function Step3({
       {/* First visit section */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-1">
-          Your first visit
+          Volunteer Induction Appointment
         </h3>
-        <p className="text-sm text-gray-600 mb-4">
-          When would you like to come in for your first visit? Our volunteer coordinator will meet with you to get you settled in.
+        <p className="text-sm text-gray-600 mb-3">
+          Your volunteer induction is a chance to meet the Lighthouse Care team, learn more about who we are and the
+          work we do, and get everything ready for you to begin volunteering.
+        </p>
+        <p className="text-sm text-gray-600 mb-3">
+          During the appointment, we&rsquo;ll walk you through our volunteer opportunities, workplace expectations,
+          safety procedures and answer any questions you may have. We&rsquo;ll also discuss where your skills,
+          interests and availability might best fit within Lighthouse Care.
+        </p>
+        <p className="text-sm font-medium text-gray-700 mb-4">
+          When you arrive, ask to speak with the volunteer coordinator.
         </p>
 
         <div className="space-y-4">

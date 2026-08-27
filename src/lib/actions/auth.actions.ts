@@ -397,7 +397,7 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
           summary: `Volunteer First Visit — ${storeName} Lighthouse Care`,
           description: [
             `Welcome to Lighthouse Care Volunteers, ${data.firstName}!`,
-            `Your coordinator will meet you at the ${storeName} store.`,
+            `Your volunteer induction — meet the Lighthouse Care team, hear about volunteer opportunities, workplace expectations and safety procedures.\nWhen you arrive, ask to speak with the volunteer coordinator.\nLocation: ${storeName} store.`,
             ``,
             `Volunteer: ${data.firstName} ${data.lastName}`,
             `Email: ${data.email}`,
