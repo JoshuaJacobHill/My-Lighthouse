@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ImageUpload } from '@/components/admin/ImageUpload'
 import { createEventAction, updateEventAction } from '@/lib/actions/event.actions'
 import type { EventInput } from '@/lib/validations'
 
@@ -51,6 +52,7 @@ export function EventForm({
   const isEdit = Boolean(event?.id)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [imageUrl, setImageUrl] = React.useState(event?.imageUrl ?? '')
   const [isPublished, setIsPublished] = React.useState(event?.isPublished ?? false)
   const [churchOnly, setChurchOnly] = React.useState(event?.churchOnly ?? false)
   const [allowVolunteers, setAllowVolunteers] = React.useState(event?.allowVolunteers ?? false)
@@ -80,7 +82,7 @@ export function EventForm({
       title: (fd.get('title') as string) ?? '',
       slug: (fd.get('slug') as string) ?? '',
       description: (fd.get('description') as string) ?? '',
-      imageUrl: (fd.get('imageUrl') as string) ?? '',
+      imageUrl,
       venue: (fd.get('venue') as string) ?? '',
       startsAt: (fd.get('startsAt') as string) ?? '',
       endsAt: (fd.get('endsAt') as string) ?? '',
@@ -136,12 +138,12 @@ export function EventForm({
           defaultValue={event?.description}
           hint="Supports Markdown — **bold**, ## headings, - lists, and [links](https://…)."
         />
-        <Input
-          label="Feature image URL"
-          name="imageUrl"
-          defaultValue={event?.imageUrl}
-          placeholder="https://…"
-          hint="Optional. Shown as a banner at the top of the event page."
+        <ImageUpload
+          label="Feature image"
+          value={imageUrl}
+          onChange={setImageUrl}
+          folder="events"
+          hint="Shown as a banner at the top of the event page. Drag an image here or click to choose — JPG, PNG, WebP or AVIF, up to 5 MB."
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Venue" name="venue" defaultValue={event?.venue} placeholder="Leave blank if the location is still TBA" />

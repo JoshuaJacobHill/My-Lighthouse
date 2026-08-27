@@ -6,6 +6,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // Hosts we serve images from, so next/image can optimise (resize + WebP/AVIF)
+  // rather than shipping full-size originals.
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' },
+      { protocol: 'https', hostname: 'lighthousecare.org.au' },
+      { protocol: 'https', hostname: 'www.lighthousecare.org.au' },
+    ],
+  },
   // Security headers
   async headers() {
     const commonHeaders = [
