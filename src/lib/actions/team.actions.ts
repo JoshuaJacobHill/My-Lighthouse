@@ -89,3 +89,25 @@ export async function setChurchMemberAction(userId: string, isChurchMember: bool
   revalidatePath(`/admin/users/${userId}`)
   return { success: true }
 }
+
+export async function setStaffAction(userId: string, isStaff: boolean): Promise<Result> {
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+  await prisma.user.update({ where: { id: userId }, data: { isStaff } })
+  revalidatePath(`/admin/users/${userId}`)
+  return { success: true }
+}
+
+export async function setTraineeAction(userId: string, isTrainee: boolean): Promise<Result> {
+  try {
+    await requireAdmin()
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+  await prisma.user.update({ where: { id: userId }, data: { isTrainee } })
+  revalidatePath(`/admin/users/${userId}`)
+  return { success: true }
+}

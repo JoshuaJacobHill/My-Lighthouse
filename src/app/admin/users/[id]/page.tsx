@@ -20,6 +20,7 @@ import { formatDate } from '@/lib/utils'
 import { getDonationsAccess } from '@/lib/permissions'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
 import { listRecurringForEmail } from '@/lib/admin-recurring'
+import { StaffToggles } from '@/components/admin/StaffToggles'
 import { ChurchMemberToggle } from '@/components/admin/ChurchMemberToggle'
 
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,8 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
       role: true,
       isActive: true,
       isChurchMember: true,
+      isStaff: true,
+      isTrainee: true,
       createdAt: true,
       lastLoginAt: true,
       volunteerProfile: {
@@ -114,14 +117,25 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                 Church member
               </span>
             )}
+            {user.isStaff && (
+              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                Staff
+              </span>
+            )}
+            {user.isTrainee && (
+              <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                Trainee
+              </span>
+            )}
             {!user.isActive && (
               <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
                 Inactive
               </span>
             )}
           </div>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             <ChurchMemberToggle userId={user.id} initial={user.isChurchMember} />
+            <StaffToggles userId={user.id} isStaff={user.isStaff} isTrainee={user.isTrainee} />
           </div>
         </div>
       </div>

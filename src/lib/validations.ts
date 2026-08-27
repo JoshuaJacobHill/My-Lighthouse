@@ -254,6 +254,7 @@ export const storySchema = z.object({
   externalUrl: optionalTrimmed,
   isPublished: z.boolean().optional().default(false),
   churchOnly: z.boolean().optional().default(false),
+  staffOnly: z.boolean().optional().default(false),
   sortOrder: z
     .union([z.string(), z.number()])
     .optional()

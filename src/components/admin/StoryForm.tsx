@@ -19,6 +19,7 @@ export interface StoryFormValues {
   externalUrl: string | null
   isPublished: boolean
   churchOnly: boolean
+  staffOnly: boolean
   sortOrder: number
 }
 
@@ -44,6 +45,7 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
       externalUrl: String(fd.get('externalUrl') ?? ''),
       isPublished: fd.get('isPublished') === 'on',
       churchOnly: fd.get('churchOnly') === 'on',
+      staffOnly: fd.get('staffOnly') === 'on',
       sortOrder: String(fd.get('sortOrder') ?? '0'),
     }
     const res = story ? await updateStoryAction(story.id, input) : await createStoryAction(input)
@@ -125,6 +127,16 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
           className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
         />
         <span className="text-sm font-medium text-gray-700">Church only (only church members see this)</span>
+      </label>
+
+      <label className="flex items-center gap-2.5">
+        <input
+          type="checkbox"
+          name="staffOnly"
+          defaultChecked={story?.staffOnly ?? false}
+          className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+        />
+        <span className="text-sm font-medium text-gray-700">Staff only (only staff &amp; trainees see this)</span>
       </label>
 
       <div className="flex items-center gap-3 pt-2">

@@ -124,6 +124,13 @@ model User {
   // Church member — sees church-only news, events & serving teams (in addition
   // to all Lighthouse Care content). Auto-set when they tithe; admin-toggleable.
   isChurchMember Boolean @default(false)
+  // Staff member — an employee. Sees staff-only news, tasks, checklists and the
+  // staff wellbeing/fitness challenges. A flag rather than a role, because staff
+  // are usually volunteers and/or donors too and must keep those capabilities.
+  isStaff        Boolean @default(false)
+  // Trainee — supported employment/traineeship. Sees their hours, achievements,
+  // required tasks and training modules, and can be assigned tasks with staff.
+  isTrainee      Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
@@ -701,6 +708,8 @@ model Story {
   isPublished Boolean   @default(false)
   // When true, only church members see this story.
   churchOnly  Boolean   @default(false)
+  // Staff-only update — visible to staff/trainees, hidden from everyone else.
+  staffOnly   Boolean   @default(false)
   publishedAt DateTime?
   sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())
