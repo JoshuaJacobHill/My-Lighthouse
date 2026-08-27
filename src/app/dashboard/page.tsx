@@ -1,7 +1,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, ArrowUpRight, Heart, HandHeart, CalendarDays, MapPin } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Heart, HandHeart, CalendarDays, MapPin, ExternalLink } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
@@ -59,6 +59,13 @@ export default async function DonorHomePage() {
   // Church members see church-only stories, staff/trainees see staff-only ones;
   // everyone else sees the public ones.
   const isStaffOrTrainee = user.isStaff || user.isTrainee
+
+  // Payroll deliberately stays in Employment Hero — we link out rather than pull
+  // payslips into this portal. Configurable at Admin → Settings → General.
+  const ehSetting = isStaffOrTrainee
+    ? await prisma.appSetting.findUnique({ where: { key: 'employment_hero_url' }, select: { value: true } })
+    : null
+  const employmentHeroUrl = ehSetting?.value?.trim() || 'https://secure.employmenthero.com'
   const stories = await prisma.story.findMany({
     where: {
       isPublished: true,
@@ -177,6 +184,36 @@ export default async function DonorHomePage() {
             </div>
           </Link>
         </section>
+
+        {/* Staff shortcuts */}
+        {isStaffOrTrainee && (
+          <section className="mb-14 grid gap-4 sm:grid-cols-2">
+            <Link
+              href="/dashboard/tasks"
+              className="group flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Staff</p>
+                <p className="mt-1 text-lg font-bold tracking-tight">Tasks &amp; checklists</p>
+                <p className="mt-0.5 text-sm text-neutral-500">What&rsquo;s on today</p>
+              </div>
+              <ArrowRight className="h-5 w-5 shrink-0 text-neutral-400" />
+            </Link>
+            <a
+              href={employmentHeroUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Staff</p>
+                <p className="mt-1 text-lg font-bold tracking-tight">Payslips &amp; leave</p>
+                <p className="mt-0.5 text-sm text-neutral-500">Opens Employment Hero</p>
+              </div>
+              <ExternalLink className="h-5 w-5 shrink-0 text-neutral-400" />
+            </a>
+          </section>
+        )}
 
         {/* Upcoming events */}
         {events.length > 0 && (

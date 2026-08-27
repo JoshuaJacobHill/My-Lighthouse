@@ -331,6 +331,14 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             helpText="Shown on the left of the sign-in screen. Paste an image URL (e.g. from your website's media library). Leave blank for the default."
           />
           <SettingField
+            label="Employment Hero URL"
+            settingKey="employment_hero_url"
+            value={values.employment_hero_url ?? 'https://secure.employmenthero.com'}
+            onChange={update}
+            placeholder="https://secure.employmenthero.com"
+            helpText="Staff see a 'Payslips & leave' shortcut to this on their dashboard. We deliberately link out rather than pull payroll data into this portal."
+          />
+          <SettingField
             label="Loganholme Coordinator Email"
             settingKey="loganholme_coordinator_email"
             type="email"
