@@ -12,8 +12,9 @@ const P = 'margin:0 0 16px 0;line-height:1.7;color:#374151;font-size:15px;'
 
 // ─── GET /api/cron/task-reminders ─────────────────────────────────────────────
 //
-// Chases anything past its hard deadline: overdue assigned tasks go to the person
-// they belong to, overdue checklist items go to every staff member. Fails CLOSED
+// Runs once a day at 5pm Brisbane (Hobby plan allows daily crons only). Chases
+// anything past its hard deadline: overdue assigned tasks go to the person they
+// belong to, overdue checklist items go to every staff member. Fails CLOSED
 // (valid CRON_SECRET, or an admin session for a manual run).
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
