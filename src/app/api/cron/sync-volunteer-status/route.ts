@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 
@@ -34,10 +35,21 @@ const THREE_MONTHS_AGO = () => {
 }
 
 export async function GET(request: NextRequest) {
+  // Allow: Vercel cron (CRON_SECRET bearer token) OR a logged-in admin.
+  // NOTE: this deliberately fails CLOSED. The previous check was
+  // `if (cronSecret && ...)`, which skipped auth entirely whenever CRON_SECRET
+  // was unset — leaving this endpoint publicly callable, able to flip volunteer
+  // statuses and send check-in emails to every eligible volunteer.
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const hasValidSecret = Boolean(cronSecret) && authHeader === `Bearer ${cronSecret}`
+
+  if (!hasValidSecret) {
+    const session = await getSession()
+    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN'
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    }
   }
 
   const cutoff = THREE_MONTHS_AGO()

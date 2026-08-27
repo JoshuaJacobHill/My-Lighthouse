@@ -1,10 +1,11 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { eventSchema, type EventInput } from '@/lib/validations'
 import { normaliseWebsiteUrl } from '@/lib/sponsor-tiers'
+import { EVENTS_TAG } from '@/lib/event-data'
 
 interface ActionResult {
   success: boolean
@@ -192,6 +193,8 @@ export async function updateEventAction(
       ),
     ])
 
+    updateTag(EVENTS_TAG)
+
     return { success: true, eventId }
   } catch (err) {
     console.error('updateEventAction failed', err)
@@ -212,6 +215,7 @@ export async function toggleEventPublishedAction(
   }
   try {
     await prisma.event.update({ where: { id: eventId }, data: { isPublished } })
+    updateTag(EVENTS_TAG)
     return { success: true, eventId }
   } catch (err) {
     console.error('toggleEventPublishedAction failed', err)
@@ -257,6 +261,7 @@ export async function addOfflineSponsorAction(input: {
       paid: true,
     },
   })
+  updateTag(EVENTS_TAG)
   revalidatePath(`/events/${event.slug}`)
   revalidatePath(`/admin/events/${input.eventId}/attendees`)
   return { success: true }
@@ -298,6 +303,7 @@ export async function updateEventSponsorAction(input: {
       logoUrl: input.logoUrl?.trim() || null,
     },
   })
+  updateTag(EVENTS_TAG)
   if (sp.event?.slug) revalidatePath(`/events/${sp.event.slug}`)
   revalidatePath(`/admin/events/${sp.eventId}/edit`)
   return { success: true }
@@ -314,6 +320,7 @@ export async function removeEventSponsorAction(id: string): Promise<ActionResult
     select: { eventId: true, event: { select: { slug: true } } },
   })
   await prisma.eventSponsor.delete({ where: { id } }).catch(() => {})
+  updateTag(EVENTS_TAG)
   if (sp?.event?.slug) revalidatePath(`/events/${sp.event.slug}`)
   if (sp?.eventId) revalidatePath(`/admin/events/${sp.eventId}/attendees`)
   return { success: true }

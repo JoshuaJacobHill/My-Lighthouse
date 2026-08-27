@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
+import { revalidateTag } from 'next/cache'
 import prisma from '@/lib/prisma'
+import { EVENTS_TAG } from '@/lib/event-data'
 import { configuredWebhookSecrets, getStripeFor } from '@/lib/stripe-accounts'
 import {
   sendDonationReceiptEmail,
@@ -282,6 +284,8 @@ async function finalizeDonation(params: {
       if (sp.userId && sp.logoUrl) {
         await prisma.user.update({ where: { id: sp.userId }, data: { imageUrl: sp.logoUrl } }).catch(() => {})
       }
+      // A newly paid sponsor must show on the public event page straight away.
+      revalidateTag(EVENTS_TAG, 'max')
     } catch (err) {
       console.error('event sponsor finalize failed', err)
     }

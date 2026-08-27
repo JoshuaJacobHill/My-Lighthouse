@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { getEventAvailability } from '@/lib/tickets'
+import { getCachedEvent, getCachedEventSponsors, getCachedEventVolunteerCount } from '@/lib/event-data'
 import { formatEventWhen } from '@/lib/utils'
 import { RegistrationForm, type TicketTypeOption } from './RegistrationForm'
 import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
@@ -37,34 +38,14 @@ export default async function EventPage({
   const { slug } = await params
   const { cancelled } = await searchParams
 
-  const event = await prisma.event.findFirst({
-    where: { slug, isPublished: true },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      imageUrl: true,
-      venue: true,
-      startsAt: true,
-      endsAt: true,
-      capacity: true,
-      churchOnly: true,
-      allowVolunteers: true,
-      volunteerCapacity: true,
-      allowDonations: true,
-      allowSponsors: true,
-      fund: { select: { slug: true, name: true } },
-      ticketTypes: {
-        orderBy: { sortOrder: 'asc' },
-        select: { id: true, name: true, price: true, quantityAvailable: true, maxPerOrder: true },
-      },
-    },
-  })
+  // The event read is cached (identical for everyone); the session lookup is
+  // per-viewer. Run them together rather than one after the other — every DB
+  // round-trip crosses Sydney→Tokyo.
+  const [event, session] = await Promise.all([getCachedEvent(slug), getSession()])
   if (!event) notFound()
 
   // Who's viewing? Signed-in supporters keep the portal shell (nav) wrapped
   // around the event; anonymous visitors get the standalone public page.
-  const session = await getSession()
   const viewer = session
     ? await prisma.user.findUnique({
         where: { id: session.userId },
@@ -81,7 +62,12 @@ export default async function EventPage({
   // Church-only events are hidden from everyone but church members.
   if (event.churchOnly && !viewer?.isChurchMember) notFound()
 
-  const availability = await getEventAvailability(event.id)
+  // Availability is deliberately uncached — a stale count could oversell.
+  const [availability, volunteerCount, sponsors] = await Promise.all([
+    getEventAvailability(event.id),
+    event.allowVolunteers ? getCachedEventVolunteerCount(event.id) : Promise.resolve(0),
+    event.allowSponsors ? getCachedEventSponsors(event.id) : Promise.resolve([]),
+  ])
   const overallRemaining =
     availability.capacity == null ? null : Math.max(0, availability.capacity - availability.totalSold)
 
@@ -101,18 +87,6 @@ export default async function EventPage({
   })
 
   const soldOut = overallRemaining === 0 || options.every((o) => o.max === 0)
-
-  // Optional sections (Good Food Festival etc.).
-  const [volunteerCount, sponsors] = await Promise.all([
-    event.allowVolunteers ? prisma.eventVolunteer.count({ where: { eventId: event.id } }) : Promise.resolve(0),
-    event.allowSponsors
-      ? prisma.eventSponsor.findMany({
-          where: { eventId: event.id, paid: true },
-          orderBy: [{ tier: 'asc' }, { createdAt: 'asc' }],
-          select: { id: true, businessName: true, logoUrl: true, websiteUrl: true, tier: true },
-        })
-      : Promise.resolve([]),
-  ])
 
   const canDonate = event.allowDonations && event.fund
   const sponsorHref = `/events/${slug}/sponsor`

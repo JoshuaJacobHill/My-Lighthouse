@@ -1,12 +1,13 @@
 'use server'
 
 import { z } from 'zod'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { isStripeConfigured, toCents } from '@/lib/stripe'
 import { getStripeFor, resolveAccount } from '@/lib/stripe-accounts'
 import { SPONSOR_TIERS, normaliseWebsiteUrl } from '@/lib/sponsor-tiers'
+import { EVENTS_TAG } from '@/lib/event-data'
 
 const schema = z.object({
   eventId: z.string().min(1),
@@ -62,6 +63,7 @@ export async function signUpEventVolunteerAction(
     },
   })
 
+  updateTag(EVENTS_TAG)
   revalidatePath(`/events/${event.slug}`)
   return { success: true }
 }
