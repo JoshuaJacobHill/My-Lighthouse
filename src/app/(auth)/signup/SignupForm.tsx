@@ -3,17 +3,10 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, AlertCircle, Check, MailCheck, ArrowLeft, UserCheck } from 'lucide-react'
+import { Loader2, AlertCircle, MailCheck, ArrowLeft, UserCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { checkSignupEmailAction, createAccountAction } from '@/lib/actions/signup.actions'
-
-const PERKS = [
-  'See your giving history and download tax-deductible receipts',
-  'Manage regular giving and update your details securely',
-  'Find volunteering and corporate team days',
-  'Hear about events and appeals first',
-]
 
 type Step = 'email' | 'existing_account' | 'link_sent' | 'details'
 
@@ -199,15 +192,6 @@ export function SignupForm() {
           place.
         </p>
       </div>
-
-      <ul className="mb-7 space-y-2">
-        {PERKS.map((p) => (
-          <li key={p} className="flex items-start gap-2.5 text-sm text-gray-700">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" aria-hidden="true" />
-            <span>{p}</span>
-          </li>
-        ))}
-      </ul>
 
       <form onSubmit={submitEmail} noValidate className="space-y-5">
         <Input
