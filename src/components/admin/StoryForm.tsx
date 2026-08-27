@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { ImageUpload } from '@/components/admin/ImageUpload'
 import { createStoryAction, updateStoryAction } from '@/lib/actions/story.actions'
 import type { StoryInput } from '@/lib/validations'
 
@@ -27,6 +28,7 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
   const router = useRouter()
   const [error, setError] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
+  const [imageUrl, setImageUrl] = React.useState(story?.imageUrl ?? '')
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -38,7 +40,7 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
       slug: String(fd.get('slug') ?? ''),
       category: String(fd.get('category') ?? 'Good news'),
       excerpt: String(fd.get('excerpt') ?? ''),
-      imageUrl: String(fd.get('imageUrl') ?? ''),
+      imageUrl,
       externalUrl: String(fd.get('externalUrl') ?? ''),
       isPublished: fd.get('isPublished') === 'on',
       churchOnly: fd.get('churchOnly') === 'on',
@@ -88,12 +90,12 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
         />
       </div>
 
-      <Input
-        label="Image URL"
-        name="imageUrl"
-        defaultValue={story?.imageUrl ?? ''}
-        placeholder="https://…"
-        hint="Optional. Paste an image URL (e.g. from your website's media library)."
+      <ImageUpload
+        label="Image"
+        value={imageUrl}
+        onChange={setImageUrl}
+        folder="stories"
+        hint="Optional. Shown alongside the story."
       />
       <Input
         label="Link to full article"

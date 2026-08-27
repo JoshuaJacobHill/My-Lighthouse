@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ImageUpload } from '@/components/admin/ImageUpload'
 import { createFundraiserAction, updateFundraiserAction } from '@/lib/actions/fundraiser.actions'
 import type { FundraiserInput } from '@/lib/validations'
 
@@ -34,6 +35,7 @@ export function FundraiserForm({
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [isActive, setIsActive] = React.useState(fundraiser?.isActive ?? true)
+  const [imageUrl, setImageUrl] = React.useState(fundraiser?.imageUrl ?? '')
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -45,7 +47,7 @@ export function FundraiserForm({
       title: (fd.get('title') as string) ?? '',
       slug: (fd.get('slug') as string) ?? '',
       story: (fd.get('story') as string) ?? '',
-      imageUrl: (fd.get('imageUrl') as string) ?? '',
+      imageUrl,
       goalAmount: (fd.get('goalAmount') as string) ?? '',
       organiserName: (fd.get('organiserName') as string) ?? '',
       organiserEmail: (fd.get('organiserEmail') as string) ?? '',
@@ -80,7 +82,7 @@ export function FundraiserForm({
           <Input label="Link slug" name="slug" defaultValue={fundraiser?.slug} placeholder="auto-generated from the title" hint="Used in the public link. Leave blank to auto-generate." />
         </div>
         <Textarea label="Story" name="story" rows={6} required defaultValue={fundraiser?.story} hint="Tell supporters what this fundraiser is about." />
-        <Input label="Header image URL" name="imageUrl" defaultValue={fundraiser?.imageUrl} placeholder="https://… (optional)" hint="Optional banner image shown at the top of the page." />
+        <ImageUpload label="Header image" value={imageUrl} onChange={setImageUrl} folder="fundraisers" hint="Optional banner shown at the top of the fundraiser page." />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Organiser / business name" name="organiserName" required defaultValue={fundraiser?.organiserName} placeholder="e.g. JCK Construction" />
           <Input label="Organiser email" name="organiserEmail" type="email" defaultValue={fundraiser?.organiserEmail} placeholder="Optional" />

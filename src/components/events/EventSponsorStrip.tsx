@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react'
 import { SPONSOR_TIER_ORDER, SPONSOR_TIER_LABEL } from '@/lib/sponsor-tiers'
+import { SmartImage } from '@/components/ui/SmartImage'
 
 type StripSponsor = {
   id: string
@@ -65,8 +66,13 @@ export function EventSponsorStrip({ sponsors }: { sponsors: StripSponsor[] }) {
               const logo = (
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black p-1.5">
                   {s.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.logoUrl} alt={s.businessName} className="max-h-full max-w-full object-contain" />
+                    <SmartImage
+                      src={s.logoUrl}
+                      alt={s.businessName}
+                      width={112}
+                      height={112}
+                      className="max-h-full max-w-full object-contain"
+                    />
                   ) : (
                     <ImageIcon className="h-5 w-5 text-gray-500" />
                   )}

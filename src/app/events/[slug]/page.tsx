@@ -9,6 +9,7 @@ import { formatEventWhen } from '@/lib/utils'
 import { RegistrationForm, type TicketTypeOption } from './RegistrationForm'
 import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
 import { Markdown } from '@/components/ui/Markdown'
+import { SmartImage } from '@/components/ui/SmartImage'
 import { EventSponsorStrip } from '@/components/events/EventSponsorStrip'
 import { SPONSOR_TIER_ORDER, SPONSOR_TIER_HEADING } from '@/lib/sponsor-tiers'
 import { PortalShell } from '@/components/layout/PortalShell'
@@ -119,9 +120,15 @@ export default async function EventPage({
   const content = (
     <div className="mx-auto max-w-2xl">
       {event.imageUrl && (
-          <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={event.imageUrl} alt={event.title} className="aspect-[16/9] w-full object-cover" />
+          <div className="relative mb-6 aspect-[16/9] w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
+            <SmartImage
+              src={event.imageUrl}
+              alt={event.title}
+              fill
+              priority
+              sizes="(max-width: 672px) 100vw, 672px"
+              className="h-full w-full object-cover"
+            />
           </div>
         )}
         <div className="mb-6">
@@ -218,8 +225,13 @@ export default async function EventPage({
                             <>
                               <span className={`flex ${box} shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black p-2`}>
                                 {s.logoUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={s.logoUrl} alt={s.businessName} className="max-h-full max-w-full object-contain" />
+                                  <SmartImage
+                                    src={s.logoUrl}
+                                    alt={s.businessName}
+                                    width={isGold ? 160 : 112}
+                                    height={isGold ? 160 : 112}
+                                    className="max-h-full max-w-full object-contain"
+                                  />
                                 ) : (
                                   <ImageIcon className="h-6 w-6 text-gray-500" />
                                 )}

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ImageUpload } from '@/components/admin/ImageUpload'
 import { createFundAction, updateFundAction } from '@/lib/actions/fund.actions'
 import type { FundInput } from '@/lib/validations'
 
@@ -56,6 +57,7 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [isActive, setIsActive] = React.useState(fund?.isActive ?? EMPTY.isActive)
+  const [imageUrl, setImageUrl] = React.useState(fund?.imageUrl ?? '')
   const [showPublicProgress, setShowPublicProgress] = React.useState(
     fund?.showPublicProgress ?? EMPTY.showPublicProgress
   )
@@ -79,7 +81,7 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
       sortOrder: (fd.get('sortOrder') as string) ?? '0',
       isActive,
       showPublicProgress,
-      imageUrl: (fd.get('imageUrl') as string) ?? '',
+      imageUrl,
       tagline: (fd.get('tagline') as string) ?? '',
       showOnDashboard,
       depositAccount: ((fd.get('depositAccount') as string) ?? 'CARE') as 'CARE' | 'CHURCH',
@@ -206,12 +208,12 @@ export function FundForm({ fund }: { fund?: FundFormValues }) {
             placeholder="e.g. Christmas gifts for kids who’d go without."
             hint="Optional. A short line shown on the appeal card."
           />
-          <Input
-            label="Appeal image URL"
-            name="imageUrl"
-            defaultValue={fund?.imageUrl}
-            placeholder="https://…"
-            hint="Optional. Image shown on the appeal card."
+          <ImageUpload
+            label="Appeal image"
+            value={imageUrl}
+            onChange={setImageUrl}
+            folder="funds"
+            hint="Optional. Shown on the appeal card."
           />
         </div>
 

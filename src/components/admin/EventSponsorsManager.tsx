@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, ImageIcon, Pencil } from 'lucide-react'
+import { ImageUpload } from '@/components/admin/ImageUpload'
 import {
   addOfflineSponsorAction,
   updateEventSponsorAction,
@@ -96,7 +97,9 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
           </select>
           <input className={input} type="number" min="1" step="1" placeholder="Amount (AUD)" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           <input className={input} placeholder="Website (optional, e.g. sponsor.com.au)" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
-          <input className={input} placeholder="Logo image URL (optional)" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
+          <div className="sm:col-span-2">
+            <ImageUpload label="Logo" value={logoUrl} onChange={setLogoUrl} folder="sponsors" hint="Shown on the event page. A transparent PNG looks best on the black tile." />
+          </div>
           <input className={input} placeholder="Contact name (optional)" value={contactName} onChange={(e) => setContactName(e.target.value)} />
           <input className={input} type="email" placeholder="Contact email (optional)" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
           {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
@@ -188,7 +191,7 @@ function SponsorEditRow({
   const [tier, setTier] = React.useState<Tier>(sponsor.tier)
   const [amount, setAmount] = React.useState(String(sponsor.amount))
   const [websiteUrl, setWebsiteUrl] = React.useState(sponsor.websiteUrl ?? '')
-  const [logoUrl, setLogoUrl] = React.useState('')
+  const [logoUrl, setLogoUrl] = React.useState(sponsor.logoUrl ?? '')
   const uploadedLogo = sponsor.logoUrl?.startsWith('data:')
 
   return (
@@ -202,12 +205,19 @@ function SponsorEditRow({
       </select>
       <input className={input} type="number" min="1" step="1" placeholder="Amount (AUD)" value={amount} onChange={(e) => setAmount(e.target.value)} required />
       <input className={input} placeholder="Website (e.g. sponsor.com.au)" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
-      <input
-        className={`${input} sm:col-span-2`}
-        placeholder={uploadedLogo ? 'Replace logo with an image URL (leave blank to keep uploaded logo)' : 'Logo image URL'}
-        value={logoUrl}
-        onChange={(e) => setLogoUrl(e.target.value)}
-      />
+      <div className="sm:col-span-2">
+        <ImageUpload
+          label="Logo"
+          value={logoUrl}
+          onChange={setLogoUrl}
+          folder="sponsors"
+          hint={
+            uploadedLogo
+              ? 'Uploaded by the sponsor at checkout. Replacing it here also re-hosts it properly.'
+              : 'Shown on the event page. A transparent PNG looks best on the black tile.'
+          }
+        />
+      </div>
       <div className="flex items-center gap-2 sm:col-span-2">
         <button
           type="button"

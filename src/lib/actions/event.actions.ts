@@ -286,10 +286,8 @@ export async function updateEventSponsorAction(input: {
   })
   if (!sp) return { success: false, error: 'Sponsor not found' }
 
-  // Only overwrite the logo when a new value is provided — keeps uploaded
-  // (data-URL) logos from being wiped when the field is left blank.
-  const newLogo = input.logoUrl?.trim()
-
+  // The edit form is pre-filled with the current logo, so an empty value here
+  // is a deliberate "remove it" rather than "leave it alone".
   await prisma.eventSponsor.update({
     where: { id: input.id },
     data: {
@@ -297,7 +295,7 @@ export async function updateEventSponsorAction(input: {
       tier: input.tier,
       amount,
       websiteUrl: normaliseWebsiteUrl(input.websiteUrl),
-      ...(newLogo ? { logoUrl: newLogo } : {}),
+      logoUrl: input.logoUrl?.trim() || null,
     },
   })
   if (sp.event?.slug) revalidatePath(`/events/${sp.event.slug}`)
