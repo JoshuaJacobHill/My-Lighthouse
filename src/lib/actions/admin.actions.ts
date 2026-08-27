@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
@@ -831,5 +832,112 @@ export async function adminEditAttendanceAction(
   } catch (err) {
     console.error('[adminEditAttendanceAction]', err)
     return { success: false, error: 'Failed to update attendance record.' }
+  }
+}
+
+// ─── Add a user of any kind ───────────────────────────────────────────────────
+
+export interface CreateUserData extends CreateVolunteerData {
+  /** Which kinds of supporter this person is. Any combination is valid. */
+  asVolunteer?: boolean
+  asStaff?: boolean
+  asChurchMember?: boolean
+  asDonor?: boolean
+  /** Donor record details (used for receipts) when asDonor is set. */
+  phone?: string
+  address?: string
+}
+
+/**
+ * Create a user and set them up as any combination of volunteer, staff, church
+ * member and donor.
+ *
+ * Note on "donor": there's no donor flag — the Donors tab is derived from actual
+ * giving. Ticking Donor creates their donor record (name/phone/address for
+ * receipting); they appear under Donors once a gift is recorded against them.
+ *
+ * Mobile is only required for volunteers, since the volunteer profile needs it.
+ */
+export async function createUserAction(
+  data: CreateUserData
+): Promise<{ success: boolean; userId?: string; error?: string }> {
+  try {
+    await requireAdminSession()
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  const firstName = data.firstName?.trim()
+  const lastName = data.lastName?.trim()
+  const email = data.email?.trim().toLowerCase()
+  if (!firstName || !lastName || !email) {
+    return { success: false, error: 'First name, last name and email are required.' }
+  }
+  if (data.asVolunteer && !data.mobile?.trim()) {
+    return { success: false, error: 'A mobile number is required for volunteers.' }
+  }
+
+  try {
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (existing) {
+      return { success: false, error: 'A user with this email address already exists.' }
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name: `${firstName} ${lastName}`,
+        role: 'VOLUNTEER', // access level; staff/church are flags, not roles
+        isStaff: Boolean(data.asStaff),
+        isChurchMember: Boolean(data.asChurchMember),
+        ...(data.asVolunteer
+          ? {
+              volunteerProfile: {
+                create: {
+                  firstName,
+                  lastName,
+                  email,
+                  mobile: data.mobile!.trim(),
+                  dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+                  addressLine1: data.addressLine1 || undefined,
+                  addressLine2: data.addressLine2 || undefined,
+                  suburb: data.suburb || undefined,
+                  state: data.state || undefined,
+                  postcode: data.postcode || undefined,
+                  emergencyName: data.emergencyName || undefined,
+                  emergencyPhone: data.emergencyPhone || undefined,
+                  emergencyRelation: data.emergencyRelation || undefined,
+                  status: (data.status as VolunteerStatus) ?? 'PENDING_INDUCTION',
+                  notes: data.notes || undefined,
+                  preferredLocations: data.preferredLocations ?? [],
+                  areasOfInterest: data.areasOfInterest ?? [],
+                },
+              },
+            }
+          : {}),
+        ...(data.asDonor
+          ? {
+              donorProfile: {
+                create: {
+                  displayName: `${firstName} ${lastName}`,
+                  phone: data.phone?.trim() || data.mobile?.trim() || undefined,
+                  address: data.address?.trim() || data.addressLine1 || undefined,
+                },
+              },
+            }
+          : {}),
+      },
+      select: { id: true },
+    })
+
+    revalidatePath('/admin/users')
+    revalidatePath('/admin/volunteers')
+    return { success: true, userId: user.id }
+  } catch (err) {
+    console.error('[createUserAction]', err)
+    return { success: false, error: 'Could not create the user. Please try again.' }
   }
 }

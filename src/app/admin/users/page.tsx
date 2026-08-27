@@ -188,10 +188,10 @@ export default async function UsersPage({
           </p>
         </div>
         <Link
-          href="/admin/volunteers/new"
+          href="/admin/users/new"
           className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
         >
-          <UserPlus className="h-4 w-4" /> Add volunteer
+          <UserPlus className="h-4 w-4" /> Add user
         </Link>
       </div>
 
