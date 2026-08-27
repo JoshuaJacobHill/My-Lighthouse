@@ -149,6 +149,9 @@ model User {
   ticketOrders TicketOrder[]
   teamInterests TeamInterest[]
   fitnessEntries FitnessEntry[]
+  tasksAssigned  StaffTask[]           @relation("TaskAssignee")
+  tasksCreated   StaffTask[]           @relation("TaskAssigner")
+  checklistDone  ChecklistCompletion[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -291,6 +294,8 @@ model Location {
   attendance        AttendanceRecord[]
   guestAttendance   GuestAttendanceRecord[]
   recurringBookings RecurringBooking[]
+  staffTasks        StaffTask[]
+  checklistItems    ChecklistItem[]
 }
 
 model Department {
@@ -1091,4 +1096,92 @@ model ShiftFeedback {
 
   @@index([volunteerId])
   @@index([rating])
+}
+
+// ─── Staff tasks & recurring checklists ───────────────────────────────────────
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+// A one-off job assigned to a staff member or trainee ("take the cardboard bins
+// out for the truck"). Assignment emails the person; overdue ones are chased.
+model StaffTask {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?      @db.Text
+  status       TaskStatus   @default(OPEN)
+  priority     TaskPriority @default(NORMAL)
+  dueAt        DateTime?
+  locationId   String?
+  assignedToId String? // null = anyone on shift can pick it up
+  assignedById String
+  completedAt  DateTime?
+  completedById String?
+  remindedAt   DateTime? // last overdue chase, so we nag once a day at most
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assignedTo User?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedBy User      @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([assignedToId])
+  @@index([dueAt])
+}
+
+enum ChecklistFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+// The *definition* of a recurring cleaning/maintenance job. Occurrences aren't
+// pre-generated: each period is identified by a computed key (see periodKey in
+// src/lib/checklists.ts), so a missing completion row means "not done yet".
+model ChecklistItem {
+  id          String             @id @default(cuid())
+  title       String
+  description String?            @db.Text
+  frequency   ChecklistFrequency @default(DAILY)
+  locationId  String? // null = applies everywhere
+  // Hard deadline inside the period — "HH:MM" Brisbane. Past this, it's overdue.
+  dueTime     String?
+  // WEEKLY: 1 = Monday … 7 = Sunday. MONTHLY: day of month.
+  weekday     Int?
+  dayOfMonth  Int?
+  sortOrder   Int                @default(0)
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+
+  location    Location?             @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  completions ChecklistCompletion[]
+
+  @@index([isActive])
+  @@index([frequency])
+}
+
+model ChecklistCompletion {
+  id            String   @id @default(cuid())
+  itemId        String
+  // Identifies the occurrence: "2026-09-03" daily, "2026-W36" weekly, "2026-09" monthly.
+  periodKey     String
+  completedById String
+  completedAt   DateTime @default(now())
+  note          String?  @db.Text
+
+  item        ChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  completedBy User          @relation(fields: [completedById], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, periodKey])
+  @@index([periodKey])
 }
