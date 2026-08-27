@@ -148,6 +148,7 @@ model User {
   sponsorships Sponsorship[]
   ticketOrders TicketOrder[]
   teamInterests TeamInterest[]
+  fitnessEntries FitnessEntry[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -228,6 +229,7 @@ model VolunteerProfile {
   inductionProgress InductionProgress[]
   shiftAssignments  ShiftAssignment[]
   recurringBookings RecurringBooking[]
+  shiftFeedback     ShiftFeedback[]
   attendanceRecords AttendanceRecord[]
   adminNotes        AdminNote[]
   emailLogs         EmailLog[]
@@ -1017,4 +1019,76 @@ model CorporateVolunteerSession {
   createdAt    DateTime  @default(now())
 
   @@index([companyKey])
+}
+
+// ─── Staff wellbeing / fitness challenges ─────────────────────────────────────
+//
+// A collective, staff-only challenge (e.g. "10 million steps in September").
+// Steps are entered by hand: device sync would mean per-provider OAuth, and
+// Apple Health has no server API at all — not worth the complexity here.
+model FitnessChallenge {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  unit      String   @default("steps")
+  goal      Int // collective target, e.g. 10,000,000
+  startsAt  DateTime
+  endsAt    DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  entries FitnessEntry[]
+
+  @@index([isActive])
+}
+
+// One row per person per day, so re-entering a day corrects it rather than
+// double-counting.
+model FitnessEntry {
+  id          String   @id @default(cuid())
+  challengeId String
+  userId      String
+  day         DateTime @db.Date
+  amount      Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  challenge FitnessChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId, day])
+  @@index([challengeId])
+  @@index([userId])
+}
+
+// Rotating encouragement shown to staff — one per day, cycled by date.
+model WellbeingTip {
+  id        String   @id @default(cuid())
+  body      String   @db.Text
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([isActive])
+}
+
+// ─── Post-shift feedback ──────────────────────────────────────────────────────
+//
+// After a volunteer signs out we email them a one-tap 5-star rating. The row is
+// created at sign-out with no rating yet; the emailed links carry an unguessable
+// token, so nobody can rate on someone else's behalf or enumerate shifts.
+model ShiftFeedback {
+  id           String    @id @default(cuid())
+  token        String    @unique
+  volunteerId  String
+  attendanceId String?   @unique
+  rating       Int? // 1–5
+  comment      String?   @db.Text
+  ratedAt      DateTime?
+  createdAt    DateTime  @default(now())
+
+  volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@index([volunteerId])
+  @@index([rating])
 }

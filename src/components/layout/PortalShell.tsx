@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Footprints,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Avatar } from '@/components/ui/avatar'
@@ -28,6 +29,8 @@ interface NavItem {
 export interface PortalCapabilities {
   isVolunteer: boolean
   hasGiven: boolean
+  /** Staff or trainee — unlocks the internal staff area. */
+  isStaff?: boolean
   // Future: isPartner (corporate) adds its own items + dashboard section.
 }
 
@@ -41,6 +44,7 @@ export function PortalShell({
   userName,
   isVolunteer,
   hasGiven,
+  isStaff,
 }: {
   children: React.ReactNode
   userName: string
@@ -61,6 +65,7 @@ export function PortalShell({
           { href: '/volunteer/availability', label: 'My availability', icon: Clock },
         ]
       : []),
+    ...(isStaff ? [{ href: '/dashboard/fitness', label: 'Staff fitness', icon: Footprints }] : []),
     isVolunteer
       ? { href: '/volunteer/profile', label: 'My profile', icon: User }
       : { href: '/dashboard/account', label: 'My account', icon: User },

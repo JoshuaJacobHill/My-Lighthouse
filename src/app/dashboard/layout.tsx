@@ -20,6 +20,8 @@ export default async function DonorLayout({ children }: { children: React.ReactN
       name: true,
       email: true,
       role: true,
+      isStaff: true,
+      isTrainee: true,
       volunteerProfile: { select: { id: true } },
       _count: { select: { donations: true } },
     },
@@ -35,6 +37,7 @@ export default async function DonorLayout({ children }: { children: React.ReactN
       userName={user.name ?? 'Friend'}
       isVolunteer={Boolean(user.volunteerProfile)}
       hasGiven={(user._count.donations ?? 0) > 0}
+      isStaff={user.isStaff || user.isTrainee}
     >
       {children}
     </PortalShell>

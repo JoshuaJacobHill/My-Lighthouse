@@ -1,6 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import { sendShiftFeedbackEmail } from '@/lib/shift-feedback'
 import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
@@ -228,6 +229,18 @@ export async function kioskSignOutAction(attendanceRecordId: string): Promise<
     const mins = durationMins % 60
     const durationLabel =
       hours === 0 ? `${mins}m` : mins === 0 ? `${hours}h` : `${hours}h ${mins}m`
+
+    // Thank them and ask for a one-tap rating. Best-effort — a mail failure must
+    // never stop someone signing out at the kiosk.
+    try {
+      await sendShiftFeedbackEmail({
+        volunteerId: record.volunteerId,
+        attendanceId: record.id,
+        durationLabel,
+      })
+    } catch (err) {
+      console.error('shift feedback email failed', err)
+    }
 
     return { success: true, durationMins, durationLabel }
   } catch (err) {

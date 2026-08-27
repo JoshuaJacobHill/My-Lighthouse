@@ -19,6 +19,7 @@ import {
   Receipt,
   ArrowLeftRight,
   Mail,
+  Star,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -48,6 +49,7 @@ const navItems: NavItem[] = [
   { href: '/admin/teams', label: 'Serving Teams', icon: Church },
   { href: '/admin/transactions', label: 'Transactions', icon: Receipt, finance: true },
   { href: '/admin/migrations', label: 'Donor Migration', icon: ArrowLeftRight, finance: true },
+  { href: '/admin/feedback', label: 'Volunteer Feedback', icon: Star },
   { href: '/admin/emails', label: 'Emails', icon: Mail },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
