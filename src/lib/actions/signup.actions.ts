@@ -113,21 +113,21 @@ export async function createAccountAction(
       where: { email: { equals: email, mode: 'insensitive' } },
       select: { id: true, passwordHash: true },
     })
-    if (existing?.passwordHash) {
+    // SECURITY: step one routes any known email to an emailed link, so reaching
+    // here with an existing record means the UI was bypassed (server actions are
+    // directly callable). Refuse regardless of whether a password is set —
+    // otherwise a passwordless donor row could be claimed by anyone.
+    if (existing) {
       return { success: false, error: 'This email has already been used. Please sign in, or reset your password.' }
     }
 
+    // Only ever creates. Claiming an existing row is refused above, so there is
+    // no update path here that could take one over.
     const passwordHash = await hashPassword(password)
-    const user = existing
-      ? await prisma.user.update({
-          where: { id: existing.id },
-          data: { passwordHash, name, company: company?.trim() || null },
-          select: { id: true },
-        })
-      : await prisma.user.create({
-          data: { email, passwordHash, name, company: company?.trim() || null, role: 'VOLUNTEER' },
-          select: { id: true },
-        })
+    const user = await prisma.user.create({
+      data: { email, passwordHash, name, company: company?.trim() || null, role: 'VOLUNTEER' },
+      select: { id: true },
+    })
 
     await prisma.donorProfile.upsert({
       where: { userId: user.id },

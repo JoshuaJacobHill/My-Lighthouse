@@ -271,11 +271,18 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
     // Only block when an *anonymous* visitor tries to re-use an email that is
     // already a full account. A signed-in supporter is simply adding a
     // volunteer profile to the account they're already using.
-    if (!session && existing?.passwordHash) {
+    // SECURITY: an anonymous caller must never be able to set a password on an
+    // email we already hold a record for. Doing so would hand them that row —
+    // including any donation history attached to it. Whether or not the row has
+    // a password is irrelevant: proving control of the inbox is the only way to
+    // claim it, which is what /signup does. A signed-in supporter is fine,
+    // because they've already authenticated as that account.
+    if (!session && existing) {
       return {
         success: false,
-        error: 'This email has already been used. Please sign in, or reset your password if you’ve forgotten it.',
-        fieldErrors: { email: 'This email is already registered — reset your password to sign in.' },
+        error:
+          'We already have an account for this email. Please sign in first (or set your password at /signup), then complete your volunteer application — it will be saved to your existing account.',
+        fieldErrors: { email: 'Already registered — sign in first, then apply.' },
       }
     }
 
