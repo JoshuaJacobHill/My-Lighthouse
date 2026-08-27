@@ -14,7 +14,7 @@ export const metadata = { title: 'Users | Lighthouse Care Admin' }
 const PAGE_SIZE = 25
 const aud0 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 })
 
-type UserType = 'all' | 'volunteers' | 'donors'
+type UserType = 'all' | 'volunteers' | 'donors' | 'staff' | 'trainees' | 'church'
 type SortKey = 'activity' | 'name' | 'joined' | 'total'
 type Dir = 'asc' | 'desc'
 
@@ -36,7 +36,10 @@ export default async function UsersPage({
   const dir: Dir = params.dir === 'asc' ? 'asc' : params.dir === 'desc' ? 'desc' : sort === 'name' ? 'asc' : 'desc'
 
   let type = (params.type as UserType) || 'all'
-  if (!canSeeDonations) type = 'volunteers'
+  // Volunteer-only admins must not browse the donor base at all — that's why
+  // 'All' is off-limits to them too, not just the Donors tab. Staff, trainee and
+  // church membership aren't financial data, so those filters stay available.
+  if (!canSeeDonations && (type === 'donors' || type === 'all')) type = 'volunteers'
 
   const searchWhere: Prisma.UserWhereInput = search
     ? {
@@ -63,7 +66,13 @@ export default async function UsersPage({
       ? { volunteerProfile: { isNot: null } }
       : type === 'donors'
         ? { donations: { some: {} } }
-        : {}
+        : type === 'staff'
+          ? { isStaff: true }
+          : type === 'trainees'
+            ? { isTrainee: true }
+            : type === 'church'
+              ? { isChurchMember: true }
+              : {}
 
   const where: Prisma.UserWhereInput = { AND: [searchWhere, typeWhere] }
 
@@ -81,6 +90,9 @@ export default async function UsersPage({
       volunteerProfile: {
         select: { id: true, status: true, firstName: true, lastName: true, joinedAt: true },
       },
+      isStaff: true,
+      isTrainee: true,
+      isChurchMember: true,
       _count: { select: { donations: true } },
     },
   })
@@ -123,13 +135,14 @@ export default async function UsersPage({
   const users = allUsers.slice(skip, skip + PAGE_SIZE)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const tabs: { key: UserType; label: string }[] = canSeeDonations
-    ? [
-        { key: 'all', label: 'All' },
-        { key: 'volunteers', label: 'Volunteers' },
-        { key: 'donors', label: 'Donors' },
-      ]
-    : [{ key: 'volunteers', label: 'Volunteers' }]
+  const tabs: { key: UserType; label: string }[] = [
+    ...(canSeeDonations ? [{ key: 'all' as UserType, label: 'All' }] : []),
+    { key: 'volunteers', label: 'Volunteers' },
+    ...(canSeeDonations ? [{ key: 'donors' as UserType, label: 'Donors' }] : []),
+    { key: 'staff', label: 'Staff' },
+    { key: 'trainees', label: 'Trainees' },
+    { key: 'church', label: 'Church' },
+  ]
 
   const baseQuery = (over: Record<string, string>) => {
     const q = new URLSearchParams()
@@ -183,8 +196,8 @@ export default async function UsersPage({
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {canSeeDonations
-              ? 'Everyone in your community — volunteers and donors.'
-              : 'Volunteers in your community.'}
+              ? 'Everyone in your community — volunteers, donors, staff and church members.'
+              : 'Volunteers, staff and church members in your community.'}
           </p>
         </div>
         <Link
@@ -268,6 +281,21 @@ export default async function UsersPage({
                       {canSeeDonations && isDonor && (
                         <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                           Donor
+                        </span>
+                      )}
+                      {u.isStaff && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          Staff
+                        </span>
+                      )}
+                      {u.isTrainee && (
+                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                          Trainee
+                        </span>
+                      )}
+                      {u.isChurchMember && (
+                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                          Church
                         </span>
                       )}
                       {isAdmin && (
