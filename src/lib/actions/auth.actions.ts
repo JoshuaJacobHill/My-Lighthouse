@@ -16,6 +16,7 @@ import {
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 import { loginSchema, volunteerSignupSchema } from '@/lib/validations'
+import { getCoordinatorEmail } from '@/lib/coordinators'
 
 // ─── ICS Calendar helper ──────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ function generateICS(opts: {
   startTime: string
   location: string
   organizerEmail: string
+  attendeeEmail?: string
 }): string {
   const [year, month, day] = opts.date.split('-')
   const [hStr, mStr] = opts.startTime.split(':')
@@ -79,7 +81,12 @@ function generateICS(opts: {
     `SUMMARY:${opts.summary}`,
     `DESCRIPTION:${opts.description.replace(/\n/g, '\\n')}`,
     `LOCATION:${opts.location}`,
-    `ORGANIZER:mailto:${opts.organizerEmail}`,
+    `ORGANIZER;CN=Lighthouse Care:mailto:${opts.organizerEmail}`,
+    // Outlook only offers Accept/Decline when the recipient is listed as an
+    // attendee — without this the invite arrives as a plain attachment.
+    ...(opts.attendeeEmail
+      ? [`ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${opts.attendeeEmail}`]
+      : []),
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n')
@@ -328,6 +335,7 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
       if (existing) {
         return tx.user.update({
           where: { id: existing.id },
+          include: { volunteerProfile: { select: { id: true } } },
           data: {
             // Never overwrite an existing password, and never demote an admin
             // who is simply adding a volunteer profile to their own account.
@@ -338,6 +346,7 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         })
       }
       return tx.user.create({
+        include: { volunteerProfile: { select: { id: true } } },
         data: {
           email: data.email.toLowerCase(),
           passwordHash,
@@ -370,22 +379,13 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         ? formatTimeLabel(firstVisitPeriod)
         : 'Not specified'
 
+      // One lookup, used for the calendar organiser, the volunteer's reply-to,
+      // and the coordinator notification below.
+      const coordinatorEmail = await getCoordinatorEmail(preferredStore)
+
       // Generate .ics calendar invite if we have a date and time
       let icsAttachment: { filename: string; content: string; contentType: string } | undefined
       if (firstVisitDate && firstVisitPeriod) {
-        // Load coordinator email for ORGANIZER field
-        let coordinatorEmailForIcs = 'rochelle@lighthousecare.org.au'
-        try {
-          const settingRows = await prisma.appSetting.findMany({
-            where: { key: { in: ['loganholme_coordinator_email', 'hillcrest_coordinator_email'] } },
-          })
-          const s = Object.fromEntries(settingRows.map((r) => [r.key, r.value]))
-          coordinatorEmailForIcs =
-            preferredStore === 'Hillcrest'
-              ? (s.hillcrest_coordinator_email ?? 'georgina@lighthousecare.org.au')
-              : (s.loganholme_coordinator_email ?? 'rochelle@lighthousecare.org.au')
-        } catch { /* fall through */ }
-
         const icsContent = generateICS({
           summary: `Volunteer First Visit — ${storeName} Lighthouse Care`,
           description: [
@@ -399,12 +399,13 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
           date: firstVisitDate,
           startTime: firstVisitPeriod,
           location: `Lighthouse Care ${storeName} Store`,
-          organizerEmail: coordinatorEmailForIcs,
+          organizerEmail: coordinatorEmail,
+          attendeeEmail: data.email,
         })
         icsAttachment = {
           filename: 'first-visit.ics',
           content: icsContent,
-          contentType: 'text/calendar',
+          contentType: 'text/calendar; charset=utf-8; method=REQUEST',
         }
       }
 
@@ -425,28 +426,12 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
         text: template.text,
         templateType: 'SIGNUP_CONFIRMATION',
         volunteerId: user.volunteerProfile?.id,
+        replyTo: coordinatorEmail,
         attachments: icsAttachment ? [icsAttachment] : undefined,
       })
 
       // ── Coordinator notification email ─────────────────────────────────────
-      // Load coordinator emails from AppSettings (with hardcoded fallbacks)
-      let coordinatorSettings: Record<string, string> = {}
-      try {
-        const settingRows = await prisma.appSetting.findMany({
-          where: { key: { in: ['loganholme_coordinator_email', 'hillcrest_coordinator_email'] } },
-        })
-        coordinatorSettings = Object.fromEntries(settingRows.map((r) => [r.key, r.value]))
-      } catch {
-        // fall through to defaults
-      }
-
-      const loganholmeEmail =
-        coordinatorSettings.loganholme_coordinator_email ?? 'rochelle@lighthousecare.org.au'
-      const hillcrestEmail =
-        coordinatorSettings.hillcrest_coordinator_email ?? 'georgina@lighthousecare.org.au'
-
-      const coordinatorEmail =
-        preferredStore === 'Hillcrest' ? hillcrestEmail : loganholmeEmail
+      // (coordinatorEmail resolved once above, alongside the calendar invite)
 
       const coordinatorSubject = `New Volunteer: ${data.firstName} ${data.lastName} — First Visit ${visitDateFormatted}`
 

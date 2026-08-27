@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { Resend } from 'resend'
 import prisma from '@/lib/prisma'
+import { getCoordinatorEmailForVolunteer } from '@/lib/coordinators'
 import type { EmailTemplateType } from '@prisma/client'
 
 export type EmailProvider = 'resend' | 'smtp' | 'mock'
@@ -19,6 +20,12 @@ interface SendEmailOptions {
   attachments?: { filename: string; content: string; contentType: string }[]
   /** Pass true to CC volunteer@lighthousecare.org.au — admin/coordinator emails only */
   ccAdmin?: boolean
+  /**
+   * Where replies should go. If omitted and `volunteerId` is set, this is
+   * resolved automatically to that volunteer's store coordinator, so a reply
+   * reaches the person who actually knows them.
+   */
+  replyTo?: string
 }
 
 interface SendEmailResult {
@@ -95,7 +102,8 @@ async function sendViaResend(
   const { data, error } = await resend.emails.send({
     from: options.from ?? resolveFromAddress(settings, options.fromName),
     to: options.to,
-    ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
+    ...(options.ccAdmin ? { cc: CC_ADDRESS } : {}),
+    ...(options.replyTo ? { replyTo: options.replyTo } : options.ccAdmin ? { replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
     html: options.html,
     text: options.text,
@@ -135,7 +143,8 @@ async function sendViaSMTP(
   const info = await transporter.sendMail({
     from: options.from ?? resolveFromAddress(settings, options.fromName),
     to: options.to,
-    ...(options.ccAdmin ? { cc: CC_ADDRESS, replyTo: CC_ADDRESS } : {}),
+    ...(options.ccAdmin ? { cc: CC_ADDRESS } : {}),
+    ...(options.replyTo ? { replyTo: options.replyTo } : options.ccAdmin ? { replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
     html: options.html,
     text: options.text,
@@ -149,6 +158,14 @@ async function sendViaSMTP(
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   // Load settings from DB (with env var fallbacks)
   const settings = await getEmailSettings()
+
+  // Replies from a volunteer should reach their own store coordinator. Resolved
+  // here so every volunteer-facing email gets it without each caller repeating
+  // the lookup.
+  if (!options.replyTo && options.volunteerId) {
+    const coordinator = await getCoordinatorEmailForVolunteer(options.volunteerId)
+    if (coordinator) options = { ...options, replyTo: coordinator }
+  }
   const provider = resolveProvider(settings)
 
   // Create a pending log entry
