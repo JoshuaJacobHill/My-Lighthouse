@@ -1,6 +1,5 @@
 'use server'
 
-import crypto from 'crypto'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
@@ -8,6 +7,7 @@ import { getSession } from '@/lib/auth'
 import { isAdminRole } from '@/lib/permissions-core'
 import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
 import { readStepsFromScreenshot } from '@/lib/step-screenshot'
+import { generateFitnessCode } from '@/lib/fitness-code'
 
 interface Result {
   success: boolean
@@ -81,8 +81,7 @@ export async function connectFitnessAction(): Promise<{ success: boolean; token?
   const me = await requireStaff()
   if (!me) return { success: false, error: 'This is a staff-only challenge.' }
 
-  // Prefixed so it's recognisable if it ever turns up somewhere it shouldn't.
-  const token = `lhf_${crypto.randomBytes(24).toString('base64url')}`
+  const token = generateFitnessCode()
   try {
     await prisma.fitnessLink.upsert({
       where: { userId: me.userId },

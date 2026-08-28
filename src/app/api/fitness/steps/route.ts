@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
+import { normaliseFitnessCode } from '@/lib/fitness-code'
+import { rateLimit } from '@/lib/rate-limit'
 import { getCurrentChallenge } from '@/lib/fitness-data'
 
 export const dynamic = 'force-dynamic'
@@ -47,7 +49,16 @@ export async function POST(request: NextRequest) {
  * add step counts to its owner's tally — and it can be replaced from the
  * portal in one tap.
  */
-export async function recordSteps(request: NextRequest, token: string) {
+export async function recordSteps(request: NextRequest, rawToken: string) {
+  // The code is short enough to be typed, so the endpoint has to be the thing
+  // that makes guessing pointless. Generous for a phone posting a few times a
+  // day; nowhere near enough to work through 380 billion possibilities.
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  if (!rateLimit(`steps:ip:${ip}`, 60, 60_000).ok) {
+    return NextResponse.json({ ok: false, error: 'Too many attempts. Try again shortly.' }, { status: 429 })
+  }
+
+  const token = normaliseFitnessCode(rawToken)
   const link = await prisma.fitnessLink.findUnique({
     where: { token },
     select: { id: true, userId: true, revokedAt: true },

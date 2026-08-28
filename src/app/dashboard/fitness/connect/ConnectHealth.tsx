@@ -67,7 +67,20 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, lastAmount }: Props) {
   const router = useRouter()
   const [token, setToken] = React.useState(initialToken)
-  const personalUrl = `${appUrl}/api/fitness/steps/${token ?? ''}`
+  const personalUrl = `${appUrl}/api/fitness/steps/${encodeURIComponent(token ?? '')}`
+  const [codeCopied, setCodeCopied] = React.useState(false)
+
+  async function copyCode() {
+    if (!token) return
+    try {
+      await navigator.clipboard.writeText(token)
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 1800)
+    } catch {
+      // Clipboard is blocked in some in-app browsers — the code is short
+      // enough to read off the screen, which is rather the point.
+    }
+  }
   const [error, setError] = React.useState('')
   const [isPending, startTransition] = React.useTransition()
 
@@ -133,18 +146,39 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
         alone, so don&rsquo;t pass it on.
       </p>
 
-      <CopyField label="Your personal link" value={personalUrl} />
+      <div className="mt-4 rounded-2xl border border-neutral-900 bg-neutral-950 p-5 text-center text-white">
+        <p className="text-xs font-semibold uppercase tracking-wide text-white/50">Your personal code</p>
+        <p className="mt-1.5 font-mono text-3xl font-bold tracking-[0.12em]">{token}</p>
+        <button
+          type="button"
+          onClick={copyCode}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
+        >
+          {codeCopied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+          {codeCopied ? 'Copied' : 'Copy code'}
+        </button>
+        <p className="mt-3 text-xs text-white/50">
+          Short enough to type if pasting plays up. Yours alone &mdash; don&rsquo;t pass it on.
+        </p>
+      </div>
+
+      <details className="mt-3 rounded-xl border border-neutral-200 px-4 py-3">
+        <summary className="cursor-pointer list-none text-xs font-semibold text-neutral-500">
+          Prefer the full link?
+        </summary>
+        <CopyField label="Your personal link" value={personalUrl} />
+      </details>
 
       {shortcutUrl ? (
         <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
           <p className="text-sm font-bold text-neutral-900">The quick way</p>
           <ol className="mt-2 space-y-2 text-sm text-neutral-600">
             <li>
-              <strong>1.</strong> Copy your personal link above.
+              <strong>1.</strong> Copy the code above (or just remember it — it&rsquo;s eight characters).
             </li>
             <li>
               <strong>2.</strong> Tap the button below and choose <strong>Add Shortcut</strong>. It&rsquo;ll ask for
-              your link &mdash; paste it in.
+              your code &mdash; type or paste it in.
             </li>
             <li>
               <strong>3.</strong> Run it once and allow Health access when asked. That&rsquo;s the opt-in.
