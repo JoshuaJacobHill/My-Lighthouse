@@ -2,12 +2,14 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Copy, Check, Smartphone, Link2Off } from 'lucide-react'
+import { Loader2, Copy, Check, Smartphone, Link2Off, Download } from 'lucide-react'
 import { connectFitnessAction, disconnectFitnessAction } from '@/lib/actions/fitness.actions'
 
 interface Props {
   initialToken: string | null
-  endpoint: string
+  appUrl: string
+  /** iCloud link to the ready-made shortcut, if one has been set up. */
+  shortcutUrl: string | null
   lastUsedAt: string | null
   lastAmount: number | null
 }
@@ -62,9 +64,10 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   )
 }
 
-export function ConnectHealth({ initialToken, endpoint, lastUsedAt, lastAmount }: Props) {
+export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, lastAmount }: Props) {
   const router = useRouter()
   const [token, setToken] = React.useState(initialToken)
+  const personalUrl = `${appUrl}/api/fitness/steps/${token ?? ''}`
   const [error, setError] = React.useState('')
   const [isPending, startTransition] = React.useTransition()
 
@@ -126,96 +129,119 @@ export function ConnectHealth({ initialToken, endpoint, lastUsedAt, lastAmount }
 
       <h2 className="text-lg font-bold text-neutral-900">Set it up on your iPhone</h2>
       <p className="mt-1 text-sm text-neutral-600">
-        Do this on the phone itself &mdash; you&rsquo;ll be copying these two values into the Shortcuts app.
+        Do this on the phone itself. Your personal link is below &mdash; it&rsquo;s the only thing that&rsquo;s yours
+        alone, so don&rsquo;t pass it on.
       </p>
 
-      <ol className="mt-6">
-        <Step n={1} title="Open Shortcuts and make a new shortcut">
-          <p>
-            The Shortcuts app comes with your iPhone. Tap <strong>+</strong> in the top corner to start a new one, and
-            name it <strong>Send my steps</strong>.
-          </p>
-        </Step>
+      <CopyField label="Your personal link" value={personalUrl} />
 
-        <Step n={2} title="Add “Find Health Samples”">
-          <p>
-            Search for <strong>Find Health Samples</strong> and add it. Set <strong>Type</strong> to{' '}
-            <strong>Steps</strong>, then add a filter so the date <strong>is today</strong>.
-          </p>
-          <p>Health will ask for permission the first time you run it — that&rsquo;s the opt-in.</p>
-        </Step>
-
-        <Step n={3} title="Add up the day">
-          <p>
-            Add <strong>Calculate Statistics</strong>, set it to <strong>Sum</strong> of{' '}
-            <strong>Health Samples</strong>. That gives you one number: today&rsquo;s total.
-          </p>
-        </Step>
-
-        <Step n={4} title="Send it across">
-          <p>
-            Add <strong>Get Contents of URL</strong> and paste the address below. Tap the arrow to expand it, set{' '}
-            <strong>Method</strong> to <strong>POST</strong>, then:
-          </p>
-          <ul className="list-disc space-y-1 pl-5">
+      {shortcutUrl ? (
+        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
+          <p className="text-sm font-bold text-neutral-900">The quick way</p>
+          <ol className="mt-2 space-y-2 text-sm text-neutral-600">
             <li>
-              Under <strong>Headers</strong>, add key <code className="font-mono">Authorization</code> with the value
-              below.
+              <strong>1.</strong> Copy your personal link above.
             </li>
             <li>
-              Under <strong>Request Body</strong>, choose <strong>JSON</strong>, add a{' '}
-              <strong>Number</strong> field called <code className="font-mono">steps</code>, and set its value to the{' '}
-              <strong>Statistics</strong> result from step 3.
-            </li>
-          </ul>
-          <CopyField label="Web address" value={endpoint} />
-          <CopyField label="Authorization header value" value={`Bearer ${token}`} />
-        </Step>
-
-        <Step n={5} title="Make it run by itself through the day">
-          <p>
-            In the <strong>Automation</strong> tab, tap <strong>+</strong>, choose{' '}
-            <strong>Time of Day</strong>, pick a time, and set it to repeat <strong>daily</strong>. Choose{' '}
-            <strong>Run Immediately</strong> and turn off <strong>Notify When Run</strong>, then pick your{' '}
-            <strong>Send my steps</strong> shortcut.
-          </p>
-          <p>
-            <strong>Set up a few of these at different times</strong> and the leaderboard keeps up with you through
-            the day rather than catching up overnight. Four is plenty:
-          </p>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>
-              <strong>12&nbsp;pm</strong>, <strong>4&nbsp;pm</strong> and <strong>8&nbsp;pm</strong> — keeps your
-              total fresh while everyone&rsquo;s watching
+              <strong>2.</strong> Tap the button below and choose <strong>Add Shortcut</strong>. It&rsquo;ll ask for
+              your link &mdash; paste it in.
             </li>
             <li>
-              <strong>11:30&nbsp;pm</strong> — the one that matters, because it catches the full day
+              <strong>3.</strong> Run it once and allow Health access when asked. That&rsquo;s the opt-in.
             </li>
-          </ul>
-          <p className="text-neutral-500">
-            Each one sends your running total for the day and replaces the last, so there&rsquo;s no double-counting
-            — more of them just means a fresher number. Apple only lets these repeat daily, so genuinely hourly
-            would mean sixteen automations; four gets you most of the way.
+          </ol>
+          <a
+            href={shortcutUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" /> Add the shortcut to my phone
+          </a>
+          <p className="mt-3 text-xs text-neutral-500">
+            Opens the Shortcuts app, which comes with your iPhone. Nothing is sent until you run it.
           </p>
-          <p>
-            Miss a day? Run the shortcut by hand, or type that day&rsquo;s number in on the challenge page.
+        </div>
+      ) : (
+        <div className="mt-6 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-5 text-sm text-neutral-600">
+          <p className="font-bold text-neutral-900">One-tap install isn&rsquo;t ready yet</p>
+          <p className="mt-1">
+            Someone needs to build the shortcut once and share the link before everyone else can install it. Until
+            then, follow the steps below &mdash; or just type your steps in on the challenge page, which is
+            genuinely fine.
           </p>
-        </Step>
+        </div>
+      )}
 
-        <Step n={6} title="Test it">
-          <p>
-            Tap the play button on the shortcut. Allow Health access when asked, then check the challenge page —
-            today&rsquo;s steps should be sitting there.
-          </p>
-        </Step>
-      </ol>
+      <details className="group mt-6 rounded-2xl border border-neutral-200 p-5">
+        <summary className="cursor-pointer list-none text-sm font-bold text-neutral-900">
+          Build it by hand instead
+          <span className="ml-2 font-medium text-neutral-400 group-open:hidden">(about 3 minutes)</span>
+        </summary>
+
+        <ol className="mt-5">
+          <Step n={1} title="Open Shortcuts and make a new one">
+            <p>
+              The Shortcuts app comes with your iPhone. Tap <strong>+</strong>, and name it{' '}
+              <strong>Send my steps</strong>.
+            </p>
+          </Step>
+
+          <Step n={2} title="Add “Find Health Samples”">
+            <p>
+              Search for <strong>Find Health Samples</strong> and add it. Set <strong>Type</strong> to{' '}
+              <strong>Steps</strong>, then add a filter so the date <strong>is today</strong>.
+            </p>
+            <p>Health will ask permission the first time you run it — that&rsquo;s the opt-in.</p>
+          </Step>
+
+          <Step n={3} title="Add up the day">
+            <p>
+              Add <strong>Calculate Statistics</strong>, set to <strong>Sum</strong> of{' '}
+              <strong>Health Samples</strong>. That&rsquo;s today&rsquo;s total, as one number.
+            </p>
+          </Step>
+
+          <Step n={4} title="Send it across">
+            <p>
+              Add <strong>Get Contents of URL</strong> and paste your personal link from above. Tap the arrow to
+              expand it, set <strong>Method</strong> to <strong>POST</strong>, choose{' '}
+              <strong>Request Body: JSON</strong>, and add a <strong>Number</strong> field called{' '}
+              <code className="font-mono">steps</code> set to the <strong>Statistics</strong> result from step 3.
+            </p>
+            <p className="text-neutral-500">
+              No headers to set — your link carries who you are.
+            </p>
+          </Step>
+
+          <Step n={5} title="Make it run by itself through the day">
+            <p>
+              In the <strong>Automation</strong> tab, tap <strong>+</strong>, choose{' '}
+              <strong>Time of Day</strong>, pick a time, repeat <strong>daily</strong>, choose{' '}
+              <strong>Run Immediately</strong> and turn off <strong>Notify When Run</strong>.
+            </p>
+            <p>
+              <strong>Set up a few at different times</strong> — say 12&nbsp;pm, 4&nbsp;pm, 8&nbsp;pm and
+              11:30&nbsp;pm — and the leaderboard keeps up through the day. Each send replaces the last, so nothing
+              double-counts. Apple only lets these repeat daily, which is why it&rsquo;s a handful rather than hourly.
+            </p>
+          </Step>
+
+          <Step n={6} title="Test it">
+            <p>
+              Tap play. Allow Health access, then check the challenge page — today&rsquo;s steps should be there.
+            </p>
+          </Step>
+        </ol>
+      </details>
 
       <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
-        <p className="font-semibold text-neutral-800">On Android?</p>
+        <p className="font-semibold text-neutral-800">Not keen on any of this?</p>
         <p className="mt-1">
-          Android keeps step data locked to the phone in much the same way, and there&rsquo;s no equivalent of
-          Shortcuts built in. On the challenge page you can either type your daily total in, or upload a screenshot
-          of your health app and we&rsquo;ll read the number off it &mdash; then throw the picture away.
+          Perfectly fine. On the challenge page you can type your daily total straight in, or upload a screenshot of
+          your health app and we&rsquo;ll read the number off it and throw the picture away. Both count exactly the
+          same as the automatic version &mdash; and neither needs setting up. Android users, that&rsquo;s your lot
+          anyway: Android keeps step data locked to the phone and has no equivalent of Shortcuts.
         </p>
       </div>
 

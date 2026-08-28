@@ -19,12 +19,16 @@ export default async function ConnectFitnessPage() {
     where: { id: session.userId },
     select: { id: true, isStaff: true, isTrainee: true, role: true },
   })
-  if (!(me?.isStaff || me?.isTrainee || isAdminRole(me?.role))) notFound()
+  if (!me || !(me.isStaff || me.isTrainee || isAdminRole(me.role))) notFound()
 
-  const link = await prisma.fitnessLink.findFirst({
-    where: { userId: me!.id, revokedAt: null },
-    select: { token: true, createdAt: true, lastUsedAt: true, lastAmount: true },
-  })
+  const [link, shortcutSetting] = await Promise.all([
+    prisma.fitnessLink.findFirst({
+      where: { userId: me.id, revokedAt: null },
+      select: { token: true, createdAt: true, lastUsedAt: true, lastAmount: true },
+    }),
+    prisma.appSetting.findUnique({ where: { key: 'fitness_shortcut_url' }, select: { value: true } }),
+  ])
+  const shortcutUrl = shortcutSetting?.value?.trim() || null
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
@@ -38,9 +42,9 @@ export default async function ConnectFitnessPage() {
 
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Send your steps automatically</h1>
         <p className="mt-3 text-neutral-600">
-          Your phone already counts your steps. This lets it send that number across each night, so you don&rsquo;t
-          have to remember to type it in. It&rsquo;s completely optional &mdash; typing your steps in by hand works
-          just as well.
+          Your phone already counts your steps. This lets it send that number across on its own, so you don&rsquo;t
+          have to remember. It&rsquo;s completely optional &mdash; typing your steps in on the challenge page works
+          exactly the same, and takes about five seconds.
         </p>
 
         <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
@@ -63,7 +67,8 @@ export default async function ConnectFitnessPage() {
 
         <ConnectHealth
           initialToken={link?.token ?? null}
-          endpoint={`${APP_URL}/api/fitness/steps`}
+          appUrl={APP_URL}
+          shortcutUrl={shortcutUrl}
           lastUsedAt={link?.lastUsedAt ? link.lastUsedAt.toISOString() : null}
           lastAmount={link?.lastAmount ?? null}
         />

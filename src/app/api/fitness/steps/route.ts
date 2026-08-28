@@ -33,7 +33,21 @@ export async function POST(request: NextRequest) {
   if (!token) {
     return NextResponse.json({ ok: false, error: 'Missing token' }, { status: 401 })
   }
+  return recordSteps(request, token)
+}
 
+/**
+ * Shared by both ways in: an Authorization header, and a personal URL with the
+ * token in the path. The second exists because setting a custom header in the
+ * Shortcuts app is the step most people get stuck on, and a link they can paste
+ * is far easier to follow.
+ *
+ * The trade-off is that a token in a URL ends up in server logs. It's accepted
+ * here because this token is write-only — the worst anyone can do with it is
+ * add step counts to its owner's tally — and it can be replaced from the
+ * portal in one tap.
+ */
+export async function recordSteps(request: NextRequest, token: string) {
   const link = await prisma.fitnessLink.findUnique({
     where: { token },
     select: { id: true, userId: true, revokedAt: true },

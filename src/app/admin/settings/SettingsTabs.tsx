@@ -348,6 +348,14 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             helpText="Staff see a 'Payslips & leave' shortcut to this on their dashboard. We deliberately link out rather than pull payroll data into this portal."
           />
           <SettingField
+            label="Apple Shortcut Install Link"
+            settingKey="fitness_shortcut_url"
+            value={values.fitness_shortcut_url ?? ''}
+            onChange={update}
+            placeholder="https://www.icloud.com/shortcuts/…"
+            helpText="Build the 'Send my steps' shortcut once on an iPhone, share it, and paste the iCloud link here. Staff then install it in one tap instead of building it themselves. Leave blank to hide the button."
+          />
+          <SettingField
             label="Loganholme Coordinator Email"
             settingKey="loganholme_coordinator_email"
             type="email"
