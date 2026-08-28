@@ -9,7 +9,7 @@ import { TotalSteps, TopFive, TipOfTheDay, WeeklySchedule, TodaysTarget } from '
 import { computePace } from '@/lib/fitness-pace'
 import { isAdminRole } from '@/lib/permissions-core'
 import { brisbaneToday, calendarDayString } from '@/lib/fitness-days'
-import { getChallengeBoard, getTipOfTheDay, getWellbeingSchedule } from '@/lib/fitness-data'
+import { getChallengeBoard, getTipOfTheDay, getWellbeingSchedule, getCurrentChallenge } from '@/lib/fitness-data'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Staff fitness challenge' }
@@ -32,10 +32,7 @@ export default async function StaffFitnessPage() {
   })
   if (!me || !(me.isStaff || me.isTrainee || isAdminRole(me.role))) notFound()
 
-  const challenge = await prisma.fitnessChallenge.findFirst({
-    where: { isActive: true },
-    orderBy: { startsAt: 'desc' },
-  })
+  const challenge = await getCurrentChallenge()
   if (!challenge) {
     return (
       <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">

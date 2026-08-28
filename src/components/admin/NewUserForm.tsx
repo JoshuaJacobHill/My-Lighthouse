@@ -30,6 +30,7 @@ export function NewUserForm({ capabilities }: { capabilities: Capability[] }) {
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
+  const [sendInvite, setSendInvite] = React.useState(true)
   const isVolunteer = types.asVolunteer
   const isDonor = types.asDonor
   const noneChosen = !Object.values(types).some(Boolean)
@@ -56,11 +57,15 @@ export function NewUserForm({ capabilities }: { capabilities: Capability[] }) {
       status: String(fd.get('status') ?? '') || undefined,
       notes: String(fd.get('notes') ?? '') || undefined,
       preferredLocations: locations,
+      sendInvite,
       ...types,
     })
     setLoading(false)
     if (!res.success) return setError(res.error ?? 'Could not create the user.')
-    router.push(res.userId ? `/admin/users/${res.userId}` : '/admin/users')
+    // The account exists either way, so a failed invite is a warning on the
+    // next screen rather than a reason to keep them on the form.
+    const query = res.emailError ? '?invite=failed' : sendInvite ? '?invite=sent' : ''
+    router.push(res.userId ? `/admin/users/${res.userId}${query}` : '/admin/users')
     router.refresh()
   }
 
@@ -207,6 +212,22 @@ export function NewUserForm({ capabilities }: { capabilities: Capability[] }) {
           </section>
         </>
       )}
+
+      <label className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+        <input
+          type="checkbox"
+          checked={sendInvite}
+          onChange={(e) => setSendInvite(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+        />
+        <span>
+          <span className="block text-sm font-medium text-gray-800">Email them a link to set a password</span>
+          <span className="block text-xs text-gray-500">
+            Without this they&rsquo;ll have an account but no way to sign in. Turn it off only if you&rsquo;re adding
+            someone in advance and will invite them later.
+          </span>
+        </span>
+      </label>
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={loading}>

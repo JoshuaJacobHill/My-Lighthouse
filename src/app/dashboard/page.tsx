@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
+import { getCurrentChallenge } from '@/lib/fitness-data'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { ChallengeBanner } from '@/components/dashboard/ChallengeBanner'
 
@@ -70,13 +71,7 @@ export default async function DonorHomePage() {
 
   // The challenge banner. Only queried for staff, and only rendered while a
   // challenge is actually running — no dead banner sitting there in October.
-  const challenge = isStaffOrTrainee
-    ? await prisma.fitnessChallenge.findFirst({
-        where: { isActive: true, endsAt: { gte: new Date() } },
-        orderBy: { startsAt: 'desc' },
-        select: { id: true, name: true, goal: true, startsAt: true, endsAt: true, imageUrl: true },
-      })
-    : null
+  const challenge = isStaffOrTrainee ? await getCurrentChallenge() : null
   let challengeBanner: React.ComponentProps<typeof ChallengeBanner> | null = null
   if (challenge) {
     const agg = await prisma.fitnessEntry.aggregate({

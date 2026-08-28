@@ -11,6 +11,28 @@ import { brisbaneToday, calendarDay, calendarDayString } from '@/lib/fitness-day
  * silently lies about the shape of the month.
  */
 
+/**
+ * The challenge to show right now.
+ *
+ * Prefers one that is actually running today; if none is, falls back to the
+ * next one due to start. Ordering by start date alone would mean a short test
+ * run today loses to a bigger challenge starting next week — and, worse, that
+ * ending the test would need someone to remember to switch the other one back
+ * on. This way the handover happens on its own.
+ */
+export async function getCurrentChallenge() {
+  const now = new Date()
+  const running = await prisma.fitnessChallenge.findFirst({
+    where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+    orderBy: { startsAt: 'desc' },
+  })
+  if (running) return running
+  return prisma.fitnessChallenge.findFirst({
+    where: { isActive: true, endsAt: { gte: now } },
+    orderBy: { startsAt: 'asc' },
+  })
+}
+
 export interface DayPoint {
   /** yyyy-mm-dd */
   day: string

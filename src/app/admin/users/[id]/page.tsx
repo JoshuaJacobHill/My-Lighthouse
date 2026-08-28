@@ -18,6 +18,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { formatDate } from '@/lib/utils'
 import { isAdminRole, requireAnyCapability } from '@/lib/permissions'
+import { SendInviteButton } from '@/components/admin/SendInviteButton'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
 import { listRecurringForEmail } from '@/lib/admin-recurring'
 import { StaffToggles } from '@/components/admin/StaffToggles'
@@ -48,6 +49,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
       isActive: true,
       isChurchMember: true,
       isStaff: true,
+      passwordHash: true,
       isTrainee: true,
       createdAt: true,
       lastLoginAt: true,
@@ -148,6 +150,9 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
           <div className="mt-3 flex flex-wrap gap-2">
             <ChurchMemberToggle userId={user.id} initial={user.isChurchMember} />
             <StaffToggles userId={user.id} isStaff={user.isStaff} isTrainee={user.isTrainee} />
+            <div className="mt-4">
+              <SendInviteButton userId={user.id} hasPassword={Boolean(user.passwordHash)} />
+            </div>
           </div>
         </div>
       </div>

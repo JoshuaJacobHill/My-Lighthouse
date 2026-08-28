@@ -2,13 +2,16 @@
 
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
-import { getSession } from '@/lib/auth'
+import { getSession, createPasswordResetToken } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
+import { renderTemplate } from '@/lib/email-templates'
 import { formatDate } from '@/lib/utils'
 import type { VolunteerStatus } from '@prisma/client'
 import { isAdminRole } from '@/lib/permissions-core'
 import { assertCapability } from '@/lib/permissions'
 import type { Capability } from '@/lib/permissions-core'
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 
 interface ActionResult {
   success: boolean
@@ -847,6 +850,8 @@ export interface CreateUserData extends CreateVolunteerData {
   /** Donor record details (used for receipts) when asDonor is set. */
   phone?: string
   address?: string
+  /** Email them a link to set a password. On unless deliberately turned off. */
+  sendInvite?: boolean
 }
 
 /**
@@ -861,7 +866,7 @@ export interface CreateUserData extends CreateVolunteerData {
  */
 export async function createUserAction(
   data: CreateUserData
-): Promise<{ success: boolean; userId?: string; error?: string }> {
+): Promise<{ success: boolean; userId?: string; error?: string; emailSent?: boolean; emailError?: string }> {
   // Checked per kind of supporter rather than once for the whole form: a church
   // manager may add a church member but not a volunteer, and neither manager
   // should be able to create a donor record without giving access.
@@ -948,9 +953,86 @@ export async function createUserAction(
 
     revalidatePath('/admin/users')
     revalidatePath('/admin/volunteers')
-    return { success: true, userId: user.id }
+    // Invite them in. Without this the account exists but the person has no
+    // password and no link — which is exactly how two staff ended up added and
+    // never hearing from us.
+    let emailSent = false
+    let emailError: string | undefined
+    if (data.sendInvite !== false) {
+      try {
+        const token = await createPasswordResetToken(user.id, 168)
+        const rendered = await renderTemplate(data.asVolunteer ? 'VOLUNTEER_WELCOME' : 'DONOR_ACCOUNT_SETUP', {
+          first_name: firstName,
+          last_name: lastName,
+          set_password_link: `${APP_URL}/set-password?token=${token}`,
+          portal_link: APP_URL,
+        })
+        const result = await sendEmail({
+          to: email,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+        })
+        emailSent = result.success
+        if (!result.success) emailError = 'The account was created but the invite email didn’t send.'
+      } catch (err) {
+        console.error('createUserAction: invite email failed', err)
+        emailError = 'The account was created but the invite email didn’t send.'
+      }
+    }
+
+    return { success: true, userId: user.id, emailSent, emailError }
   } catch (err) {
     console.error('[createUserAction]', err)
     return { success: false, error: 'Could not create the user. Please try again.' }
   }
+}
+
+/**
+ * Send (or resend) the set-a-password invite for an existing account.
+ *
+ * Needed because an account can exist without anyone ever having been told
+ * about it — which is how two staff ended up added and unable to sign in.
+ * Issuing a new token invalidates any earlier unused one.
+ */
+export async function sendAccountInviteAction(
+  userId: string
+): Promise<{ success: boolean; error?: string; sentTo?: string }> {
+  try {
+    await assertCapability('care.people')
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, email: true, volunteerProfile: { select: { id: true } } },
+  })
+  if (!user?.email) return { success: false, error: 'That account has no email address.' }
+
+  const firstName = user.name?.trim().split(/\s+/)[0] || 'there'
+  const lastName = user.name?.trim().split(/\s+/).slice(1).join(' ') || ''
+
+  try {
+    const token = await createPasswordResetToken(user.id, 168)
+    const rendered = await renderTemplate(user.volunteerProfile ? 'VOLUNTEER_WELCOME' : 'DONOR_ACCOUNT_SETUP', {
+      first_name: firstName,
+      last_name: lastName,
+      set_password_link: `${APP_URL}/set-password?token=${token}`,
+      portal_link: APP_URL,
+    })
+    const result = await sendEmail({
+      to: user.email,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    })
+    if (!result.success) return { success: false, error: 'Could not send that. Please try again.' }
+  } catch (err) {
+    console.error('sendAccountInviteAction failed', err)
+    return { success: false, error: 'Could not send that. Please try again.' }
+  }
+
+  revalidatePath(`/admin/users/${userId}`)
+  return { success: true, sentTo: user.email }
 }

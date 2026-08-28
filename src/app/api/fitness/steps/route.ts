@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
+import { getCurrentChallenge } from '@/lib/fitness-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,11 +67,9 @@ export async function POST(request: NextRequest) {
     ? payload.day
     : brisbaneToday(now)
 
-  const challenge = await prisma.fitnessChallenge.findFirst({
-    where: { isActive: true },
-    orderBy: { startsAt: 'desc' },
-    select: { id: true, startsAt: true, endsAt: true },
-  })
+  // Same selection as the pages, so a phone posting during a test run lands in
+  // the test rather than in a challenge that hasn't started.
+  const challenge = await getCurrentChallenge()
   if (!challenge) {
     return NextResponse.json({ ok: false, error: 'No challenge is running' }, { status: 409 })
   }
