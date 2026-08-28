@@ -109,6 +109,20 @@ export async function readStepsFromScreenshot(bytes: Uint8Array): Promise<ReadRe
     if (!reading) return { ok: false, error: 'We couldn’t read that one. Try typing the number in instead.' }
     return { ok: true, reading }
   } catch (err) {
+    // Worth telling apart. A billing or key problem fails identically to an
+    // unreadable photo from the outside, and the two need very different
+    // fixes: one is an admin task, the other is "take a clearer screenshot".
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      console.error('[step-screenshot] ANTHROPIC_API_KEY is rejected. Check the key is correct and active.', err)
+      return { ok: false, unavailable: true, error: 'Reading screenshots isn’t set up properly yet.' }
+    }
+    if (err instanceof Anthropic.BadRequestError && /credit|billing|quota/i.test(err.message)) {
+      console.error('[step-screenshot] Anthropic account is out of credit.', err)
+      return { ok: false, unavailable: true, error: 'Reading screenshots is unavailable right now.' }
+    }
+    if (err instanceof Anthropic.RateLimitError) {
+      return { ok: false, error: 'Too busy right now. Try again in a moment, or type the number in.' }
+    }
     console.error('[step-screenshot] read failed', err)
     return { ok: false, error: 'We couldn’t read that one. Try typing the number in instead.' }
   }

@@ -47,6 +47,9 @@ export function LogStepsForm({
   const fileRef = React.useRef<HTMLInputElement>(null)
   const [reading, setReading] = React.useState(false)
   const [readNote, setReadNote] = React.useState('')
+  // If the service turns out not to be set up, stop offering it for this visit
+  // rather than letting people keep trying something that cannot work.
+  const [readerBroken, setReaderBroken] = React.useState(false)
 
   function onScreenshot(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -63,7 +66,10 @@ export function LogStepsForm({
     body.append('screenshot', file)
     readStepsScreenshotAction(body)
       .then((res) => {
-        if (!res.success) return setError(res.error ?? 'Could not read that screenshot.')
+        if (!res.success) {
+          if (res.unavailable) setReaderBroken(true)
+          return setError(res.error ?? 'Could not read that screenshot.')
+        }
         if (res.steps != null) setAmount(String(res.steps))
         if (res.day) setDay(res.day)
         setReadNote(
@@ -120,7 +126,7 @@ export function LogStepsForm({
         </p>
       )}
 
-      {screenshotEnabled && (
+      {screenshotEnabled && !readerBroken && (
         <div className="mt-5 border-t border-neutral-100 pt-4">
           <input
             ref={fileRef}
