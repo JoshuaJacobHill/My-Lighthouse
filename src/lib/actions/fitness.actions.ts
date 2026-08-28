@@ -1,9 +1,13 @@
 'use server'
 
+import crypto from 'crypto'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { isAdminRole } from '@/lib/permissions-core'
+import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
+import { readStepsFromScreenshot } from '@/lib/step-screenshot'
 
 interface Result {
   success: boolean
@@ -19,7 +23,7 @@ async function requireStaff(): Promise<{ userId: string } | null> {
     select: { isStaff: true, isTrainee: true, role: true },
   })
   const allowed =
-    user?.isStaff || user?.isTrainee || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+    user?.isStaff || user?.isTrainee || isAdminRole(user?.role)
   return allowed ? { userId: session.userId } : null
 }
 
@@ -50,9 +54,8 @@ export async function logFitnessAction(input: LogFitnessInput): Promise<Result> 
   })
   if (!challenge) return { success: false, error: 'That challenge isn’t running.' }
 
-  // Treat the entered date as a Brisbane calendar day.
-  const dayDate = new Date(`${day}T00:00:00+10:00`)
-  if (Number.isNaN(dayDate.getTime())) return { success: false, error: 'Please choose a valid date.' }
+  const dayDate = calendarDay(day)
+  if (!dayDate) return { success: false, error: 'Please choose a valid date.' }
   if (dayDate < challenge.startsAt || dayDate > challenge.endsAt) {
     return { success: false, error: 'That date is outside the challenge period.' }
   }
@@ -65,4 +68,111 @@ export async function logFitnessAction(input: LogFitnessInput): Promise<Result> 
 
   revalidatePath('/staff/fitness')
   return { success: true }
+}
+
+// ─── Connecting a phone ───────────────────────────────────────────────────────
+
+/**
+ * Create (or replace) this person's push token. Opt-in: nothing exists until
+ * they ask for it here, and generating a new one immediately invalidates the
+ * old, so a lost phone is dealt with by pressing the button again.
+ */
+export async function connectFitnessAction(): Promise<{ success: boolean; token?: string; error?: string }> {
+  const me = await requireStaff()
+  if (!me) return { success: false, error: 'This is a staff-only challenge.' }
+
+  // Prefixed so it's recognisable if it ever turns up somewhere it shouldn't.
+  const token = `lhf_${crypto.randomBytes(24).toString('base64url')}`
+  try {
+    await prisma.fitnessLink.upsert({
+      where: { userId: me.userId },
+      update: { token, revokedAt: null, createdAt: new Date(), lastUsedAt: null, lastAmount: null },
+      create: { userId: me.userId, token },
+    })
+  } catch (err) {
+    console.error('connectFitnessAction failed', err)
+    return { success: false, error: 'Could not set that up. Please try again.' }
+  }
+  revalidatePath('/dashboard/fitness/connect')
+  revalidatePath('/dashboard/fitness')
+  return { success: true, token }
+}
+
+/** Turn the link off. Steps already recorded stay — only the pushing stops. */
+export async function disconnectFitnessAction(): Promise<Result> {
+  const me = await requireStaff()
+  if (!me) return { success: false, error: 'This is a staff-only challenge.' }
+  try {
+    await prisma.fitnessLink.updateMany({
+      where: { userId: me.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+  } catch (err) {
+    console.error('disconnectFitnessAction failed', err)
+    return { success: false, error: 'Could not disconnect. Please try again.' }
+  }
+  revalidatePath('/dashboard/fitness/connect')
+  revalidatePath('/dashboard/fitness')
+  return { success: true }
+}
+
+// ─── Reading a screenshot ─────────────────────────────────────────────────────
+
+export interface ScreenshotResult {
+  success: boolean
+  error?: string
+  /** True when the feature simply isn't configured, so the UI can hide itself. */
+  unavailable?: boolean
+  steps?: number
+  day?: string
+  /** Did the screenshot actually show a date, or are we assuming today? */
+  dateAssumed?: boolean
+  note?: string
+}
+
+/**
+ * Read a step count off an uploaded screenshot and hand it back for the person
+ * to confirm. Nothing is saved here and the image is never stored — the bytes
+ * live in this function's scope and go out of it with the response.
+ *
+ * Confirmation is deliberate: the number goes into the form, the person checks
+ * it against their own screen, and they press save. We never write a figure
+ * straight from an image into the leaderboard.
+ */
+export async function readStepsScreenshotAction(formData: FormData): Promise<ScreenshotResult> {
+  const me = await requireStaff()
+  if (!me) return { success: false, error: 'This is a staff-only challenge.' }
+
+  const file = formData.get('screenshot')
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: 'Please choose a screenshot.' }
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const result = await readStepsFromScreenshot(bytes)
+  if (!result.ok) {
+    return { success: false, error: result.error, unavailable: result.unavailable }
+  }
+
+  const { reading } = result
+  if (!reading.looksLikeStepScreen) {
+    return { success: false, error: 'That doesn’t look like a step screen. Try the one showing your daily total.' }
+  }
+  if (reading.steps == null || reading.steps < 0 || reading.steps > 200_000) {
+    return {
+      success: false,
+      error: reading.note || 'We couldn’t find a clear daily total in that. Try typing it in instead.',
+    }
+  }
+
+  // A date printed in the image is used as-is; anything else falls back to today
+  // and is flagged so the person can correct it before saving.
+  const explicit = reading.date && /^\d{4}-\d{2}-\d{2}$/.test(reading.date) ? reading.date : null
+  return {
+    success: true,
+    steps: reading.steps,
+    day: explicit ?? brisbaneToday(),
+    dateAssumed: !explicit,
+    note: reading.note,
+  }
 }

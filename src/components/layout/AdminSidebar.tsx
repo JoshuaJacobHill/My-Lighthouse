@@ -27,32 +27,34 @@ import {
   X,
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import type { Capability } from '@/lib/permissions-core'
 
 interface NavItem {
   href: string
   label: string
   icon: React.ElementType
-  finance?: boolean // hidden from admins without donations access
+  /** Hidden unless the admin holds at least one of these. Omitted = every admin. */
+  needs?: Capability[]
 }
 
 const navItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/roster', label: 'Roster / Calendar', icon: Calendar },
-  { href: '/admin/on-site', label: 'On-Site Now', icon: MapPin },
-  { href: '/admin/attendance', label: 'Attendance', icon: CheckSquare },
-  { href: '/admin/reports', label: 'Reports', icon: BarChart2 },
-  { href: '/admin/funds', label: 'Funds', icon: HeartHandshake, finance: true },
-  { href: '/admin/fundraisers', label: 'Fundraisers', icon: Megaphone, finance: true },
-  { href: '/admin/events', label: 'Events', icon: Ticket, finance: true },
-  { href: '/admin/stories', label: 'Good News', icon: Newspaper, finance: true },
-  { href: '/admin/teams', label: 'Serving Teams', icon: Church },
-  { href: '/admin/transactions', label: 'Transactions', icon: Receipt, finance: true },
-  { href: '/admin/migrations', label: 'Donor Migration', icon: ArrowLeftRight, finance: true },
-  { href: '/admin/tasks', label: 'Tasks & Checklists', icon: CheckSquare },
-  { href: '/admin/feedback', label: 'Volunteer Feedback', icon: Star },
-  { href: '/admin/emails', label: 'Emails', icon: Mail },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/users', label: 'Users', icon: Users, needs: ['care.people', 'church.members', 'care.giving'] },
+  { href: '/admin/roster', label: 'Roster / Calendar', icon: Calendar, needs: ['care.people'] },
+  { href: '/admin/on-site', label: 'On-Site Now', icon: MapPin, needs: ['care.people'] },
+  { href: '/admin/attendance', label: 'Attendance', icon: CheckSquare, needs: ['care.people'] },
+  { href: '/admin/reports', label: 'Reports', icon: BarChart2, needs: ['care.people'] },
+  { href: '/admin/funds', label: 'Funds', icon: HeartHandshake, needs: ['care.giving'] },
+  { href: '/admin/fundraisers', label: 'Fundraisers', icon: Megaphone, needs: ['care.giving'] },
+  { href: '/admin/events', label: 'Events', icon: Ticket, needs: ['care.giving'] },
+  { href: '/admin/stories', label: 'Good News', icon: Newspaper, needs: ['care.stories', 'church.stories'] },
+  { href: '/admin/teams', label: 'Serving Teams', icon: Church, needs: ['church.teams'] },
+  { href: '/admin/transactions', label: 'Transactions', icon: Receipt, needs: ['care.giving', 'church.giving'] },
+  { href: '/admin/migrations', label: 'Donor Migration', icon: ArrowLeftRight, needs: ['care.giving'] },
+  { href: '/admin/tasks', label: 'Tasks & Checklists', icon: CheckSquare, needs: ['care.tasks'] },
+  { href: '/admin/feedback', label: 'Volunteer Feedback', icon: Star, needs: ['care.people'] },
+  { href: '/admin/emails', label: 'Emails', icon: Mail, needs: ['system.settings'] },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, needs: ['system.settings'] },
 ]
 
 interface SidebarLinkProps {
@@ -86,15 +88,17 @@ interface AdminSidebarProps {
   /** Controlled collapsed state — for desktop only */
   collapsed?: boolean
   onCollapsedChange?: (collapsed: boolean) => void
-  /** When false, the fundraising/donations items are hidden. */
-  canSeeDonations?: boolean
+  /** Every capability the signed-in admin holds; anything else is hidden. */
+  capabilities?: Capability[]
 }
 
-export function AdminSidebar({ collapsed = false, onCollapsedChange, canSeeDonations = false }: AdminSidebarProps) {
+export function AdminSidebar({ collapsed = false, onCollapsedChange, capabilities = [] }: AdminSidebarProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = React.useState(false)
 
-  const items = navItems.filter((item) => !item.finance || canSeeDonations)
+  // Hiding a link is presentation only — every page and action behind it has
+  // its own server-side capability guard.
+  const items = navItems.filter((item) => !item.needs || item.needs.some((c) => capabilities.includes(c)))
 
   const isActive = (href: string) =>
     href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)

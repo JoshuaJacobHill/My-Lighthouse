@@ -1,12 +1,14 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { FundForm } from '@/components/admin/FundForm'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'New fund | Lighthouse Care Admin' }
 
-export default function NewFundPage() {
+export default async function NewFundPage() {
+  await requireCapability('care.giving')
   return (
     <div className="max-w-3xl space-y-6">
       <div>

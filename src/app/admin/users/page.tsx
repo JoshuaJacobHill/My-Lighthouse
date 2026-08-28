@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { formatDate } from '@/lib/utils'
-import { getDonationsAccess } from '@/lib/permissions'
+import { isAdminRole, requireAnyCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,8 +23,11 @@ export default async function UsersPage({
 }: {
   searchParams: Promise<{ search?: string; type?: string; page?: string; sort?: string; dir?: string }>
 }) {
+  const me = await requireAnyCapability(['care.people', 'church.members', 'care.giving'])
   const params = await searchParams
-  const canSeeDonations = await getDonationsAccess()
+  const canSeeDonations = me.held.includes('care.giving')
+  const canSeePeople = me.held.includes('care.people')
+  const canSeeChurch = me.held.includes('church.members')
 
   const page = Math.max(1, Number(params.page) || 1)
   const skip = (page - 1) * PAGE_SIZE
@@ -35,11 +38,19 @@ export default async function UsersPage({
     : 'activity'
   const dir: Dir = params.dir === 'asc' ? 'asc' : params.dir === 'desc' ? 'desc' : sort === 'name' ? 'asc' : 'desc'
 
-  let type = (params.type as UserType) || 'all'
-  // Volunteer-only admins must not browse the donor base at all — that's why
-  // 'All' is off-limits to them too, not just the Donors tab. Staff, trainee and
-  // church membership aren't financial data, so those filters stay available.
-  if (!canSeeDonations && (type === 'donors' || type === 'all')) type = 'volunteers'
+  // Which lists this admin may look at. 'All' mixes everyone together, so it
+  // needs every one of them — a church manager landing on the default tab must
+  // not be shown the donor base, and a care manager must not be shown church
+  // contact details. Anyone arriving with a ?type= they can't see is moved to
+  // the first list they can.
+  const allowedTypes: UserType[] = [
+    ...(canSeePeople && canSeeDonations && canSeeChurch ? (['all'] as UserType[]) : []),
+    ...(canSeePeople ? (['volunteers', 'staff', 'trainees'] as UserType[]) : []),
+    ...(canSeeDonations ? (['donors'] as UserType[]) : []),
+    ...(canSeeChurch ? (['church'] as UserType[]) : []),
+  ]
+  const requested = (params.type as UserType) || 'all'
+  const type: UserType = allowedTypes.includes(requested) ? requested : allowedTypes[0]
 
   const searchWhere: Prisma.UserWhereInput = search
     ? {
@@ -135,14 +146,16 @@ export default async function UsersPage({
   const users = allUsers.slice(skip, skip + PAGE_SIZE)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const tabs: { key: UserType; label: string }[] = [
-    ...(canSeeDonations ? [{ key: 'all' as UserType, label: 'All' }] : []),
-    { key: 'volunteers', label: 'Volunteers' },
-    ...(canSeeDonations ? [{ key: 'donors' as UserType, label: 'Donors' }] : []),
-    { key: 'staff', label: 'Staff' },
-    { key: 'trainees', label: 'Trainees' },
-    { key: 'church', label: 'Church' },
-  ]
+  const TAB_LABELS: Record<UserType, string> = {
+    all: 'All',
+    volunteers: 'Volunteers',
+    donors: 'Donors',
+    staff: 'Staff',
+    trainees: 'Trainees',
+    church: 'Church',
+  }
+  const TAB_ORDER: UserType[] = ['all', 'volunteers', 'donors', 'staff', 'trainees', 'church']
+  const tabs = TAB_ORDER.filter((k) => allowedTypes.includes(k)).map((k) => ({ key: k, label: TAB_LABELS[k] }))
 
   const baseQuery = (over: Record<string, string>) => {
     const q = new URLSearchParams()
@@ -263,7 +276,7 @@ export default async function UsersPage({
               const displayName = displayNameOf(u)
               const giving = totals.get(u.id)
               const isDonor = (u._count.donations ?? 0) > 0
-              const isAdmin = u.role === 'ADMIN' || u.role === 'SUPER_ADMIN'
+              const isAdmin = isAdminRole(u.role)
               return (
                 <tr key={u.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                   <td className="px-5 py-3">

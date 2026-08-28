@@ -4,6 +4,9 @@ import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { SettingsTabs } from './SettingsTabs'
+import { isAdminRole } from '@/lib/permissions-core'
+import { ASSIGNABLE_ADMIN_ROLES } from '@/lib/constants'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +18,9 @@ async function getSettings(): Promise<Record<string, string>> {
 }
 
 export default async function SettingsPage() {
+  await requireCapability('system.settings')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !isAdminRole(session.role)) {
     redirect('/login')
   }
 
@@ -24,7 +28,7 @@ export default async function SettingsPage() {
     getSettings(),
     session.role === 'SUPER_ADMIN'
       ? prisma.user.findMany({
-          where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] } },
+          where: { role: { in: [...ASSIGNABLE_ADMIN_ROLES] } },
           orderBy: { createdAt: 'asc' },
           select: {
             id: true,

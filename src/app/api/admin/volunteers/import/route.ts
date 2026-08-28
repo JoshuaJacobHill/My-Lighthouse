@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSession, hashPassword, createPasswordResetToken } from '@/lib/auth'
 import { renderTemplate } from '@/lib/email-templates'
 import { sendEmail } from '@/lib/email'
+import { hasCapability } from '@/lib/permissions'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 
@@ -68,7 +69,7 @@ function splitList(raw?: string): string[] {
 
 export async function POST(req: NextRequest) {
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !(await hasCapability('care.people'))) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 

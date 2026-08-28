@@ -16,6 +16,8 @@ import {
 import prisma from '@/lib/prisma'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { formatDate, formatDateTime } from '@/lib/utils'
+import { getCapabilities } from '@/lib/permissions'
+import type { Capability } from '@/lib/permissions-core'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,7 +55,56 @@ function durationSince(date: Date): string {
   return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`
 }
 
+const AREA_LINKS: { capability: Capability; href: string; label: string; blurb: string }[] = [
+  { capability: 'church.members', href: '/admin/users?type=church', label: 'Church members', blurb: 'Contact details for everyone in the church.' },
+  { capability: 'church.giving', href: '/admin/transactions', label: 'Tithes & giving', blurb: 'Every church gift received, with a CSV export.' },
+  { capability: 'church.stories', href: '/admin/stories', label: 'Good news', blurb: 'Write and publish stories for the church.' },
+  { capability: 'church.teams', href: '/admin/teams', label: 'Serving teams', blurb: 'Who serves where, and on which roster.' },
+  { capability: 'care.tasks', href: '/admin/tasks', label: 'Tasks & checklists', blurb: 'Assign work and keep the checklists on track.' },
+  { capability: 'care.stories', href: '/admin/stories', label: 'Good news', blurb: 'Write and publish stories for supporters.' },
+  { capability: 'care.giving', href: '/admin/funds', label: 'Funds & fundraisers', blurb: 'Appeals, events and Lighthouse Care giving.' },
+  { capability: 'system.settings', href: '/admin/settings', label: 'Settings', blurb: 'Email templates, induction content and more.' },
+]
+
+function ScopedAdminHome({ capabilities }: { capabilities: Capability[] }) {
+  const links = AREA_LINKS.filter((l) => capabilities.includes(l.capability))
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Admin</h1>
+        <p className="mt-0.5 text-sm text-gray-500">Everything you look after, in one place.</p>
+      </div>
+      {links.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          Your account doesn&rsquo;t have any admin areas assigned yet. A super admin can set this up in Settings.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {links.map((l) => (
+            <Link
+              key={l.href + l.label}
+              href={l.href}
+              className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-orange-300 hover:bg-orange-50"
+            >
+              <p className="font-semibold text-gray-900">{l.label}</p>
+              <p className="mt-1 text-sm text-gray-500">{l.blurb}</p>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default async function AdminDashboardPage() {
+  // The dashboard below is entirely volunteer data — names, attendance and who
+  // has gone quiet. An admin without people access gets a plain index of their
+  // own areas instead, and none of those queries run at all.
+  const capabilities = await getCapabilities()
+  if (!capabilities.includes('care.people')) {
+    return <ScopedAdminHome capabilities={capabilities} />
+  }
+
   const now = new Date()
   const todayStart = startOfDay(now)
   const todayEnd = addDays(todayStart, 1)

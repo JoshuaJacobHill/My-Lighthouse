@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { AttendeesCsvButton } from '@/components/admin/AttendeesCsvButton'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,7 @@ export default async function AttendeesPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requireCapability('care.giving')
   const { id } = await params
 
   const event = await prisma.event.findUnique({

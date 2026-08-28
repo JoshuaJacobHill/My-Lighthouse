@@ -5,6 +5,8 @@ import { subDays, subMonths, subQuarters, format, startOfDay } from 'date-fns'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { ReportExportButton } from './ReportExportButton'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,8 +44,9 @@ function getRangeLabel(range: DateRange): string {
 }
 
 export default async function ReportsPage({ searchParams }: PageProps) {
+  await requireCapability('care.people')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !isAdminRole(session.role)) {
     redirect('/login')
   }
 

@@ -5,6 +5,8 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 import { format } from 'date-fns'
+import { isAdminRole } from '@/lib/permissions-core'
+import { assertCapability } from '@/lib/permissions'
 
 export type RecurringFrequency = 'ONE_OFF' | 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY'
 
@@ -572,7 +574,7 @@ export async function editShiftBookingAction(
 async function requireAdminSessionForShifts(): Promise<void> {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
-  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') throw new Error('Insufficient permissions')
+  await assertCapability('care.people')
 }
 
 export async function adminBookShiftForVolunteerAction(

@@ -1,9 +1,11 @@
 import prisma from '@/lib/prisma'
 import { OnSiteClient } from '@/components/admin/OnSiteClient'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function OnSitePage() {
+  await requireCapability('care.people')
   const [registeredRecords, guestRecords] = await Promise.all([
     prisma.attendanceRecord.findMany({
       where: { signOutAt: null },

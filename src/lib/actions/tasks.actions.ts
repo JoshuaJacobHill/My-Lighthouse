@@ -7,6 +7,8 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
 import { periodKey } from '@/lib/checklists'
+import { isAdminRole } from '@/lib/permissions-core'
+import { assertCapability } from '@/lib/permissions'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 const P = 'margin:0 0 18px 0;line-height:1.7;color:#374151;font-size:15px;'
@@ -19,7 +21,7 @@ interface Result {
 async function requireAdmin() {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
-  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') throw new Error('Insufficient permissions')
+  await assertCapability('care.tasks')
   return session
 }
 
@@ -31,7 +33,7 @@ async function requireStaff(): Promise<{ userId: string } | null> {
     where: { id: session.userId },
     select: { isStaff: true, isTrainee: true, role: true },
   })
-  const ok = u?.isStaff || u?.isTrainee || u?.role === 'ADMIN' || u?.role === 'SUPER_ADMIN'
+  const ok = u?.isStaff || u?.isTrainee || isAdminRole(u?.role)
   return ok ? { userId: session.userId } : null
 }
 

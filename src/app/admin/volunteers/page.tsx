@@ -10,6 +10,7 @@ import { DeleteVolunteerButton } from '@/components/admin/DeleteVolunteerButton'
 import { ImportVolunteersModal } from '@/components/admin/ImportVolunteersModal'
 import { formatDate } from '@/lib/utils'
 import type { VolunteerStatus } from '@prisma/client'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ export default async function VolunteersPage({
 }: {
   searchParams: Promise<{ search?: string; status?: string; location?: string; page?: string }>
 }) {
+  await requireCapability('care.people')
   const params = await searchParams
   const page = Math.max(1, Number(params.page) || 1)
   const skip = (page - 1) * PAGE_SIZE

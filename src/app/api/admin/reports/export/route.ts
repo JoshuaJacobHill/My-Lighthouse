@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { subDays, subMonths, subQuarters, startOfDay, format } from 'date-fns'
+import { hasCapability } from '@/lib/permissions'
 
 function getRangeStart(range: string): Date {
   const now = new Date()
@@ -27,7 +28,7 @@ function csvEscape(value: string | null | undefined): string {
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !(await hasCapability('care.people'))) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 

@@ -1,15 +1,14 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
-import { getSession } from '@/lib/auth'
 import { NewUserForm } from '@/components/admin/NewUserForm'
+import { getCapabilities, requireAnyCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Add User | Lighthouse Care Admin' }
 
 export default async function NewUserPage() {
-  const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) redirect('/login')
+  await requireAnyCapability(['care.people', 'church.members'])
+  const capabilities = await getCapabilities()
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -19,10 +18,10 @@ export default async function NewUserPage() {
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">Add user</h1>
         <p className="mt-0.5 text-sm text-gray-500">
-          Create a volunteer, staff member, church member or donor — or any combination.
+          Create any combination of the kinds of supporter you look after.
         </p>
       </div>
-      <NewUserForm />
+      <NewUserForm capabilities={capabilities} />
     </div>
   )
 }

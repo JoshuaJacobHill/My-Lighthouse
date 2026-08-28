@@ -17,11 +17,12 @@ import prisma from '@/lib/prisma'
 import { Avatar } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { formatDate } from '@/lib/utils'
-import { getDonationsAccess } from '@/lib/permissions'
+import { isAdminRole, requireAnyCapability } from '@/lib/permissions'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
 import { listRecurringForEmail } from '@/lib/admin-recurring'
 import { StaffToggles } from '@/components/admin/StaffToggles'
 import { ChurchMemberToggle } from '@/components/admin/ChurchMemberToggle'
+import { USER_ROLES } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,8 +32,11 @@ const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD',
 const aud2 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
 
 export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const me = await requireAnyCapability(['care.people', 'church.members', 'care.giving'])
   const { id } = await params
-  const canSeeDonations = await getDonationsAccess()
+  const canSeeDonations = me.held.includes('care.giving')
+  const canSeePeople = me.held.includes('care.people')
+  const canSeeChurch = me.held.includes('church.members')
 
   const user = await prisma.user.findUnique({
     where: { id },
@@ -70,10 +74,18 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
 
   const vp = user.volunteerProfile
   const isDonor = (user._count.donations ?? 0) > 0
-  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
+  const isAdmin = isAdminRole(user.role)
 
-  // A donor-only account must not be visible to volunteer-only managers.
-  if (!vp && !canSeeDonations) redirect('/admin/users')
+  // Can this admin see this particular person at all? A record is reachable
+  // only through a list they're allowed to browse: a care manager gets
+  // volunteers, staff and trainees; a church manager gets church members; donor
+  // records need giving access. Someone who is only a donor stays invisible to
+  // volunteer-side managers, and vice versa.
+  const visibleToMe =
+    (canSeePeople && (vp !== null || user.isStaff || user.isTrainee)) ||
+    (canSeeChurch && user.isChurchMember) ||
+    (canSeeDonations && isDonor)
+  if (!visibleToMe) redirect('/admin/users')
 
   const gifts = canSeeDonations ? await getDonorGifts(user.id) : []
   const summary = canSeeDonations && gifts.length > 0 ? summariseGifts(gifts) : null
@@ -109,7 +121,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
             )}
             {isAdmin && (
               <span className="rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                {user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
+                {USER_ROLES[user.role as keyof typeof USER_ROLES] ?? 'Admin'}
               </span>
             )}
             {user.isChurchMember && (

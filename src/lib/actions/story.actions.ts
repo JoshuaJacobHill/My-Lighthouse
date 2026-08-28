@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { storySchema, type StoryInput } from '@/lib/validations'
+import { can, isAdminRole, type PermissionUser } from '@/lib/permissions-core'
 
 interface ActionResult {
   success: boolean
@@ -14,9 +15,39 @@ interface ActionResult {
 async function requireAdminSession(): Promise<void> {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
-  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') {
+  if (!isAdminRole(session.role)) {
     throw new Error('Insufficient permissions')
   }
+}
+
+/**
+ * Stories are the one thing both sides of the house write, so a story's
+ * audience decides who may touch it: `churchOnly` stories belong to the church
+ * manager, everything else to the Care side. Enforced here rather than only in
+ * the form, because the audience arrives from the client and a church manager
+ * could otherwise untick the box and publish to every volunteer.
+ */
+async function requireStoryAudience(churchOnly: boolean): Promise<void> {
+  const me = await currentPermissionUser()
+  const needed = churchOnly ? 'church.stories' : 'care.stories'
+  if (!can(me, needed)) {
+    throw new Error(
+      churchOnly
+        ? 'You do not have permission to publish church stories.'
+        : 'You do not have permission to publish Care stories.'
+    )
+  }
+}
+
+async function currentPermissionUser(): Promise<PermissionUser> {
+  const session = await getSession()
+  if (!session) throw new Error('Not authenticated')
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { role: true, canViewDonations: true },
+  })
+  if (!user) throw new Error('Not authenticated')
+  return user
 }
 
 function slugify(value: string): string {
@@ -56,6 +87,12 @@ export async function createStoryAction(input: StoryInput): Promise<ActionResult
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid story details' }
   }
   const data = parsed.data
+
+  try {
+    await requireStoryAudience(data.churchOnly ?? false)
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
 
   try {
     const slug = await uniqueSlug(data.slug ? slugify(data.slug) : slugify(data.title))
@@ -99,9 +136,18 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
   try {
     const existing = await prisma.story.findUnique({
       where: { id: storyId },
-      select: { id: true, publishedAt: true },
+      select: { id: true, publishedAt: true, churchOnly: true },
     })
     if (!existing) return { success: false, error: 'Story not found' }
+
+    // Both ends: you must own the story as it stands, and be allowed to publish
+    // to the audience you're moving it to.
+    try {
+      await requireStoryAudience(existing.churchOnly)
+      await requireStoryAudience(data.churchOnly ?? false)
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
 
     const slug = await uniqueSlug(data.slug ? slugify(data.slug) : slugify(data.title), storyId)
     await prisma.story.update({
@@ -136,6 +182,16 @@ export async function deleteStoryAction(storyId: string): Promise<ActionResult> 
     return { success: false, error: (err as Error).message }
   }
   try {
+    const existing = await prisma.story.findUnique({
+      where: { id: storyId },
+      select: { churchOnly: true },
+    })
+    if (!existing) return { success: false, error: 'Story not found' }
+    try {
+      await requireStoryAudience(existing.churchOnly)
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
     await prisma.story.delete({ where: { id: storyId } })
     revalidate()
     return { success: true }

@@ -2,12 +2,15 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import QuizManager from './QuizManager'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Page() {
+  await requireCapability('system.settings')
   const session = await getSession()
-  if (!session || !['ADMIN', 'SUPER_ADMIN'].includes(session.role)) redirect('/login')
+  if (!session || !isAdminRole(session.role)) redirect('/login')
 
   const questions = await prisma.inductionQuizQuestion.findMany({
     orderBy: { sortOrder: 'asc' },

@@ -7,17 +7,18 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { createUserAction } from '@/lib/actions/admin.actions'
 import { LOCATIONS, AUSTRALIAN_STATES } from '@/lib/constants'
+import type { Capability } from '@/lib/permissions-core'
 
 const TYPES = [
-  { key: 'asVolunteer', label: 'Volunteer', icon: HandHeart, hint: 'Books shifts, completes an induction' },
-  { key: 'asStaff', label: 'Staff', icon: Briefcase, hint: 'Tasks, checklists and staff-only updates' },
-  { key: 'asChurchMember', label: 'Church member', icon: Church, hint: 'Sees church-only news, events and teams' },
-  { key: 'asDonor', label: 'Donor', icon: Heart, hint: 'Creates their giving record for receipts' },
+  { key: 'asVolunteer', label: 'Volunteer', icon: HandHeart, hint: 'Books shifts, completes an induction', needs: 'care.people' },
+  { key: 'asStaff', label: 'Staff', icon: Briefcase, hint: 'Tasks, checklists and staff-only updates', needs: 'care.people' },
+  { key: 'asChurchMember', label: 'Church member', icon: Church, hint: 'Sees church-only news, events and teams', needs: 'church.members' },
+  { key: 'asDonor', label: 'Donor', icon: Heart, hint: 'Creates their giving record for receipts', needs: 'care.giving' },
 ] as const
 
 type TypeKey = (typeof TYPES)[number]['key']
 
-export function NewUserForm() {
+export function NewUserForm({ capabilities }: { capabilities: Capability[] }) {
   const router = useRouter()
   const [types, setTypes] = React.useState<Record<TypeKey, boolean>>({
     asVolunteer: false,
@@ -78,7 +79,7 @@ export function NewUserForm() {
           Pick any that apply — people are often more than one.
         </p>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {TYPES.map((t) => {
+          {TYPES.filter((t) => capabilities.includes(t.needs as Capability)).map((t) => {
             const Icon = t.icon
             const on = types[t.key]
             return (

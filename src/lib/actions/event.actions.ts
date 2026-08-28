@@ -6,6 +6,8 @@ import { getSession } from '@/lib/auth'
 import { eventSchema, type EventInput } from '@/lib/validations'
 import { normaliseWebsiteUrl } from '@/lib/sponsor-tiers'
 import { EVENTS_TAG } from '@/lib/event-data'
+import { isAdminRole } from '@/lib/permissions-core'
+import { assertCapability } from '@/lib/permissions'
 
 interface ActionResult {
   success: boolean
@@ -16,9 +18,7 @@ interface ActionResult {
 async function requireAdminSession(): Promise<{ userId: string; role: string }> {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
-  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') {
-    throw new Error('Insufficient permissions')
-  }
+  await assertCapability('care.giving')
   return { userId: session.userId, role: session.role }
 }
 

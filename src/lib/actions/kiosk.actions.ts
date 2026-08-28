@@ -37,7 +37,7 @@ async function requireKioskSession(): Promise<{ userId: string; role: string }> 
   if (!session) {
     throw new Error('Not authenticated')
   }
-  const allowedRoles = ['KIOSK', 'ADMIN', 'SUPER_ADMIN']
+  const allowedRoles = ['KIOSK', 'ADMIN', 'SUPER_ADMIN', 'CARE_MANAGER']
   if (!allowedRoles.includes(session.role)) {
     throw new Error('Insufficient permissions — kiosk access required')
   }

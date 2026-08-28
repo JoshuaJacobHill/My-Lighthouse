@@ -5,6 +5,7 @@ import { LogOut } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { AdminSidebar } from './AdminSidebar'
 import { Avatar } from '@/components/ui/avatar'
+import type { Capability } from '@/lib/permissions-core'
 
 interface AdminUser {
   id: string
@@ -14,11 +15,11 @@ interface AdminUser {
 
 interface AdminLayoutProps {
   user: AdminUser
-  canSeeDonations?: boolean
+  capabilities?: Capability[]
   children: React.ReactNode
 }
 
-export default function AdminLayout({ user, canSeeDonations = false, children }: AdminLayoutProps) {
+export default function AdminLayout({ user, capabilities = [], children }: AdminLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const router = useRouter()
 
@@ -36,7 +37,7 @@ export default function AdminLayout({ user, canSeeDonations = false, children }:
       <AdminSidebar
         collapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
-        canSeeDonations={canSeeDonations}
+        capabilities={capabilities}
       />
 
       {/* Main content area */}

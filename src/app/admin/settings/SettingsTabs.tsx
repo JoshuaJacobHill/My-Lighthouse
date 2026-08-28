@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Save, Loader2, Plus, Trash2, UserPlus, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
+import { USER_ROLES, ASSIGNABLE_ADMIN_ROLES, ADMIN_ROLE_DESCRIPTIONS } from '@/lib/constants'
+
+/** Badge colour per admin role — purple for the widest access, down to teal. */
+const ROLE_BADGE: Record<string, string> = {
+  SUPER_ADMIN: 'bg-purple-100 text-purple-700',
+  ADMIN: 'bg-blue-100 text-blue-700',
+  CARE_MANAGER: 'bg-orange-100 text-orange-700',
+  CHURCH_MANAGER: 'bg-teal-100 text-teal-700',
+}
 
 interface AdminUser {
   id: string
@@ -501,12 +510,10 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                     <td className="px-5 py-3">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          admin.role === 'SUPER_ADMIN'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
+                          ROLE_BADGE[admin.role] ?? 'bg-blue-100 text-blue-700'
                         }`}
                       >
-                        {admin.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
+                        {USER_ROLES[admin.role as keyof typeof USER_ROLES] ?? 'Admin'}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-gray-500 text-xs">
@@ -588,16 +595,18 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                       onChange={(e) => setEditForm((p) => ({ ...p, role: e.target.value }))}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none bg-white"
                     >
-                      <option value="ADMIN">Admin</option>
-                      <option value="SUPER_ADMIN">Super Admin</option>
+                      {ASSIGNABLE_ADMIN_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {USER_ROLES[r]}
+                        </option>
+                      ))}
                     </select>
                   </div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                    {editForm.role === 'SUPER_ADMIN' ? (
-                      <p className="text-sm text-gray-500">
-                        Super Admins can always see donations, donors and the fundraising area.
-                      </p>
-                    ) : (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
+                    <p className="text-xs text-gray-500">
+                      {ADMIN_ROLE_DESCRIPTIONS[editForm.role as keyof typeof ADMIN_ROLE_DESCRIPTIONS]}
+                    </p>
+                    {editForm.role !== 'ADMIN' ? null : (
                       <label className="flex items-start gap-2.5">
                         <input
                           type="checkbox"
@@ -764,9 +773,15 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                       }
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none bg-white"
                     >
-                      <option value="ADMIN">Admin</option>
-                      <option value="SUPER_ADMIN">Super Admin</option>
+                      {ASSIGNABLE_ADMIN_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {USER_ROLES[r]}
+                        </option>
+                      ))}
                     </select>
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      {ADMIN_ROLE_DESCRIPTIONS[addAdminForm.role as keyof typeof ADMIN_ROLE_DESCRIPTIONS]}
+                    </p>
                   </div>
 
                   {addAdminError && (

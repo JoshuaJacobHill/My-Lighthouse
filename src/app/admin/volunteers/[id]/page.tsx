@@ -15,6 +15,7 @@ import { SendEmailModal } from '@/components/admin/SendEmailModal'
 import { OnboardingForm } from '@/components/admin/OnboardingForm'
 import { DeleteVolunteerButton } from '@/components/admin/DeleteVolunteerButton'
 import { formatDate, formatDateTime } from '@/lib/utils'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,7 @@ export default async function VolunteerProfilePage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requireCapability('care.people')
   const { id } = await params
 
   const volunteer = await prisma.volunteerProfile.findUnique({

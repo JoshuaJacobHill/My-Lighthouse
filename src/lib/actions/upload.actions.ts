@@ -2,6 +2,7 @@
 
 import { put } from '@vercel/blob'
 import { getSession } from '@/lib/auth'
+import { isAdminRole } from '@/lib/permissions-core'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 
@@ -50,7 +51,7 @@ const EXT: Record<string, string> = {
  */
 export async function uploadImageAction(formData: FormData): Promise<UploadResult> {
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !isAdminRole(session.role)) {
     return { success: false, error: 'You need to be signed in as an admin to upload images.' }
   }
 

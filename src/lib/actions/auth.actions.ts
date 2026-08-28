@@ -17,6 +17,7 @@ import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 import { loginSchema, volunteerSignupSchema } from '@/lib/validations'
 import { getCoordinatorEmail } from '@/lib/coordinators'
+import { isAdminRole } from '@/lib/permissions-core'
 
 // ─── ICS Calendar helper ──────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ export async function loginAction(formData: FormData): Promise<{
     // or kiosk lands on the one unified portal dashboard (/donor), which adapts
     // to whether they give, volunteer, both, or neither.
     let redirectTo = '/dashboard'
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+    if (isAdminRole(user.role)) {
       redirectTo = '/admin'
     } else if (user.role === 'KIOSK') {
       redirectTo = '/kiosk'

@@ -5,6 +5,8 @@ import { Mail, Send, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { EmailTemplateToggle } from './EmailTemplateToggle'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,8 +44,9 @@ export default async function EmailsPage({
 }: {
   searchParams: Promise<{ tab?: string }>
 }) {
+  await requireCapability('system.settings')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !isAdminRole(session.role)) {
     redirect('/login')
   }
 

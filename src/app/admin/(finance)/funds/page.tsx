@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { Button } from '@/components/ui/button'
 import { FundsList, type FundRow } from '@/components/admin/FundsList'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,7 @@ function donateBaseUrl(): string {
 }
 
 export default async function FundsPage() {
+  await requireCapability('care.giving')
   const funds = await prisma.fund.findMany({
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   })

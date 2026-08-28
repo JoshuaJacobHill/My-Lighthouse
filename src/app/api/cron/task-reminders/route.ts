@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
 import { periodKey, isOverdue } from '@/lib/checklists'
+import { isAdminRole } from '@/lib/permissions-core'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   const hasValidSecret = Boolean(cronSecret) && authHeader === `Bearer ${cronSecret}`
   if (!hasValidSecret) {
     const session = await getSession()
-    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN'
+    const isAdmin = isAdminRole(session?.role)
     if (!isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 

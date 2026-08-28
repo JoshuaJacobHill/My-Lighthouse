@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 import { profileUpdateSchema } from '@/lib/validations'
+import { assertCapability } from '@/lib/permissions'
 
 interface ActionResult {
   success: boolean
@@ -351,8 +352,9 @@ export async function saveInductionAnswersAction(
   volunteerId: string,
   answers: Record<string, string>
 ): Promise<ActionResult> {
-  const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  try {
+    await assertCapability('care.people')
+  } catch {
     return { success: false, error: 'Not authorised' }
   }
 

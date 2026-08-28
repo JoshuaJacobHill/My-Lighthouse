@@ -4,12 +4,14 @@ import prisma from '@/lib/prisma'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/utils'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Events | Lighthouse Care Admin' }
 
 export default async function EventsPage() {
+  await requireCapability('care.giving')
   const events = await prisma.event.findMany({
     orderBy: { startsAt: 'desc' },
     select: {

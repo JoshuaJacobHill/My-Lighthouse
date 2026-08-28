@@ -5,6 +5,8 @@ import prisma from '@/lib/prisma'
 import { defaultTemplates } from '@/lib/email-templates'
 import { TemplateEditor } from './TemplateEditor'
 import type { EmailTemplateType } from '@prisma/client'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,8 +38,9 @@ interface PageProps {
 }
 
 export default async function EditTemplatePage({ params }: PageProps) {
+  await requireCapability('system.settings')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !isAdminRole(session.role)) {
     redirect('/login')
   }
 

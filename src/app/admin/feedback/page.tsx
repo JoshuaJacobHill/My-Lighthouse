@@ -3,13 +3,16 @@ import { Star, MessageSquare } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { formatDateTime } from '@/lib/utils'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Volunteer Feedback | Lighthouse Care Admin' }
 
 export default async function FeedbackAdminPage() {
+  await requireCapability('care.people')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) redirect('/login')
+  if (!session || !isAdminRole(session.role)) redirect('/login')
 
   const [rated, agg, withComments] = await Promise.all([
     prisma.shiftFeedback.findMany({

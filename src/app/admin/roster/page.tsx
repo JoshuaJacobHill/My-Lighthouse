@@ -23,6 +23,8 @@ import { RosterActions } from './RosterActions'
 import { RosterControls } from './RosterControls'
 import { AssignVolunteerModal } from './AssignVolunteerModal'
 import { GenerateShiftsButton } from './GenerateShiftsButton'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -143,8 +145,9 @@ const FILL_BORDER: Record<'empty' | 'partial' | 'full', string> = {
 }
 
 export default async function RosterPage({ searchParams }: PageProps) {
+  await requireCapability('care.people')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !isAdminRole(session.role)) {
     redirect('/login')
   }
 

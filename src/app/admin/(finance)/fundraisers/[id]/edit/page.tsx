@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { FundraiserForm, type FundraiserFormValues } from '@/components/admin/FundraiserForm'
 import { OfflineDonationsManager, type OfflineDonationRow } from '@/components/admin/OfflineDonationsManager'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,7 @@ export default async function EditFundraiserPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requireCapability('care.giving')
   const { id } = await params
 
   const [fundraiser, funds, offline] = await Promise.all([

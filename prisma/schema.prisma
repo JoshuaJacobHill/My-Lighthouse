@@ -102,6 +102,10 @@ enum UserRole {
   ADMIN
   SUPER_ADMIN
   KIOSK
+  // Scoped admin roles. What each one can reach is defined by the capability
+  // map in src/lib/permissions.ts — never by comparing roles at the call site.
+  CARE_MANAGER
+  CHURCH_MANAGER
 }
 
 model User {
@@ -149,6 +153,8 @@ model User {
   ticketOrders TicketOrder[]
   teamInterests TeamInterest[]
   fitnessEntries FitnessEntry[]
+  fitnessLink    FitnessLink?
+  extraEmails    UserEmail[]
   tasksAssigned  StaffTask[]           @relation("TaskAssignee")
   tasksCreated   StaffTask[]           @relation("TaskAssigner")
   checklistDone  ChecklistCompletion[]
@@ -1037,6 +1043,9 @@ model FitnessChallenge {
   slug      String   @unique
   unit      String   @default("steps")
   goal      Int // collective target, e.g. 10,000,000
+  // Designed banner for the staff dashboard. When set it replaces the built-in
+  // artwork, so the campaign can be re-skinned without a deploy.
+  imageUrl  String?
   startsAt  DateTime
   endsAt    DateTime
   isActive  Boolean  @default(true)
@@ -1067,6 +1076,86 @@ model FitnessEntry {
 }
 
 // Rotating encouragement shown to staff — one per day, cycled by date.
+/**
+ * Opt-in link between a staff member and their phone's health data.
+ *
+ * Apple Health can't be read from a web page — HealthKit is native-only — so
+ * the phone pushes to us instead: an iOS Shortcut reads today's step count and
+ * POSTs it with this token. Nothing exists until the person creates it, and
+ * revoking is a single row update.
+ *
+ * The token is write-only by design: it can add a step count for its owner and
+ * nothing else. It reads no personal data, so a leaked token means someone
+ * could fudge one person's step tally — annoying, not harmful — and it can be
+ * regenerated from the fitness page at any time.
+ */
+model FitnessLink {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  token      String    @unique
+  source     String    @default("Apple Health") // whatever set it up
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  lastAmount Int?
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([revokedAt])
+}
+
+/**
+ * A recurring staff wellbeing session — the weekly health schedule.
+ *
+ * Times are plain strings on purpose ("11:30"). These are wall-clock slots in a
+ * printed-on-the-fridge sense, not instants: nobody wants "Tuesday 11:30" to
+ * drift because of a timezone conversion.
+ */
+/**
+ * An extra email address on an account.
+ *
+ * The primary address stays on `User.email` — this table holds only the
+ * additional ones, so nothing that already reads `user.email` changes meaning.
+ * Someone might sign up with their work address and later give with a personal
+ * one; linking the two brings the giving history together.
+ *
+ * A row is worthless until `verifiedAt` is set. Verification is what proves the
+ * person actually controls the address, and nothing — no donation claiming, no
+ * merging — happens before it.
+ */
+model UserEmail {
+  id             String    @id @default(cuid())
+  userId         String
+  email          String    @unique
+  verifiedAt     DateTime?
+  token          String?   @unique
+  tokenExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([verifiedAt])
+}
+
+model WellbeingSession {
+  id        String   @id @default(cuid())
+  title     String
+  weekday   Int // 1 = Monday … 7 = Sunday
+  startTime String // "11:30", 24-hour
+  endTime   String? // optional — some sessions just have a start
+  location  String?
+  leader    String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, weekday])
+}
+
 model WellbeingTip {
   id        String   @id @default(cuid())
   body      String   @db.Text

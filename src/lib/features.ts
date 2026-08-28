@@ -1,3 +1,4 @@
+import { isAdminRole } from '@/lib/permissions-core'
 /**
  * Feature flags for the platform.
  *
@@ -39,6 +40,6 @@ export function canAccessDonorPortal(user: {
 }): boolean {
   if (isDonorPortalEnabled()) return true
   if (isEarlyAccessEmail(user.email)) return true
-  if (user.role && ['ADMIN', 'SUPER_ADMIN'].includes(user.role)) return true
+  if (user.role && isAdminRole(user.role)) return true
   return false
 }

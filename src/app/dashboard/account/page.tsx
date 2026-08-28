@@ -4,6 +4,7 @@ import { ArrowLeft, KeyRound, HandHeart, ArrowRight, Church } from 'lucide-react
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AccountSettingsForm } from '@/components/donor/AccountSettingsForm'
+import { LinkedEmails } from '@/components/donor/LinkedEmails'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,10 @@ export default async function DonorAccountPage() {
       company: true,
       donorProfile: { select: { phone: true, address: true, consentEmailUpdates: true } },
       volunteerProfile: { select: { id: true } },
+      extraEmails: {
+        select: { id: true, email: true, verifiedAt: true },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   })
   if (!user) redirect('/login')
@@ -57,6 +62,11 @@ export default async function DonorAccountPage() {
           }}
         />
       </div>
+
+      <LinkedEmails
+        primary={user.email}
+        emails={user.extraEmails.map((e) => ({ id: e.id, email: e.email, verified: e.verifiedAt !== null }))}
+      />
 
       {/* My tithes (church givers only) */}
       {hasTithe && (

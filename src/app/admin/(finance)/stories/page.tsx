@@ -3,13 +3,20 @@ import { Plus, ExternalLink } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { DeleteStoryButton } from '@/components/admin/DeleteStoryButton'
+import { requireAnyCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Good News & Stories | Lighthouse Care Admin' }
 
 export default async function StoriesPage() {
+  const me = await requireAnyCapability(['care.stories', 'church.stories'])
+  // Only the audiences this admin writes for. A church manager sees church
+  // stories, a care manager sees the rest; a general admin sees both.
+  const seesCare = me.held.includes('care.stories')
+  const seesChurch = me.held.includes('church.stories')
   const stories = await prisma.story.findMany({
+    where: seesCare && seesChurch ? {} : { churchOnly: seesChurch },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
   })
 

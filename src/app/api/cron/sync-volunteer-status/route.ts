@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
+import { isAdminRole } from '@/lib/permissions-core'
 
 // ─── Runs daily at 2 am AEST (16:00 UTC) ────────────────────────────────────
 //
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   if (!hasValidSecret) {
     const session = await getSession()
-    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN'
+    const isAdmin = isAdminRole(session?.role)
     if (!isAdmin) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
@@ -213,7 +214,7 @@ let _systemUserId: string | null | undefined = undefined
 async function getSystemUserId(): Promise<string | null> {
   if (_systemUserId !== undefined) return _systemUserId
   const admin = await prisma.user.findFirst({
-    where: { role: { in: ['SUPER_ADMIN', 'ADMIN'] } },
+    where: { role: { in: ['SUPER_ADMIN', 'ADMIN', 'CARE_MANAGER'] } },
     orderBy: { createdAt: 'asc' },
     select: { id: true },
   })

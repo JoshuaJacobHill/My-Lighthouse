@@ -5,6 +5,8 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import type { Metadata } from 'next'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,9 +29,10 @@ export default async function EditVolunteerPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requireCapability('care.people')
   const { id } = await params
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !isAdminRole(session.role)) {
     redirect('/login')
   }
 
@@ -52,7 +55,7 @@ export default async function EditVolunteerPage({
     'use server'
 
     const session = await getSession()
-    if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+    if (!session || !isAdminRole(session.role)) {
       return
     }
 

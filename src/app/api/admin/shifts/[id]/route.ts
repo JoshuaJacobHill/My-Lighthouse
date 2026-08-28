@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { hasCapability } from '@/lib/permissions'
 
 async function requireAdmin() {
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !(await hasCapability('care.people'))) {
     return null
   }
   return session

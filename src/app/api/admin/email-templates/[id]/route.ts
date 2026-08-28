@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import type { EmailTemplateType } from '@prisma/client'
+import { hasCapability } from '@/lib/permissions'
 
 async function requireAdmin() {
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !(await hasCapability('system.settings'))) {
     return null
   }
   return session

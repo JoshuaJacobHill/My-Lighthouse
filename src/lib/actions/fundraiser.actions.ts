@@ -10,6 +10,8 @@ import {
   type OfflineDonationInput,
   type OfflineDonationEditInput,
 } from '@/lib/validations'
+import { isAdminRole } from '@/lib/permissions-core'
+import { assertCapability } from '@/lib/permissions'
 
 interface ActionResult {
   success: boolean
@@ -20,9 +22,7 @@ interface ActionResult {
 async function requireAdminSession(): Promise<void> {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
-  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') {
-    throw new Error('Insufficient permissions')
-  }
+  await assertCapability('care.giving')
 }
 
 function slugify(value: string): string {

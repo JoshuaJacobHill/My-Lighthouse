@@ -3,9 +3,12 @@ import { clsx } from 'clsx'
 import prisma from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { financialYearRange } from '@/lib/donations'
+import type { Prisma } from '@prisma/client'
 import { STRIPE_ACCOUNTS } from '@/lib/stripe-accounts'
+import { givingScopeFor, donationScopeWhere, givingScopeLabel } from '@/lib/giving-scope'
 import { listActiveRecurringEmails } from '@/lib/admin-recurring'
 import { AttendeesCsvButton } from '@/components/admin/AttendeesCsvButton'
+import { requireAnyCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,17 +41,29 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<{ type?: string }>
 }) {
+  const me = await requireAnyCapability(['care.giving', 'church.giving'])
   const { type: typeParam } = await searchParams
   const filter: Filter = typeParam === 'recurring' ? 'recurring' : typeParam === 'once' ? 'once' : 'all'
-  const listWhere =
+
+  // Everything on this page — totals, counts, rows and the CSV — is narrowed to
+  // the side of the ledger this admin may see. A church manager gets tithes; a
+  // Care manager with giving access gets Care gifts.
+  const scope = givingScopeFor(me.held)!
+  const scopeWhere = donationScopeWhere(scope)
+  const scopeLabel = givingScopeLabel(scope)
+  const typeWhere =
     filter === 'recurring' ? { isRecurring: true } : filter === 'once' ? { isRecurring: false } : {}
+  const listWhere: Prisma.DonationWhereInput = { AND: [scopeWhere, typeWhere] }
 
   const { start, end, label: fyLabel } = financialYearRange()
 
   const [totals, fyAgg, recurringCount, rows] = await Promise.all([
-    prisma.donation.aggregate({ _sum: { amount: true }, _count: true }),
-    prisma.donation.aggregate({ where: { createdAt: { gte: start, lt: end } }, _sum: { amount: true } }),
-    prisma.donation.count({ where: { isRecurring: true } }),
+    prisma.donation.aggregate({ where: scopeWhere, _sum: { amount: true }, _count: true }),
+    prisma.donation.aggregate({
+      where: { AND: [scopeWhere, { createdAt: { gte: start, lt: end } }] },
+      _sum: { amount: true },
+    }),
+    prisma.donation.count({ where: { AND: [scopeWhere, { isRecurring: true }] } }),
     prisma.donation.findMany({
       where: listWhere,
       orderBy: { createdAt: 'desc' },
@@ -110,10 +125,16 @@ export default async function TransactionsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Every gift received, across all funds, fundraisers and events.</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Transactions{scopeLabel ? <span className="text-gray-400"> &middot; {scopeLabel}</span> : null}
+          </h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {scopeLabel
+              ? `Every ${scopeLabel} gift received. Figures on this page cover ${scopeLabel} only.`
+              : 'Every gift received, across all funds, fundraisers and events.'}
+          </p>
         </div>
-        {rows.length > 0 && <AttendeesCsvButton csv={csv} filename={`transactions-${new Date().toISOString().slice(0, 10)}.csv`} />}
+        {rows.length > 0 && <AttendeesCsvButton csv={csv} filename={`transactions-${scope}-${new Date().toISOString().slice(0, 10)}.csv`} />}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">

@@ -1,8 +1,10 @@
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { NewVolunteerForm } from '@/components/admin/NewVolunteerForm'
+import { requireCapability } from '@/lib/permissions'
 
-export default function NewVolunteerPage() {
+export default async function NewVolunteerPage() {
+  await requireCapability('care.people')
   return (
     <div className="space-y-6">
       <div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { hashPassword } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { ASSIGNABLE_ADMIN_ROLES } from '@/lib/constants'
 
 async function requireSuperAdmin() {
   const session = await getSession()
@@ -32,7 +33,7 @@ export async function PATCH(
       canViewDonations?: boolean
     }
 
-    const allowedRoles = ['ADMIN', 'SUPER_ADMIN']
+    const allowedRoles = ASSIGNABLE_ADMIN_ROLES as readonly string[]
     if (role && !allowedRoles.includes(role)) {
       return NextResponse.json({ success: false, error: 'Invalid role.' }, { status: 400 })
     }

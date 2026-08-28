@@ -3,6 +3,7 @@ import { Plus, Pencil, ExternalLink } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,7 @@ function baseUrl(): string {
 }
 
 export default async function FundraisersPage() {
+  await requireCapability('care.giving')
   const fundraisers = await prisma.fundraiser.findMany({
     orderBy: { createdAt: 'desc' },
     select: { id: true, title: true, slug: true, organiserName: true, goalAmount: true, isActive: true },

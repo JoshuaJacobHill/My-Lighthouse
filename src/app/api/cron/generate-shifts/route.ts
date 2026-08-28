@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { isAdminRole } from '@/lib/permissions-core'
 
 // ─── QLD Public Holiday Calculator ───────────────────────────────────────────
 // Queensland does not observe daylight saving. All dates are local AEST.
@@ -163,7 +164,7 @@ export async function GET(request: NextRequest) {
   if (!hasValidSecret) {
     // Fall back to session-based admin check
     const session = await getSession()
-    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN'
+    const isAdmin = isAdminRole(session?.role)
     if (!isAdmin) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }

@@ -16,6 +16,7 @@ import {
   X,
   Footprints,
   CheckSquare,
+  Newspaper,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Avatar } from '@/components/ui/avatar'
@@ -69,6 +70,7 @@ export function PortalShell({
     ...(isStaff
       ? [
           { href: '/dashboard/tasks', label: 'Tasks & checklists', icon: CheckSquare },
+          { href: '/dashboard/news', label: 'News & updates', icon: Newspaper },
           { href: '/dashboard/fitness', label: 'Staff fitness', icon: Footprints },
         ]
       : []),
@@ -89,18 +91,42 @@ export function PortalShell({
   const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href)
 
-  // Mobile bottom-tab destinations (same for everyone; content adapts).
+  // Mobile bottom tabs. Four slots, and they go to whatever that person opens
+  // most: staff live in tasks and updates all day, so giving and volunteering
+  // move down the dashboard for them rather than taking a permanent tab.
   const accountHref = isVolunteer ? '/volunteer/profile' : '/dashboard/account'
   const onAccount = pathname.startsWith('/dashboard/account') || pathname.startsWith('/volunteer/profile')
   const tabs = [
     { href: '/dashboard', label: 'Home', icon: LayoutDashboard, active: pathname === '/dashboard' },
-    {
-      href: '/volunteer',
-      label: 'Volunteer',
-      icon: HandHeart,
-      active: pathname.startsWith('/volunteer') && !pathname.startsWith('/volunteer/profile'),
-    },
-    { href: '/dashboard/give', label: 'Give', icon: Heart, active: pathname === '/dashboard/give' || pathname.startsWith('/give') },
+    ...(isStaff
+      ? [
+          {
+            href: '/dashboard/tasks',
+            label: 'Tasks',
+            icon: CheckSquare,
+            active: pathname.startsWith('/dashboard/tasks'),
+          },
+          {
+            href: '/dashboard/news',
+            label: 'News',
+            icon: Newspaper,
+            active: pathname.startsWith('/dashboard/news'),
+          },
+        ]
+      : [
+          {
+            href: '/volunteer',
+            label: 'Volunteer',
+            icon: HandHeart,
+            active: pathname.startsWith('/volunteer') && !pathname.startsWith('/volunteer/profile'),
+          },
+          {
+            href: '/dashboard/give',
+            label: 'Give',
+            icon: Heart,
+            active: pathname === '/dashboard/give' || pathname.startsWith('/give'),
+          },
+        ]),
     { href: accountHref, label: 'Account', icon: User, active: onAccount },
   ]
 

@@ -1,16 +1,25 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { StoryForm } from '@/components/admin/StoryForm'
+import { requireAnyCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Edit story | Lighthouse Care Admin' }
 
 export default async function EditStoryPage({ params }: { params: Promise<{ id: string }> }) {
+  const me = await requireAnyCapability(['care.stories', 'church.stories'])
   const { id } = await params
   const story = await prisma.story.findUnique({ where: { id } })
+  // Someone with a direct link to a story from the other side of the house
+  // shouldn't get the edit form; the save action refuses too, but there's no
+  // reason to show them the content first.
+  if (story && !me.held.includes(story.churchOnly ? 'church.stories' : 'care.stories')) {
+    redirect('/admin/stories')
+  }
   if (!story) notFound()
 
   return (

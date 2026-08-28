@@ -57,8 +57,23 @@ export const USER_ROLES = {
   VOLUNTEER: 'Volunteer',
   ADMIN: 'Admin',
   SUPER_ADMIN: 'Super Admin',
+  CARE_MANAGER: 'Lighthouse Care Manager',
+  CHURCH_MANAGER: 'Lighthouse Church Manager',
   KIOSK: 'Kiosk',
 } as const
+
+/** Shown beside each role when assigning one, so the choice is obvious. */
+export const ADMIN_ROLE_DESCRIPTIONS = {
+  SUPER_ADMIN: 'Sees and manages everything, including other admins.',
+  ADMIN: 'General admin. Donor and church giving only if you tick giving access.',
+  CARE_MANAGER:
+    'Staff, volunteers and trainees, tasks and checklists, volunteer settings and Care good news. No giving data.',
+  CHURCH_MANAGER:
+    'Church member contact details, tithe transactions, church good news and serving teams. No volunteer or Care donor data.',
+} as const
+
+/** Roles that can be assigned to an admin user, most senior first. */
+export const ASSIGNABLE_ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'CARE_MANAGER', 'CHURCH_MANAGER'] as const
 
 export const AUSTRALIAN_STATES = [
   'QLD',

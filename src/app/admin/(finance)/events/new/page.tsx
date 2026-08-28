@@ -2,12 +2,14 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { EventForm } from '@/components/admin/EventForm'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'New event | Lighthouse Care Admin' }
 
 export default async function NewEventPage() {
+  await requireCapability('care.giving')
   const funds = await prisma.fund.findMany({
     where: { isActive: true },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],

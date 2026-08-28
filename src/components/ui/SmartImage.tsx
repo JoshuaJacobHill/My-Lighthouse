@@ -9,6 +9,9 @@ const OPTIMISABLE_HOSTS = [
 ]
 
 function canOptimise(src: string): boolean {
+  // A path relative to /public is always safe for the optimiser — it's our own
+  // file, served from our own origin.
+  if (src.startsWith('/') && !src.startsWith('//')) return true
   try {
     const url = new URL(src)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return false

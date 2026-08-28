@@ -5,6 +5,7 @@ import { formatDate, formatDateTime, formatDuration } from '@/lib/utils'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { AttendanceTableClient, type AttendanceRow } from '@/components/admin/AttendanceTableClient'
 import { clsx } from 'clsx'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,6 +93,7 @@ export default async function AttendancePage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
+  await requireCapability('care.people')
   const params = await searchParams
   const activeTab = (params.tab as Tab) ?? 'all'
   const activeRange = (params.range as Range) ?? 'week'

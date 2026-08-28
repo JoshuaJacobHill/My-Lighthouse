@@ -2,13 +2,16 @@ import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { ServingTeamsAdmin } from '@/components/admin/ServingTeamsAdmin'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Serving Teams | Lighthouse Care Admin' }
 
 export default async function AdminTeamsPage() {
+  await requireCapability('church.teams')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) redirect('/login')
+  if (!session || !isAdminRole(session.role)) redirect('/login')
 
   const teams = await prisma.servingTeam.findMany({
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],

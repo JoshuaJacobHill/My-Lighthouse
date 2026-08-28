@@ -6,6 +6,9 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { formatDate } from '@/lib/utils'
 import type { VolunteerStatus } from '@prisma/client'
+import { isAdminRole } from '@/lib/permissions-core'
+import { assertCapability } from '@/lib/permissions'
+import type { Capability } from '@/lib/permissions-core'
 
 interface ActionResult {
   success: boolean
@@ -20,9 +23,7 @@ async function requireAdminSession(): Promise<{ userId: string; role: string }> 
   if (!session) {
     throw new Error('Not authenticated')
   }
-  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') {
-    throw new Error('Insufficient permissions')
-  }
+  await assertCapability('care.people')
   return { userId: session.userId, role: session.role }
 }
 
@@ -861,8 +862,20 @@ export interface CreateUserData extends CreateVolunteerData {
 export async function createUserAction(
   data: CreateUserData
 ): Promise<{ success: boolean; userId?: string; error?: string }> {
+  // Checked per kind of supporter rather than once for the whole form: a church
+  // manager may add a church member but not a volunteer, and neither manager
+  // should be able to create a donor record without giving access.
+  const needed: Capability[] = [
+    ...(data.asVolunteer || data.asStaff ? (['care.people'] as Capability[]) : []),
+    ...(data.asChurchMember ? (['church.members'] as Capability[]) : []),
+    ...(data.asDonor ? (['care.giving'] as Capability[]) : []),
+  ]
   try {
-    await requireAdminSession()
+    // Nothing ticked is a validation problem, not a permissions one — fall back
+    // to requiring people access so an empty form can't slip past the gate.
+    for (const capability of needed.length > 0 ? needed : (['care.people'] as Capability[])) {
+      await assertCapability(capability)
+    }
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }

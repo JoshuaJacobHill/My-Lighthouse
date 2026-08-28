@@ -25,16 +25,32 @@ export function financialYearRange(ref: Date = new Date()): {
 
 /**
  * Link any unclaimed gifts to this account by matching the payer email — but
- * ONLY when the account's email is verified (plan §8). Returns how many linked.
+ * ONLY for addresses that have been verified (plan §8). Returns how many linked.
+ *
+ * Covers every address on the account, not just the primary: someone who signed
+ * up with a work address and gave with a personal one has both here once
+ * they've confirmed the second, and their history should follow.
  */
 export async function claimDonationsForUser(
   userId: string,
   email: string | null,
   emailVerified: Date | null
 ): Promise<number> {
-  if (!email || !emailVerified) return 0
+  const extras = await prisma.userEmail.findMany({
+    where: { userId, verifiedAt: { not: null } },
+    select: { email: true },
+  })
+  const addresses = [
+    ...(email && emailVerified ? [email] : []),
+    ...extras.map((e) => e.email),
+  ]
+  if (addresses.length === 0) return 0
+
   const result = await prisma.donation.updateMany({
-    where: { userId: null, donorEmail: { equals: email, mode: 'insensitive' } },
+    where: {
+      userId: null,
+      OR: addresses.map((a) => ({ donorEmail: { equals: a, mode: 'insensitive' as const } })),
+    },
     data: { userId },
   })
   // Anyone who has tithed is a church member (sees church-only content).

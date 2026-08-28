@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { TasksAdmin } from './TasksAdmin'
+import { isAdminRole } from '@/lib/permissions-core'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Tasks & Checklists | Lighthouse Care Admin' }
@@ -18,8 +20,9 @@ const fmtDue = (d: Date) =>
   }).format(d)
 
 export default async function AdminTasksPage() {
+  await requireCapability('care.tasks')
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) redirect('/login')
+  if (!session || !isAdminRole(session.role)) redirect('/login')
 
   const [tasks, items, staff, locations] = await Promise.all([
     prisma.staffTask.findMany({

@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { EventForm, type EventFormValues } from '@/components/admin/EventForm'
 import { EventSponsorsManager } from '@/components/admin/EventSponsorsManager'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ export default async function EditEventPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requireCapability('care.giving')
   const { id } = await params
 
   const [event, funds] = await Promise.all([

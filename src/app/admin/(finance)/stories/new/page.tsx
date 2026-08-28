@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { StoryForm } from '@/components/admin/StoryForm'
+import { requireAnyCapability } from '@/lib/permissions'
 
 export const metadata = { title: 'New story | Lighthouse Care Admin' }
 
-export default function NewStoryPage() {
+export default async function NewStoryPage() {
+  await requireAnyCapability(['care.stories', 'church.stories'])
   return (
     <div className="space-y-6">
       <Link

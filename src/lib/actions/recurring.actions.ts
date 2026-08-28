@@ -3,6 +3,7 @@
 import type Stripe from 'stripe'
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
+import { getVerifiedEmails } from '@/lib/user-emails'
 import prisma from '@/lib/prisma'
 import { getStripeFor, isAccountConfigured, type StripeAccountKey } from '@/lib/stripe-accounts'
 
@@ -49,19 +50,26 @@ const rank = (s: string) => (ACTIVE_STATUSES.has(s) ? 0 : 1)
 export async function listMyRecurringGifts(): Promise<RecurringGift[]> {
   const session = await getSession()
   if (!session) return []
-  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { email: true } })
-  if (!user?.email) return []
-  const email = user.email.toLowerCase()
+  // Every verified address on the account — a gift set up with a personal
+  // email belongs to the same person as the one they signed in with.
+  const emails = await getVerifiedEmails(session.userId)
+  if (emails.length === 0) return []
 
   const gifts: (RecurringGift & { fundSlug?: string })[] = []
   const opts = { apiVersion: SUB_API_VERSION }
+  const seen = new Set<string>()
 
   for (const account of ACCOUNTS) {
     if (!isAccountConfigured(account)) continue
     try {
       const stripe = getStripeFor(account)
-      const customers = await stripe.customers.list({ email, limit: 20 }, opts)
-      for (const customer of customers.data) {
+      const customers = (
+        await Promise.all(emails.map((email) => stripe.customers.list({ email, limit: 20 }, opts)))
+      ).flatMap((page) => page.data)
+      for (const customer of customers) {
+        // The same customer can come back under more than one address.
+        if (seen.has(customer.id)) continue
+        seen.add(customer.id)
         const subs = await stripe.subscriptions.list(
           { customer: customer.id, status: 'all', limit: 50, expand: ['data.items.data.price'] },
           opts
@@ -113,11 +121,10 @@ export async function cancelMyRecurringGift(
 ): Promise<{ success: boolean; error?: string }> {
   const session = await getSession()
   if (!session) return { success: false, error: 'Please sign in again.' }
-  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { email: true } })
-  if (!user?.email) return { success: false, error: 'No account email on file.' }
   if (!isAccountConfigured(account)) return { success: false, error: 'Unavailable right now.' }
 
-  const email = user.email.toLowerCase()
+  const emails = await getVerifiedEmails(session.userId)
+  if (emails.length === 0) return { success: false, error: 'Please confirm your email address first.' }
   const opts = { apiVersion: SUB_API_VERSION }
   try {
     const stripe = getStripeFor(account)
@@ -126,9 +133,11 @@ export async function cancelMyRecurringGift(
       typeof sub.customer === 'object' && sub.customer && 'email' in sub.customer
         ? ((sub.customer as { email?: string | null }).email ?? '')
         : ''
+    // Ownership check — verified addresses only, so an unconfirmed address can
+    // never be used to reach someone else's subscription.
     const owns =
-      customerEmail.toLowerCase() === email ||
-      (sub.metadata?.donorEmail ?? '').toLowerCase() === email
+      emails.includes(customerEmail.toLowerCase()) ||
+      emails.includes((sub.metadata?.donorEmail ?? '').toLowerCase())
     if (!owns) return { success: false, error: 'That recurring gift isn’t on your account.' }
 
     // Already cancelled — nothing to do (avoid a Stripe error on re-cancel).

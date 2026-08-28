@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { isAdminRole } from '@/lib/permissions-core'
+import { assertCapability } from '@/lib/permissions'
 
 type Result = { success: boolean; error?: string }
 
@@ -43,10 +45,7 @@ export async function withdrawTeamInterestAction(teamId: string): Promise<Result
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 async function requireAdmin() {
-  const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
-    throw new Error('Insufficient permissions')
-  }
+  await assertCapability('church.teams')
 }
 
 export async function createServingTeamAction(input: { name: string; description?: string }): Promise<Result> {

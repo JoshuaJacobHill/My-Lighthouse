@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { FundForm, type FundFormValues } from '@/components/admin/FundForm'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,7 @@ export default async function EditFundPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  await requireCapability('care.giving')
   const { id } = await params
 
   const fund = await prisma.fund.findUnique({ where: { id } })

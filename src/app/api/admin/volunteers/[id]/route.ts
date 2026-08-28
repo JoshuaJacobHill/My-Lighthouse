@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { hasCapability } from '@/lib/permissions'
 
 // ─── DELETE /api/admin/volunteers/[id] ───────────────────────────────────────
 
@@ -9,7 +10,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession()
-  if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
+  if (!session || !(await hasCapability('care.people'))) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 

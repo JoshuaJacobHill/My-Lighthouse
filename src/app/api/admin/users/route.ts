@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { hashPassword } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { ASSIGNABLE_ADMIN_ROLES } from '@/lib/constants'
+import type { UserRole } from '@prisma/client'
 
 async function requireSuperAdmin() {
   const session = await getSession()
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'All fields are required.' }, { status: 400 })
     }
 
-    const allowedRoles = ['ADMIN', 'SUPER_ADMIN']
+    const allowedRoles = ASSIGNABLE_ADMIN_ROLES as readonly string[]
     if (!allowedRoles.includes(role)) {
       return NextResponse.json({ success: false, error: 'Invalid role.' }, { status: 400 })
     }
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
         name,
         email: email.toLowerCase(),
         passwordHash,
-        role: role as 'ADMIN' | 'SUPER_ADMIN',
+        role: role as UserRole,
         isActive: true,
         emailVerified: new Date(),
       },

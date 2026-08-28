@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { periodKey, periodLabel, isOverdue } from '@/lib/checklists'
 import { TaskList, type TaskRow, type ChecklistRow } from './TaskList'
+import { isAdminRole } from '@/lib/permissions-core'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Tasks & checklists' }
@@ -26,7 +27,7 @@ export default async function StaffTasksPage() {
     where: { id: session.userId },
     select: { id: true, isStaff: true, isTrainee: true, role: true },
   })
-  const allowed = me?.isStaff || me?.isTrainee || me?.role === 'ADMIN' || me?.role === 'SUPER_ADMIN'
+  const allowed = me?.isStaff || me?.isTrainee || isAdminRole(me?.role)
   if (!allowed) notFound()
 
   const [tasks, items] = await Promise.all([

@@ -8,6 +8,7 @@ import { isDonorPortalEnabled } from '@/lib/features'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
+import { ChallengeBanner } from '@/components/dashboard/ChallengeBanner'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'My Lighthouse Care' }
@@ -66,6 +67,43 @@ export default async function DonorHomePage() {
     ? await prisma.appSetting.findUnique({ where: { key: 'employment_hero_url' }, select: { value: true } })
     : null
   const employmentHeroUrl = ehSetting?.value?.trim() || 'https://secure.employmenthero.com'
+
+  // The challenge banner. Only queried for staff, and only rendered while a
+  // challenge is actually running — no dead banner sitting there in October.
+  const challenge = isStaffOrTrainee
+    ? await prisma.fitnessChallenge.findFirst({
+        where: { isActive: true, endsAt: { gte: new Date() } },
+        orderBy: { startsAt: 'desc' },
+        select: { id: true, name: true, goal: true, startsAt: true, endsAt: true, imageUrl: true },
+      })
+    : null
+  let challengeBanner: React.ComponentProps<typeof ChallengeBanner> | null = null
+  if (challenge) {
+    const agg = await prisma.fitnessEntry.aggregate({
+      where: { challengeId: challenge.id },
+      _sum: { amount: true },
+    })
+    const total = agg._sum.amount ?? 0
+    const now = Date.now()
+    const started = now >= challenge.startsAt.getTime()
+    challengeBanner = {
+      name: challenge.name,
+      imageUrl: challenge.imageUrl,
+      total,
+      goal: challenge.goal,
+      progress: challenge.goal > 0 ? Math.min(1, total / challenge.goal) : 0,
+      started,
+      startLabel: new Intl.DateTimeFormat('en-AU', {
+        timeZone: 'Australia/Brisbane',
+        day: 'numeric',
+        month: 'long',
+      }).format(challenge.startsAt),
+      daysLeft: Math.max(
+        0,
+        Math.ceil(((started ? challenge.endsAt.getTime() : challenge.startsAt.getTime()) - now) / 86_400_000)
+      ),
+    }
+  }
   const stories = await prisma.story.findMany({
     where: {
       isPublished: true,
@@ -94,57 +132,10 @@ export default async function DonorHomePage() {
       ? d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Australia/Brisbane' })
       : 'Date TBA'
 
-  return (
-    <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
-      <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
-        {!live && (
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-            Preview — donor portal hidden from the public until launch
-          </div>
-        )}
-
-        {/* Greeting */}
-        <header className="mb-10 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-neutral-400">Welcome back</p>
-            <h1 className="mt-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
-              Hi, {firstName} <span className="font-normal">👋</span>
-            </h1>
-          </div>
-          {vp && <StatusBadge status={vp.status} />}
-        </header>
-
-        {/* Staff shortcuts */}
-        {isStaffOrTrainee && (
-          <section className="mb-14 grid gap-4 sm:grid-cols-2">
-            <Link
-              href="/dashboard/tasks"
-              className="group flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
-            >
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Staff</p>
-                <p className="mt-1 text-lg font-bold tracking-tight">Tasks &amp; checklists</p>
-                <p className="mt-0.5 text-sm text-neutral-500">What&rsquo;s on today</p>
-              </div>
-              <ArrowRight className="h-5 w-5 shrink-0 text-neutral-400" />
-            </Link>
-            <a
-              href={employmentHeroUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
-            >
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Staff</p>
-                <p className="mt-1 text-lg font-bold tracking-tight">Payslips &amp; leave</p>
-                <p className="mt-0.5 text-sm text-neutral-500">Opens Employment Hero</p>
-              </div>
-              <ExternalLink className="h-5 w-5 shrink-0 text-neutral-400" />
-            </a>
-          </section>
-        )}
-
-        {/* Glances — tithe (church givers) · giving · volunteering */}
+  // Giving and volunteering. Staff open this page for tasks and news, so for
+  // them these sit at the bottom rather than above the fold; everyone else
+  // still gets them first, because for them it's the whole point of the page.
+  const givingAndVolunteering = (
         <section className="mb-14 space-y-5">
           {tithePlan && (
             <Link
@@ -214,6 +205,66 @@ export default async function DonorHomePage() {
             </div>
           </Link>
         </section>
+  )
+
+  return (
+    <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
+      <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
+        {!live && (
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+            Preview — donor portal hidden from the public until launch
+          </div>
+        )}
+
+        {/* Greeting */}
+        <header className="mb-10 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-neutral-400">Welcome back</p>
+            <h1 className="mt-1 text-4xl font-extrabold tracking-tight sm:text-5xl">
+              Hi, {firstName} <span className="font-normal">👋</span>
+            </h1>
+          </div>
+          {vp && <StatusBadge status={vp.status} />}
+        </header>
+
+        {/* September challenge */}
+        {isStaffOrTrainee && challengeBanner && (
+          <section className="mb-5">
+            <ChallengeBanner {...challengeBanner} />
+          </section>
+        )}
+
+        {/* Staff shortcuts */}
+        {isStaffOrTrainee && (
+          <section className="mb-14 grid gap-4 sm:grid-cols-2">
+            <Link
+              href="/dashboard/tasks"
+              className="group flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Staff</p>
+                <p className="mt-1 text-lg font-bold tracking-tight">Tasks &amp; checklists</p>
+                <p className="mt-0.5 text-sm text-neutral-500">What&rsquo;s on today</p>
+              </div>
+              <ArrowRight className="h-5 w-5 shrink-0 text-neutral-400" />
+            </Link>
+            <a
+              href={employmentHeroUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-6 transition-shadow hover:shadow-lg hover:shadow-neutral-200/60"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Staff</p>
+                <p className="mt-1 text-lg font-bold tracking-tight">Payslips &amp; leave</p>
+                <p className="mt-0.5 text-sm text-neutral-500">Opens Employment Hero</p>
+              </div>
+              <ExternalLink className="h-5 w-5 shrink-0 text-neutral-400" />
+            </a>
+          </section>
+        )}
+
+        {!isStaffOrTrainee && givingAndVolunteering}
 
         {/* Upcoming events */}
         {events.length > 0 && (
@@ -271,6 +322,8 @@ export default async function DonorHomePage() {
             </Link>
           </section>
         )}
+
+        {isStaffOrTrainee && <div className="mt-14">{givingAndVolunteering}</div>}
       </div>
     </div>
   )

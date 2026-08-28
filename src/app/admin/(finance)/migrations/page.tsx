@@ -1,10 +1,12 @@
 import prisma from '@/lib/prisma'
 import { MigrationsClient } from './MigrationsClient'
+import { requireCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Donor Migration | Lighthouse Care Admin' }
 
 export default async function MigrationsPage() {
+  await requireCapability('care.giving')
   // Gated by the (finance) layout — donations access required.
   const [funds, intents] = await Promise.all([
     prisma.fund.findMany({

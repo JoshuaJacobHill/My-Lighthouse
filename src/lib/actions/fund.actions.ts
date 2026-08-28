@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { fundSchema, type FundInput } from '@/lib/validations'
+import { isAdminRole } from '@/lib/permissions-core'
+import { assertCapability } from '@/lib/permissions'
 
 interface ActionResult {
   success: boolean
@@ -18,9 +20,7 @@ async function requireAdminSession(): Promise<{ userId: string; role: string }> 
   if (!session) {
     throw new Error('Not authenticated')
   }
-  if (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN') {
-    throw new Error('Insufficient permissions')
-  }
+  await assertCapability('care.giving')
   return { userId: session.userId, role: session.role }
 }
 

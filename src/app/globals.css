@@ -88,3 +88,47 @@ body {
   from { transform: translateY(4px); }
   to   { transform: translateY(0); }
 }
+
+/* ─── Fitness challenge celebrations ──────────────────────────────────────────
+   Milestone colours are lifted from the campaign artwork: lime #ccf078 and
+   deep green #009048. Every motion below is switched off under
+   prefers-reduced-motion — the colour and the label carry the meaning on their
+   own, so nothing is lost by holding still. */
+
+@keyframes milestone-pop {
+  0% { transform: scale(0.85); }
+  55% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes goal-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(204, 240, 120, 0.45); }
+  50% { box-shadow: 0 0 0 12px rgba(204, 240, 120, 0); }
+}
+
+@keyframes confetti-drop {
+  0% { transform: translate3d(0, -12%, 0) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate3d(var(--drift, 0), 260%, 0) rotate(var(--spin, 540deg)); opacity: 0; }
+}
+
+@keyframes count-rise {
+  from { transform: translateY(0.18em); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-milestone-pop { animation: milestone-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-goal-glow { animation: goal-glow 2.4s ease-out infinite; }
+.animate-confetti { animation: confetti-drop var(--fall, 2.6s) linear var(--delay, 0s) infinite; }
+.animate-count-rise { animation: count-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-milestone-pop,
+  .animate-goal-glow,
+  .animate-confetti,
+  .animate-count-rise {
+    animation: none !important;
+  }
+  /* Confetti is pure decoration — with motion off it's just clutter. */
+  .animate-confetti { display: none !important; }
+}
