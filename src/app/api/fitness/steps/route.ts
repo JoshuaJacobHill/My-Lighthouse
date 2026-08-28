@@ -24,6 +24,24 @@ export const dynamic = 'force-dynamic'
 
 const MAX_STEPS = 200_000
 
+/** Find a key regardless of case, trying each name in turn. */
+function pick(body: unknown, ...names: string[]): unknown {
+  if (!body || typeof body !== 'object') return undefined
+  const entries = Object.entries(body as Record<string, unknown>)
+  for (const name of names) {
+    const hit = entries.find(([k]) => k.toLowerCase() === name)
+    if (hit && hit[1] !== null && hit[1] !== '') return hit[1]
+  }
+  return undefined
+}
+
+/** Shortcuts may send "8,421" or " 8421 " rather than a bare number. */
+function toNumber(value: unknown): number {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return Number(value.replace(/[,\s]/g, ''))
+  return NaN
+}
+
 function bearer(request: NextRequest): string | null {
   const header = request.headers.get('authorization') ?? ''
   const match = /^Bearer\s+(.+)$/i.exec(header.trim())
@@ -88,10 +106,11 @@ export async function recordSteps(request: NextRequest, rawToken: string) {
     return NextResponse.json({ ok: false, error: 'Expected a JSON body' }, { status: 400 })
   }
 
-  const payload = body as { steps?: unknown; day?: unknown }
-  // Shortcuts sends numbers as text often enough that coercing is kinder than
-  // rejecting; anything that isn't a whole number still fails.
-  const steps = Math.round(Number(payload.steps))
+  // Be generous about how the field is spelled. The Shortcuts app capitalises
+  // the field name for you when you type it, so a hand-built shortcut usually
+  // sends "Steps" — and rejecting that over a capital letter is a miserable
+  // thing to do to someone who has just built the whole thing correctly.
+  const steps = Math.round(toNumber(pick(body, 'steps', 'stepcount', 'count', 'value')))
   if (!Number.isFinite(steps) || steps < 0 || steps > MAX_STEPS) {
     return NextResponse.json(
       { ok: false, error: `steps must be a whole number between 0 and ${MAX_STEPS}` },
@@ -100,9 +119,9 @@ export async function recordSteps(request: NextRequest, rawToken: string) {
   }
 
   const now = new Date()
-  const day = typeof payload.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.day)
-    ? payload.day
-    : brisbaneToday(now)
+  const rawDay = pick(body, 'day', 'date')
+  const day =
+    typeof rawDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDay.trim()) ? rawDay.trim() : brisbaneToday(now)
 
   // Same selection as the pages, so a phone posting during a test run lands in
   // the test rather than in a challenge that hasn't started.
