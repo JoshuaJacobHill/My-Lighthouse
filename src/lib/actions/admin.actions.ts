@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { getSession, createPasswordResetToken } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
+import { wrapEmailHtml } from '@/lib/email-html'
 import { formatDate } from '@/lib/utils'
 import type { VolunteerStatus } from '@prisma/client'
 import { isAdminRole } from '@/lib/permissions-core'
@@ -864,6 +865,55 @@ export interface CreateUserData extends CreateVolunteerData {
  *
  * Mobile is only required for volunteers, since the volunteer profile needs it.
  */
+
+/**
+ * The invite email, chosen by what the person actually is.
+ *
+ * The donor template thanks people for their giving and points at tax receipts,
+ * which reads very oddly to a staff member being set up with a work account —
+ * so staff get their own wording rather than the supporter one.
+ */
+async function buildInvite(opts: {
+  firstName: string
+  lastName: string
+  link: string
+  isStaff: boolean
+  isVolunteer: boolean
+}): Promise<{ subject: string; html: string; text: string }> {
+  if (opts.isStaff) {
+    const P = 'margin:0 0 16px 0;line-height:1.7;color:#374151;font-size:15px;'
+    return {
+      subject: 'Your Lighthouse account is ready',
+      html: wrapEmailHtml(
+        `
+        <p style="${P}">Hi ${opts.firstName},</p>
+        <p style="${P}">Your account on the <strong>My Lighthouse Portal</strong> is set up. It&rsquo;s where the team keeps track of the day-to-day:</p>
+        <ul style="margin:0 0 18px 0;padding-left:20px;color:#374151;font-size:15px;line-height:1.8;">
+          <li>Tasks and the daily, weekly and monthly checklists</li>
+          <li>Payslips and leave, straight through to Employment Hero</li>
+          <li>Staff news and updates</li>
+          <li>The September step challenge</li>
+        </ul>
+        <p style="${P}">Pick a password and you&rsquo;re in:</p>
+        <p style="margin:22px 0;"><a href="${opts.link}" style="background:#f97316;color:#fff;padding:13px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;font-size:14px;">Set my password &rarr;</a></p>
+        <p style="${P}">The link works for the next 7 days. If it expires, ask and we&rsquo;ll send another.</p>
+        <p style="${P};margin-bottom:0;">Any trouble getting in, just reply to this email.</p>
+      `,
+        APP_URL
+      ),
+      text: `Hi ${opts.firstName},\n\nYour account on the My Lighthouse Portal is set up. It's where the team keeps track of tasks and checklists, payslips and leave, staff news, and the September step challenge.\n\nPick a password and you're in:\n${opts.link}\n\nThe link works for the next 7 days. Any trouble getting in, just reply to this email.`,
+    }
+  }
+
+  const rendered = await renderTemplate(opts.isVolunteer ? 'VOLUNTEER_WELCOME' : 'DONOR_ACCOUNT_SETUP', {
+    first_name: opts.firstName,
+    last_name: opts.lastName,
+    set_password_link: opts.link,
+    portal_link: APP_URL,
+  })
+  return { subject: rendered.subject, html: rendered.html, text: rendered.text }
+}
+
 export async function createUserAction(
   data: CreateUserData
 ): Promise<{ success: boolean; userId?: string; error?: string; emailSent?: boolean; emailError?: string }> {
@@ -961,11 +1011,12 @@ export async function createUserAction(
     if (data.sendInvite !== false) {
       try {
         const token = await createPasswordResetToken(user.id, 168)
-        const rendered = await renderTemplate(data.asVolunteer ? 'VOLUNTEER_WELCOME' : 'DONOR_ACCOUNT_SETUP', {
-          first_name: firstName,
-          last_name: lastName,
-          set_password_link: `${APP_URL}/set-password?token=${token}`,
-          portal_link: APP_URL,
+        const rendered = await buildInvite({
+          firstName,
+          lastName,
+          link: `${APP_URL}/set-password?token=${token}`,
+          isStaff: Boolean(data.asStaff),
+          isVolunteer: Boolean(data.asVolunteer),
         })
         const result = await sendEmail({
           to: email,
@@ -1006,7 +1057,14 @@ export async function sendAccountInviteAction(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, volunteerProfile: { select: { id: true } } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      isStaff: true,
+      isTrainee: true,
+      volunteerProfile: { select: { id: true } },
+    },
   })
   if (!user?.email) return { success: false, error: 'That account has no email address.' }
 
@@ -1015,11 +1073,12 @@ export async function sendAccountInviteAction(
 
   try {
     const token = await createPasswordResetToken(user.id, 168)
-    const rendered = await renderTemplate(user.volunteerProfile ? 'VOLUNTEER_WELCOME' : 'DONOR_ACCOUNT_SETUP', {
-      first_name: firstName,
-      last_name: lastName,
-      set_password_link: `${APP_URL}/set-password?token=${token}`,
-      portal_link: APP_URL,
+    const rendered = await buildInvite({
+      firstName,
+      lastName,
+      link: `${APP_URL}/set-password?token=${token}`,
+      isStaff: user.isStaff || user.isTrainee,
+      isVolunteer: Boolean(user.volunteerProfile),
     })
     const result = await sendEmail({
       to: user.email,
