@@ -8,81 +8,56 @@ import { connectFitnessAction, disconnectFitnessAction } from '@/lib/actions/fit
 interface Props {
   initialToken: string | null
   appUrl: string
-  /** iCloud link to the ready-made shortcut, if one has been set up. */
+  /** iCloud link to the ready made shortcut, if one has been set up. */
   shortcutUrl: string | null
   lastUsedAt: string | null
   lastAmount: number | null
 }
 
-/** Small copy-to-clipboard field — these values get typed into a phone. */
-function CopyField({ label, value, mono = true }: { label: string; value: string; mono?: boolean }) {
-  const [copied, setCopied] = React.useState(false)
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    } catch {
-      // Clipboard is blocked in some in-app browsers — the text stays selectable.
-    }
-  }
-
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mt-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{label}</p>
-      <div className="mt-1 flex items-stretch gap-2">
-        <code
-          className={`flex-1 overflow-x-auto rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm ${mono ? 'font-mono' : ''} text-neutral-800`}
-        >
-          {value}
-        </code>
-        <button
-          type="button"
-          onClick={copy}
-          className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-          aria-label={`Copy ${label}`}
-        >
-          {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-        </button>
-      </div>
-    </div>
+    <section className="mt-4 rounded-2xl border border-neutral-200 p-5">
+      <h2 className="text-sm font-bold text-neutral-900">{title}</h2>
+      <div className="mt-2 space-y-2 text-sm text-neutral-600">{children}</div>
+    </section>
   )
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+/** Numbered list that keeps its spacing right, unlike a bolded "1." inline. */
+function Steps({ items }: { items: React.ReactNode[] }) {
   return (
-    <li className="flex gap-4">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-sm font-bold text-white">
-        {n}
-      </span>
-      <div className="pb-6">
-        <p className="font-semibold text-neutral-900">{title}</p>
-        <div className="mt-1 space-y-2 text-sm text-neutral-600">{children}</div>
-      </div>
-    </li>
+    <ol className="mt-3 space-y-3">
+      {items.map((item, i) => (
+        <li key={i} className="flex gap-3">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-xs font-bold text-white">
+            {i + 1}
+          </span>
+          <span className="pt-0.5 text-sm text-neutral-600">{item}</span>
+        </li>
+      ))}
+    </ol>
   )
 }
 
 export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, lastAmount }: Props) {
   const router = useRouter()
   const [token, setToken] = React.useState(initialToken)
+  const [copied, setCopied] = React.useState(false)
+  const [error, setError] = React.useState('')
+  const [isPending, startTransition] = React.useTransition()
+
   const personalUrl = `${appUrl}/api/fitness/steps/${encodeURIComponent(token ?? '')}`
-  const [codeCopied, setCodeCopied] = React.useState(false)
 
   async function copyCode() {
     if (!token) return
     try {
       await navigator.clipboard.writeText(token)
-      setCodeCopied(true)
-      setTimeout(() => setCodeCopied(false), 1800)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
     } catch {
-      // Clipboard is blocked in some in-app browsers — the code is short
-      // enough to read off the screen, which is rather the point.
+      // Blocked in some in app browsers. The code is short enough to read.
     }
   }
-  const [error, setError] = React.useState('')
-  const [isPending, startTransition] = React.useTransition()
 
   function connect() {
     setError('')
@@ -104,9 +79,10 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
     })
   }
 
+  // ── Not set up yet ──
   if (!token) {
     return (
-      <div className="mt-8">
+      <div className="mt-6">
         <button
           type="button"
           onClick={connect}
@@ -115,195 +91,190 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
         >
           {isPending ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Setting up&hellip;
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Setting up
             </>
           ) : (
             <>
-              <Smartphone className="h-4 w-4" /> Set this up on my phone
+              <Smartphone className="h-4 w-4" aria-hidden="true" /> Get my code
             </>
           )}
         </button>
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        <p className="mt-3 text-center text-xs text-neutral-500">
-          Takes about two minutes on an iPhone. Nothing is sent until you finish the setup.
+        <p className="mt-3 text-center text-sm text-neutral-500">
+          Takes about two minutes on an iPhone. Nothing sends until you finish.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="mt-8">
+    <div className="mt-6">
       {lastUsedAt && (
-        <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          Working &mdash; last received {lastAmount != null ? `${lastAmount.toLocaleString('en-AU')} steps ` : ''}
-          {new Date(lastUsedAt).toLocaleString('en-AU', { timeZone: 'Australia/Brisbane' })}.
+        <div className="mb-4 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-800">
+          Working. Last received {lastAmount != null ? `${lastAmount.toLocaleString('en-AU')} steps ` : ''}
+          {new Date(lastUsedAt).toLocaleString('en-AU', {
+            timeZone: 'Australia/Brisbane',
+            day: 'numeric',
+            month: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
+          .
         </div>
       )}
 
-      <h2 className="text-lg font-bold text-neutral-900">Set it up on your iPhone</h2>
-      <p className="mt-1 text-sm text-neutral-600">
-        Do this on the phone itself. Your personal link is below &mdash; it&rsquo;s the only thing that&rsquo;s yours
-        alone, so don&rsquo;t pass it on.
-      </p>
-
-      <div className="mt-4 rounded-2xl border border-neutral-900 bg-neutral-950 p-5 text-center text-white">
-        <p className="text-xs font-semibold uppercase tracking-wide text-white/50">Your personal code</p>
-        <p className="mt-1.5 font-mono text-3xl font-bold tracking-[0.12em]">{token}</p>
+      {/* ── The code, front and centre ── */}
+      <div className="rounded-[28px] bg-neutral-950 px-5 py-7 text-center text-white">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">Your personal code</p>
+        <p className="mt-2 font-mono text-3xl font-bold tracking-[0.12em] sm:text-4xl">{token}</p>
         <button
           type="button"
           onClick={copyCode}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/25"
         >
-          {codeCopied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-          {codeCopied ? 'Copied' : 'Copy code'}
+          {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+          {copied ? 'Copied' : 'Copy code'}
         </button>
-        <p className="mt-3 text-xs text-white/50">
-          Short enough to type if pasting plays up. Yours alone &mdash; don&rsquo;t pass it on.
+        <p className="mx-auto mt-4 max-w-xs text-xs leading-relaxed text-white/50">
+          Yours alone. Please don&rsquo;t pass it on.
         </p>
       </div>
 
-      <details className="mt-3 rounded-xl border border-neutral-200 px-4 py-3">
-        <summary className="cursor-pointer list-none text-xs font-semibold text-neutral-500">
-          Prefer the full link?
-        </summary>
-        <CopyField label="Your personal link" value={personalUrl} />
-      </details>
-
+      {/* ── The one thing to do ── */}
       {shortcutUrl ? (
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
-          <p className="text-sm font-bold text-neutral-900">The quick way</p>
-          <ol className="mt-2 space-y-2 text-sm text-neutral-600">
-            <li>
-              <strong>1.</strong> Copy the code above (or just remember it — it&rsquo;s eight characters).
-            </li>
-            <li>
-              <strong>2.</strong> Tap the button below and choose <strong>Add Shortcut</strong>. It&rsquo;ll ask for
-              your code &mdash; type or paste it in.
-            </li>
-            <li>
-              <strong>3.</strong> Run it once and allow Health access when asked. That&rsquo;s the opt-in.
-            </li>
-            <li>
-              <strong>4.</strong> In the <strong>Automation</strong> tab, add an <strong>App</strong> automation:
-              something you open often, <strong>Is Opened</strong>, <strong>Run Immediately</strong>. Your steps
-              then update all through the day on their own.
-            </li>
-          </ol>
+        <section className="mt-4 rounded-2xl border border-neutral-200 p-5">
+          <h2 className="text-sm font-bold text-neutral-900">Set it up</h2>
+          <Steps
+            items={[
+              <>Copy your code above.</>,
+              <>
+                Tap the button below, then <strong>Add Shortcut</strong>. Paste your code when it asks.
+              </>,
+              <>Run it once and allow Health access. That is the opt in.</>,
+              <>
+                In the <strong>Automation</strong> tab tap <strong>+</strong>, choose <strong>App</strong>, pick
+                something you open often, set <strong>Is Opened</strong> and <strong>Run Immediately</strong>.
+              </>,
+            ]}
+          />
           <a
             href={shortcutUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600"
+            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600"
           >
             <Download className="h-4 w-4" aria-hidden="true" /> Add the shortcut to my phone
           </a>
-          <p className="mt-3 text-xs text-neutral-500">
-            Opens the Shortcuts app, which comes with your iPhone. Nothing is sent until you run it.
+          <p className="mt-3 text-center text-xs text-neutral-500">
+            Opens Shortcuts, which comes with your iPhone.
           </p>
-        </div>
+        </section>
       ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-5 text-sm text-neutral-600">
-          <p className="font-bold text-neutral-900">One-tap install isn&rsquo;t ready yet</p>
-          <p className="mt-1">
-            Someone needs to build the shortcut once and share the link before everyone else can install it. Until
-            then, follow the steps below &mdash; or just type your steps in on the challenge page, which is
-            genuinely fine.
+        <section className="mt-4 rounded-2xl border border-dashed border-neutral-300 p-5 text-sm text-neutral-600">
+          <h2 className="text-sm font-bold text-neutral-900">One tap install is not ready yet</h2>
+          <p className="mt-2">
+            Someone needs to build the shortcut and share the link first. Until then, follow the steps below, or just
+            type your steps in on the challenge page.
           </p>
-        </div>
+        </section>
       )}
 
-      <details className="group mt-6 rounded-2xl border border-neutral-200 p-5">
-        <summary className="cursor-pointer list-none text-sm font-bold text-neutral-900">
-          Build it by hand instead
-          <span className="ml-2 font-medium text-neutral-400 group-open:hidden">(about 3 minutes)</span>
-        </summary>
-
-        <ol className="mt-5">
-          <Step n={1} title="Open Shortcuts and make a new one">
-            <p>
-              The Shortcuts app comes with your iPhone. Tap <strong>+</strong>, and name it{' '}
-              <strong>Send my steps</strong>.
-            </p>
-          </Step>
-
-          <Step n={2} title="Add “Find Health Samples”">
-            <p>
-              Search for <strong>Find Health Samples</strong> and add it. Set <strong>Type</strong> to{' '}
-              <strong>Steps</strong>, then add a filter so the date <strong>is today</strong>.
-            </p>
-            <p>Health will ask permission the first time you run it — that&rsquo;s the opt-in.</p>
-          </Step>
-
-          <Step n={3} title="Add up the day">
-            <p>
-              Add <strong>Calculate Statistics</strong>, set to <strong>Sum</strong> of{' '}
-              <strong>Health Samples</strong>. That&rsquo;s today&rsquo;s total, as one number.
-            </p>
-          </Step>
-
-          <Step n={4} title="Send it across">
-            <p>
-              Add <strong>Get Contents of URL</strong> and paste your personal link from above. Tap the arrow to
-              expand it, set <strong>Method</strong> to <strong>POST</strong>, choose{' '}
-              <strong>Request Body: JSON</strong>, and add a <strong>Number</strong> field called{' '}
-              <code className="font-mono">steps</code> set to the <strong>Statistics</strong> result from step 3.
-            </p>
-            <p className="text-neutral-500">
-              No headers to set — your link carries who you are.
-            </p>
-          </Step>
-
-          <Step n={5} title="Make it run by itself">
-            <p>
-              Go to the <strong>Automation</strong> tab and tap <strong>+</strong>. The obvious choice is{' '}
-              <strong>Time of Day</strong>, but Apple only lets those repeat once a day &mdash; so the better one is{' '}
-              <strong>App</strong>.
-            </p>
-            <p>
-              Choose <strong>App</strong>, pick something you open all the time (Messages, Instagram, your
-              bank &mdash; whatever), set it to <strong>Is Opened</strong>, then{' '}
-              <strong>Run Immediately</strong> with <strong>Notify When Run</strong> turned off. Pick your{' '}
-              <strong>Send my steps</strong> shortcut.
-            </p>
-            <p className="rounded-xl bg-neutral-100 px-3.5 py-2.5 text-neutral-700">
-              That&rsquo;s the whole trick: your steps now go up every time you open that app &mdash; dozens of times
-              a day, without you thinking about it. One automation instead of sixteen.
-            </p>
-            <p className="text-neutral-500">
-              Each send replaces the last, so nothing double-counts however often it runs. If you&rsquo;d rather have
-              set times, a Time of Day automation works too &mdash; just add a few (12&nbsp;pm, 4&nbsp;pm,
-              8&nbsp;pm, 11:30&nbsp;pm), since each one can only repeat daily.
-            </p>
-          </Step>
-
-          <Step n={6} title="Test it">
-            <p>
-              Tap play. Allow Health access, then check the challenge page — today&rsquo;s steps should be there.
-            </p>
-          </Step>
-        </ol>
-      </details>
-
-      <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
-        <p className="font-semibold text-neutral-800">Not keen on any of this?</p>
-        <p className="mt-1">
-          Perfectly fine. On the challenge page you can type your daily total straight in, or upload a screenshot of
-          your health app and we&rsquo;ll read the number off it and throw the picture away. Both count exactly the
-          same as the automatic version &mdash; and neither needs setting up. Android users, that&rsquo;s your lot
-          anyway: Android keeps step data locked to the phone and has no equivalent of Shortcuts.
+      {/* ── Everything else, out of the way ── */}
+      <Panel title="What that automation does">
+        <p>
+          Your steps send every time you open that app. Usually dozens of times a day, so the leaderboard keeps up
+          without you thinking about it.
         </p>
-      </div>
+        <p>Each send replaces the last one, so nothing double counts.</p>
+        <p className="text-neutral-500">
+          Prefer set times? Use a <strong>Time of Day</strong> automation instead. Apple only lets those repeat daily,
+          so add a few: midday, 4pm, 8pm and 11:30pm.
+        </p>
+      </Panel>
+
+      <Panel title="What we can see">
+        <p>
+          <strong className="text-neutral-800">Only a step count and a date.</strong> Nothing else from Health. No
+          heart rate, no workouts, no location, no sleep.
+        </p>
+        <p>
+          <strong className="text-neutral-800">Your phone does the sending.</strong> We have no way to reach into your
+          Health app.
+        </p>
+        <p>
+          <strong className="text-neutral-800">Stop any time</strong> using the button below, or by deleting the
+          shortcut.
+        </p>
+      </Panel>
+
+      <Panel title="Rather not bother?">
+        <p>
+          Type your daily total on the challenge page. Five seconds, nothing to set up, counts exactly the same.
+        </p>
+        <p>
+          You can also upload a screenshot of your health app and we will read the number off it, then throw the
+          picture away. That is the option for Android, which keeps step data locked to the phone.
+        </p>
+      </Panel>
+
+      <details className="group mt-4 rounded-2xl border border-neutral-200 p-5">
+        <summary className="cursor-pointer list-none text-sm font-bold text-neutral-900">
+          Build the shortcut by hand
+          <span className="ml-2 font-medium text-neutral-400 group-open:hidden">about 3 minutes</span>
+        </summary>
+        <p className="mt-3 text-sm text-neutral-600">
+          In Shortcuts, tap <strong>+</strong> and add four actions:
+        </p>
+        <Steps
+          items={[
+            <>
+              <strong>Text</strong>, containing your code above.
+            </>,
+            <>
+              <strong>Find Health Samples</strong>. Type is <strong>Steps</strong>, and add a filter so the date{' '}
+              <strong>is today</strong>.
+            </>,
+            <>
+              <strong>Calculate Statistics</strong>, set to <strong>Sum</strong> of Health Samples.
+            </>,
+            <>
+              <strong>Get Contents of URL</strong>. Paste the link below, set Method to <strong>POST</strong>, Request
+              Body to <strong>JSON</strong>, then add a Number field called <code className="font-mono">steps</code>{' '}
+              set to the Statistics result.
+            </>,
+          ]}
+        />
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Your personal link</p>
+          <div className="mt-1 flex items-stretch gap-2">
+            <code className="flex-1 overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 font-mono text-xs text-neutral-800">
+              {personalUrl}
+            </code>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(personalUrl).catch(() => {})}
+              className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+              aria-label="Copy your personal link"
+            >
+              <Copy className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <p className="mt-3 text-sm text-neutral-500">
+          No headers to set. The link carries who you are.
+        </p>
+      </details>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-8 flex flex-wrap gap-3 border-t border-neutral-200 pt-6">
+      <div className="mt-6 flex flex-wrap gap-3 border-t border-neutral-200 pt-5">
         <button
           type="button"
           onClick={disconnect}
           disabled={isPending}
           className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-100 disabled:opacity-60"
         >
-          <Link2Off className="h-4 w-4" /> Stop sending my steps
+          <Link2Off className="h-4 w-4" aria-hidden="true" /> Stop sending my steps
         </button>
         <button
           type="button"
@@ -311,12 +282,12 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
           disabled={isPending}
           className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-100 disabled:opacity-60"
         >
-          Start again with a new code
+          New code
         </button>
       </div>
       <p className="mt-3 text-xs text-neutral-500">
-        Stopping leaves the steps you&rsquo;ve already logged in place — it only stops your phone sending more. A new
-        code immediately stops the old one working, so update the shortcut if you generate one.
+        Stopping leaves your logged steps alone. A new code stops the old one working, so update your shortcut if you
+        make one.
       </p>
     </div>
   )

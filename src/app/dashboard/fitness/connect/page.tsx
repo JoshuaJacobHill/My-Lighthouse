@@ -41,29 +41,10 @@ export default async function ConnectFitnessPage() {
         </Link>
 
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Send your steps automatically</h1>
-        <p className="mt-3 text-neutral-600">
-          Your phone already counts your steps. This lets it send that number across on its own, so you don&rsquo;t
-          have to remember. It&rsquo;s completely optional &mdash; typing your steps in on the challenge page works
-          exactly the same, and takes about five seconds.
+        <p className="mt-2.5 text-neutral-500">
+          Your phone already counts your steps. This lets it send the daily total across on its own. Completely
+          optional.
         </p>
-
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-500">What we can and can&rsquo;t see</h2>
-          <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-            <li>
-              <strong>We only ever receive a step count and a date.</strong> Nothing else from Health &mdash; no heart
-              rate, no workouts, no location, no sleep.
-            </li>
-            <li>
-              <strong>Your phone does the sending.</strong> We have no way to reach into your Health app, and this
-              can&rsquo;t pull anything on its own.
-            </li>
-            <li>
-              <strong>You can stop it any time</strong> with the button at the bottom of this page, or by deleting the
-              shortcut from your phone.
-            </li>
-          </ul>
-        </div>
 
         <ConnectHealth
           initialToken={link?.token ?? null}
