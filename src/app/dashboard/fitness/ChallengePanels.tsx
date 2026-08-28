@@ -32,29 +32,52 @@ export function TotalSteps({
   participants,
   started,
   behind,
+  startLabel,
 }: {
   total: number
   goal: number
   participants: number
   started: boolean
   behind: number
+  startLabel?: string
 }) {
   const pct = Math.min(100, Math.round((total / Math.max(1, goal)) * 100))
   const milestones = buildMilestones(total, goal)
   const done = goal > 0 && total >= goal
-  const latest = [...milestones].reverse().find((m) => m.reached)
 
   const card = (
-    <section className={`p-7 text-white ${done ? '' : 'rounded-[28px] bg-neutral-950'}`}>
+    <section className={`p-5 sm:p-6 ${done ? 'text-white' : 'rounded-[28px] border border-neutral-200'}`}>
       {done && <GoalReachedBadge />}
-      <p className="text-sm font-medium text-white/60">Our total so far</p>
-      <p className="animate-count-rise mt-1.5 text-[3.25rem] font-extrabold leading-none tracking-tighter tabular-nums sm:text-6xl">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className={`text-lg font-bold tracking-tight ${done ? 'text-white' : 'text-neutral-950'}`}>
+          The whole month
+        </h2>
+        <span
+          className={`text-sm font-semibold ${
+            done ? 'text-white/80' : !started ? 'text-neutral-500' : behind <= 0 ? 'text-green-700' : 'text-amber-700'
+          }`}
+        >
+          {!started
+            ? `Starts ${startLabel ?? '1 September'}`
+            : done
+              ? 'Goal smashed'
+              : behind <= 0
+                ? 'On track'
+                : `${nf.format(behind)} behind`}
+        </span>
+      </div>
+
+      <p className={`mt-2 text-3xl font-extrabold tracking-tight tabular-nums ${done ? 'text-white' : 'text-neutral-950'}`}>
         {nf.format(total)}
+        <span className={`ml-2 text-base font-semibold ${done ? 'text-white/60' : 'text-neutral-400'}`}>
+          of {nf.format(goal)}
+        </span>
       </p>
-      <p className="mt-1.5 text-sm text-white/60">
-        of {nf.format(goal)} steps &middot; {participants} {participants === 1 ? 'person' : 'people'} walking
+      <p className={`mt-0.5 text-sm ${done ? 'text-white/60' : 'text-neutral-500'}`}>
+        {participants} {participants === 1 ? 'person' : 'people'} walking
       </p>
-      <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-white/15">
+
+      <div className={`mt-4 h-2 w-full overflow-hidden rounded-full ${done ? 'bg-white/20' : 'bg-neutral-100'}`}>
         <div
           className="h-full rounded-full transition-[width] duration-700 ease-out"
           style={{
@@ -63,25 +86,9 @@ export function TotalSteps({
           }}
         />
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="font-semibold">{pct}%</span>
-        <span className="text-white/60">
-          {!started
-            ? 'Starts 1 September'
-            : done
-              ? 'Goal smashed'
-              : behind <= 0
-                ? 'Ahead of pace'
-                : `${nf.format(behind)} behind pace`}
-        </span>
-      </div>
+      <p className={`mt-1.5 text-sm font-semibold ${done ? 'text-white' : 'text-neutral-600'}`}>{pct}%</p>
 
-      <MilestoneTrack milestones={milestones} />
-      {started && !done && latest && (
-        <p className="mt-3 text-sm font-semibold" style={{ color: LIME }}>
-          {latest.label} of the way there — nice work.
-        </p>
-      )}
+      <MilestoneTrack milestones={milestones} onLight={!done} />
     </section>
   )
 
@@ -205,54 +212,48 @@ export function TodaysTarget({ pace }: { pace: Pace }) {
   const teamPct = pace.teamPerDay > 0 ? Math.min(100, Math.round((pace.todaySoFar / pace.teamPerDay) * 100)) : 100
 
   return (
-    <section className="rounded-[28px] border border-neutral-200 p-5 sm:p-6">
+    <section className="rounded-[28px] bg-neutral-950 p-7 text-white">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-lg font-bold tracking-tight text-neutral-950">Today</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm font-medium text-white/60">Your target today</p>
+        <p className="text-sm text-white/50">
           {pace.daysRemaining} {pace.daysRemaining === 1 ? 'day' : 'days'} left
         </p>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-x-8 gap-y-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Your share today</p>
-          <p className="mt-0.5 text-4xl font-extrabold tracking-tight tabular-nums text-neutral-950">
-            {nf.format(pace.personPerDay)}
-          </p>
-          <p className="mt-0.5 text-xs text-neutral-400">about {walkingTime(pace.personPerDay)} of walking</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Everyone together</p>
-          <p className="mt-0.5 text-2xl font-extrabold tracking-tight tabular-nums text-neutral-700">
-            {nf.format(pace.teamPerDay)}
-          </p>
-          <p className="mt-0.5 text-xs text-neutral-400">a day, from here</p>
-        </div>
-      </div>
+      <p className="animate-count-rise mt-1.5 text-[3.25rem] font-extrabold leading-none tracking-tighter tabular-nums sm:text-6xl">
+        {nf.format(pace.personPerDay)}
+      </p>
+      <p className="mt-1.5 text-sm text-white/60">
+        steps &middot; about {walkingTime(pace.personPerDay)} of walking
+      </p>
 
-      <div className="mt-5">
+      <div className="mt-6 rounded-2xl bg-white/10 p-4">
         <div className="flex items-baseline justify-between text-sm">
-          <span className="font-semibold text-neutral-700">
-            {nf.format(pace.todaySoFar)} <span className="font-normal text-neutral-400">logged today</span>
+          <span className="font-semibold">
+            {nf.format(pace.todaySoFar)}{' '}
+            <span className="font-normal text-white/50">logged by the team today</span>
           </span>
-          <span className={covered ? 'font-semibold' : 'text-neutral-500'} style={covered ? { color: GREEN } : undefined}>
+          <span className={covered ? 'font-bold' : 'text-white/60'} style={covered ? { color: LIME } : undefined}>
             {covered ? 'Target met' : `${nf.format(pace.todayToGo)} to go`}
           </span>
         </div>
-        <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-neutral-100">
+        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/15">
           <div
             className="h-full rounded-full transition-[width] duration-700 ease-out"
             style={{
               width: `${Math.max(teamPct, pace.todaySoFar > 0 ? 2 : 0)}%`,
-              background: covered ? GREEN : 'linear-gradient(to right, #fb923c, #f97316)',
+              background: covered ? LIME : 'linear-gradient(to right, #fb923c, #f97316)',
             }}
           />
         </div>
+        <p className="mt-2 text-xs text-white/50">
+          Everyone together needs {nf.format(pace.teamPerDay)} a day from here.
+        </p>
       </div>
 
       <p
         className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium text-neutral-900"
-        style={{ backgroundColor: pace.myShareMet || covered ? LIME : '#fff7ed' }}
+        style={{ backgroundColor: pace.myShareMet || covered ? LIME : '#fed7aa' }}
       >
         {paceMessage(pace)}
       </p>

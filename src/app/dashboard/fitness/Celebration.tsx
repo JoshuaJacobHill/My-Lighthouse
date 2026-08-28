@@ -63,34 +63,39 @@ function Confetti() {
   )
 }
 
-export function MilestoneTrack({ milestones }: { milestones: Milestone[] }) {
+/** `onLight` styles the not-yet-reached markers for a white card rather than a dark one. */
+export function MilestoneTrack({ milestones, onLight = false }: { milestones: Milestone[]; onLight?: boolean }) {
+  const idle = onLight
+    ? { box: 'bg-neutral-100', icon: 'text-neutral-400', label: 'text-neutral-500', steps: 'text-neutral-400' }
+    : { box: 'bg-white/10', icon: 'text-white/40', label: 'text-white/50', steps: 'text-white/30' }
+
   return (
     <ul className="mt-5 grid grid-cols-4 gap-2">
       {milestones.map((m) => (
         <li
           key={m.fraction}
           className={`rounded-2xl px-2 py-2.5 text-center transition-colors ${
-            m.reached ? 'animate-milestone-pop' : 'bg-white/10'
+            m.reached ? 'animate-milestone-pop' : idle.box
           }`}
           style={m.reached ? { backgroundColor: m.fraction === 1 ? GREEN : LIME } : undefined}
         >
           <span
             className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full ${
-              m.reached ? (m.fraction === 1 ? 'bg-white/25 text-white' : 'bg-black/15 text-neutral-900') : 'text-white/40'
+              m.reached ? (m.fraction === 1 ? 'bg-white/25 text-white' : 'bg-black/15 text-neutral-900') : idle.icon
             }`}
           >
             {m.reached ? <Check className="h-3.5 w-3.5" /> : <Lock className="h-3 w-3" />}
           </span>
           <span
             className={`mt-1 block text-sm font-extrabold ${
-              m.reached ? (m.fraction === 1 ? 'text-white' : 'text-neutral-900') : 'text-white/50'
+              m.reached ? (m.fraction === 1 ? 'text-white' : 'text-neutral-900') : idle.label
             }`}
           >
             {m.label}
           </span>
           <span
             className={`block text-[10px] font-semibold ${
-              m.reached ? (m.fraction === 1 ? 'text-white/70' : 'text-neutral-900/60') : 'text-white/30'
+              m.reached ? (m.fraction === 1 ? 'text-white/70' : 'text-neutral-900/60') : idle.steps
             }`}
           >
             {nf.format(m.steps)}

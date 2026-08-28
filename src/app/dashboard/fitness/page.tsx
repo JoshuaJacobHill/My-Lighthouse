@@ -102,15 +102,23 @@ export default async function StaffFitnessPage() {
           </p>
         )}
 
-        <div className="mt-7">
-          <TotalSteps
-            total={board.total}
-            goal={challenge.goal}
-            participants={board.participants}
-            started={started}
-            behind={onTrack - board.total}
-          />
-        </div>
+
+        {started ? (
+          <div className="mt-7">
+            <TodaysTarget pace={pace} />
+          </div>
+        ) : (
+          <div className="mt-7">
+            <TotalSteps
+              total={board.total}
+              goal={challenge.goal}
+              participants={board.participants}
+              started={started}
+              behind={onTrack - board.total}
+              startLabel={startLabel}
+            />
+          </div>
+        )}
 
         {/* ── Your bit ── */}
         <section className="mt-5 flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-5 sm:p-6">
@@ -181,7 +189,14 @@ export default async function StaffFitnessPage() {
         {/* ── Day by day ── */}
         {started && (
           <div className="mt-5">
-            <TodaysTarget pace={pace} />
+            <TotalSteps
+              total={board.total}
+              goal={challenge.goal}
+              participants={board.participants}
+              started={started}
+              behind={onTrack - board.total}
+              startLabel={startLabel}
+            />
           </div>
         )}
 
