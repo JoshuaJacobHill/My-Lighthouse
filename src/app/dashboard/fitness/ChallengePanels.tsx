@@ -1,4 +1,4 @@
-import { Sparkles, CalendarDays, Medal } from 'lucide-react'
+import { Medal, Sparkles } from 'lucide-react'
 import { MilestoneTrack, GoalReachedShell, GoalReachedBadge } from './Celebration'
 import { buildMilestones, LIME, GREEN } from '@/lib/fitness-milestones'
 import { paceMessage, walkingTime, type Pace } from '@/lib/fitness-pace'
@@ -50,7 +50,7 @@ export function TotalSteps({
       {done && <GoalReachedBadge />}
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className={`text-lg font-bold tracking-tight ${done ? 'text-white' : 'text-neutral-950'}`}>
-          The whole month
+          Everyone, this month
         </h2>
         <span
           className={`text-sm font-semibold ${
@@ -74,7 +74,7 @@ export function TotalSteps({
         </span>
       </p>
       <p className={`mt-0.5 text-sm ${done ? 'text-white/60' : 'text-neutral-500'}`}>
-        {participants} {participants === 1 ? 'person' : 'people'} walking
+        combined, from {participants} {participants === 1 ? 'person' : 'people'}
       </p>
 
       <div className={`mt-4 h-2 w-full overflow-hidden rounded-full ${done ? 'bg-white/20' : 'bg-neutral-100'}`}>
@@ -102,7 +102,7 @@ export function TopFive({ rows }: { rows: Standing[] }) {
       <h2 className="text-lg font-bold tracking-tight text-neutral-950">Top 5 this month</h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-sm text-neutral-500">
-          Nobody has logged any steps yet. Be the first &mdash; it only takes a second.
+          Nobody has logged any steps yet.
         </p>
       ) : (
         <ol className="mt-4 space-y-3.5">
@@ -156,57 +156,6 @@ export function TipOfTheDay({ tip }: { tip: string }) {
   )
 }
 
-export function WeeklySchedule({ schedule }: { schedule: ScheduleItem[] }) {
-  const byWeekday = DAY_NAMES.map((_, i) => ({ weekday: i, list: schedule.filter((s) => s.weekday === i) })).filter(
-    (d) => d.list.length > 0
-  )
-  return (
-    <section className="rounded-[28px] border border-neutral-200 p-5 sm:p-6">
-      <h2 className="text-lg font-bold tracking-tight text-neutral-950">This week</h2>
-      <p className="mt-0.5 text-sm text-neutral-500">Everyone&rsquo;s welcome &mdash; come along to whatever suits.</p>
-      {byWeekday.length === 0 ? (
-        <p className="mt-4 text-sm text-neutral-500">Nothing scheduled yet.</p>
-      ) : (
-        <div className="mt-4 divide-y divide-neutral-100">
-          {byWeekday.map(({ weekday, list }) => (
-            <div key={weekday} className="flex gap-4 py-3.5 first:pt-0 last:pb-0">
-              <div className="w-20 shrink-0 sm:w-24">
-                <p className={`text-sm font-bold ${list[0].isToday ? 'text-orange-600' : 'text-neutral-900'}`}>
-                  {DAY_NAMES[weekday]}
-                </p>
-                {list[0].isToday && <p className="text-xs font-semibold text-orange-500">Today</p>}
-              </div>
-              <ul className="min-w-0 flex-1 space-y-3">
-                {list.map((s) => (
-                  <li key={s.id}>
-                    <p className="font-semibold text-neutral-900">{s.title}</p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-neutral-500">
-                      <span className="inline-flex items-center gap-1.5">
-                        <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-                        {clock(s.startTime)}
-                        {s.endTime && ` – ${clock(s.endTime)}`}
-                      </span>
-                      {s.location && <span>&middot; {s.location}</span>}
-                      {s.leader && <span>&middot; with {s.leader}</span>}
-                    </p>
-                    {s.notes && <p className="mt-0.5 text-xs italic text-neutral-400">{s.notes}</p>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-/**
- * What the goal means for one person, today.
- *
- * Sits directly under the collective total because that number, on its own,
- * tells nobody what to do. "Your share: 2,400 today" does.
- */
 export function TodaysTarget({ pace }: { pace: Pace }) {
   const covered = pace.todayToGo === 0
   const teamPct = pace.teamPerDay > 0 ? Math.min(100, Math.round((pace.todaySoFar / pace.teamPerDay) * 100)) : 100
@@ -224,7 +173,7 @@ export function TodaysTarget({ pace }: { pace: Pace }) {
         {nf.format(pace.personPerDay)}
       </p>
       <p className="mt-1.5 text-sm text-white/60">
-        steps &middot; about {walkingTime(pace.personPerDay)} of walking
+        steps today, about {walkingTime(pace.personPerDay)} of walking
       </p>
 
       <div className="mt-6 rounded-2xl bg-white/10 p-4">
@@ -247,16 +196,9 @@ export function TodaysTarget({ pace }: { pace: Pace }) {
           />
         </div>
         <p className="mt-2 text-xs text-white/50">
-          Everyone together needs {nf.format(pace.teamPerDay)} a day from here.
+          The team needs {nf.format(pace.teamPerDay)} a day from here.
         </p>
       </div>
-
-      <p
-        className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium text-neutral-900"
-        style={{ backgroundColor: pace.myShareMet || covered ? LIME : '#fed7aa' }}
-      >
-        {paceMessage(pace)}
-      </p>
     </section>
   )
 }

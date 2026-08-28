@@ -29,7 +29,25 @@ interface Props {
   todayIndex: number
 }
 
+type Range = 'week' | 'month'
+
 export function StepsChart({ days, todayIndex }: Props) {
+  // A week is the useful view day to day. The month is for stepping back, so it
+  // is one tap away rather than the default.
+  const [range, setRange] = React.useState<Range>('week')
+
+  // The seven days ending today, so the current week is always complete even
+  // when the days ahead are still empty.
+  const window7 = React.useMemo(() => {
+    const end = todayIndex >= 0 ? todayIndex : days.findLastIndex((d) => !d.future)
+    const last = end >= 0 ? end : days.length - 1
+    const start = Math.max(0, Math.min(last - 6, days.length - 7))
+    return { start, end: Math.min(start + 7, days.length) }
+  }, [days, todayIndex])
+
+  const shown = range === 'week' ? days.slice(window7.start, window7.end) : days
+  const offset = range === 'week' ? window7.start : 0
+
   // Open on today where possible, otherwise the last day with any steps.
   const initial = React.useMemo(() => {
     if (todayIndex >= 0 && days[todayIndex] && !days[todayIndex].future) return todayIndex
@@ -41,14 +59,14 @@ export function StepsChart({ days, todayIndex }: Props) {
   const [showTable, setShowTable] = React.useState(false)
   const refs = React.useRef<(HTMLButtonElement | null)[]>([])
 
-  const max = Math.max(1, ...days.map((d) => d.total))
+  const max = Math.max(1, ...shown.map((d) => d.total))
   const active = selected >= 0 ? days[selected] : null
-  const logged = days.filter((d) => !d.future)
+  const logged = shown.filter((d) => !d.future)
   const average = logged.length ? Math.round(logged.reduce((s, d) => s + d.total, 0) / logged.length) : 0
 
   function onKeyDown(e: React.KeyboardEvent, i: number) {
     const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null
-    if (next === null || next < 0 || next >= days.length) return
+    if (next === null || next < offset || next >= offset + shown.length) return
     e.preventDefault()
     setSelected(next)
     refs.current[next]?.focus()
@@ -56,13 +74,28 @@ export function StepsChart({ days, todayIndex }: Props) {
 
   return (
     <section className="rounded-[28px] border border-neutral-200 p-5 sm:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="text-lg font-bold tracking-tight text-neutral-950">Steps each day</h2>
-        <p className="text-sm text-neutral-500">
-          Averaging <strong className="font-semibold text-neutral-700">{nf.format(average)}</strong> a day
-        </p>
+        <div className="flex rounded-full bg-neutral-100 p-0.5" role="tablist" aria-label="Range">
+          {(['week', 'month'] as Range[]).map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="tab"
+              aria-selected={range === r}
+              onClick={() => setRange(r)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold capitalize transition-colors ${
+                range === r ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-800'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="mt-0.5 text-sm text-neutral-500">Tap a day to see who led it.</p>
+      <p className="mt-1 text-sm text-neutral-500">
+        Averaging {nf.format(average)} a day. Tap a day to see who led it.
+      </p>
 
       {/* ── The bars ── */}
       <div
@@ -70,7 +103,8 @@ export function StepsChart({ days, todayIndex }: Props) {
         role="group"
         aria-label="Steps by day"
       >
-        {days.map((d, i) => {
+        {shown.map((d, localIndex) => {
+          const i = offset + localIndex
           const height = d.future ? 3 : Math.max(d.total > 0 ? 4 : 2, Math.round((d.total / max) * 100))
           const isSelected = i === selected
           return (
@@ -111,16 +145,20 @@ export function StepsChart({ days, todayIndex }: Props) {
           "Today" is positioned over its own column rather than centred, so it
           points at the bar it actually describes. */}
       <div className="relative mt-3 h-4 text-[11px] font-medium text-neutral-400">
-        <span className="absolute left-0">{days[0]?.label}</span>
-        {todayIndex > 2 && todayIndex < days.length - 3 && (
-          <span
-            className="absolute -translate-x-1/2 font-semibold text-neutral-700"
-            style={{ left: `${((todayIndex + 0.5) / days.length) * 100}%` }}
-          >
-            Today
-          </span>
-        )}
-        <span className="absolute right-0">{days[days.length - 1]?.label}</span>
+        <span className="absolute left-0">{shown[0]?.label}</span>
+        {(() => {
+          const local = todayIndex - offset
+          if (local <= 2 || local >= shown.length - 3) return null
+          return (
+            <span
+              className="absolute -translate-x-1/2 font-semibold text-neutral-700"
+              style={{ left: `${((local + 0.5) / shown.length) * 100}%` }}
+            >
+              Today
+            </span>
+          )
+        })()}
+        <span className="absolute right-0">{shown[shown.length - 1]?.label}</span>
       </div>
 
       {/* ── The selected day ── */}
@@ -164,7 +202,7 @@ export function StepsChart({ days, todayIndex }: Props) {
         className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-500 hover:text-neutral-800"
       >
         <Table2 className="h-4 w-4" aria-hidden="true" />
-        {showTable ? 'Hide every day' : 'See every day'}
+        {showTable ? 'Hide the numbers' : 'See the numbers'}
       </button>
 
       {showTable && (
@@ -178,7 +216,7 @@ export function StepsChart({ days, todayIndex }: Props) {
               </tr>
             </thead>
             <tbody>
-              {days
+              {shown
                 .filter((d) => !d.future)
                 .map((d) => (
                   <tr key={d.day} className="border-t border-neutral-100">

@@ -347,6 +347,19 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             placeholder="https://secure.employmenthero.com"
             helpText="Staff see a 'Payslips & leave' shortcut to this on their dashboard. We deliberately link out rather than pull payroll data into this portal."
           />
+          <div className="rounded-xl border border-gray-200 p-4">
+            <p className="text-sm font-medium text-gray-800">Wellbeing schedule</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              The weekly sessions staff see on the fitness challenge page. One per location if the two stores are
+              doing different things.
+            </p>
+            <a
+              href="/admin/settings/schedule"
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:underline"
+            >
+              Manage the schedule
+            </a>
+          </div>
           <SettingField
             label="Apple Shortcut Install Link"
             settingKey="fitness_shortcut_url"

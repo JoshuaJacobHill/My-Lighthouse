@@ -111,20 +111,20 @@ export function walkingTime(steps: number): string {
  * sitting next to it.
  */
 export function paceMessage(pace: Pace): string {
-  if (pace.finished) return 'We’ve done it. Anything from here is a bonus.'
-  if (pace.daysRemaining <= 0) return 'That’s the month done.'
+  if (pace.finished) return 'We did it. Anything from here is a bonus.'
+  if (pace.daysRemaining <= 0) return 'That is the month done.'
 
   if (pace.todayToGo === 0) {
-    return 'Today’s target is already covered — anything more puts us ahead.'
+    return 'Today is already covered. Anything more puts us ahead.'
   }
   if (pace.myAveragePerDay === 0) {
-    return `Nothing logged yet — your share works out at about ${fmt(pace.personPerDay)} steps a day.`
+    return `Nothing logged yet. Your share is about ${fmt(pace.personPerDay)} steps a day.`
   }
   if (pace.myShareMet) {
-    return `You’re above your share at ${fmt(pace.myAveragePerDay)} a day. Every extra one helps carry someone having a rough week.`
+    return `You are above your share at ${fmt(pace.myAveragePerDay)} a day. Every extra one helps carry someone having a rough week.`
   }
   const gap = pace.personPerDay - pace.myAveragePerDay
-  return `You’re averaging ${fmt(pace.myAveragePerDay)} a day. Another ${fmt(gap)} — roughly ${walkingTime(gap)} of walking — would put you on your share.`
+  return `You are averaging ${fmt(pace.myAveragePerDay)} a day. Another ${fmt(gap)}, about ${walkingTime(gap)} of walking, puts you on your share.`
 }
 
 function fmt(n: number): string {

@@ -1,12 +1,14 @@
 import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
-import { Footprints, Smartphone, ChevronRight, Lock } from 'lucide-react'
+import { Footprints, Smartphone, ChevronRight, Lock, Settings } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { LogStepsForm } from './LogStepsForm'
 import { StepsChart } from './StepsChart'
-import { TotalSteps, TopFive, TipOfTheDay, WeeklySchedule, TodaysTarget } from './ChallengePanels'
-import { computePace } from '@/lib/fitness-pace'
+import { TotalSteps, TopFive, TipOfTheDay, TodaysTarget } from './ChallengePanels'
+import { WeekSchedule } from './WeekSchedule'
+import { PaceNudge } from './PaceNudge'
+import { computePace, paceMessage } from '@/lib/fitness-pace'
 import { isAdminRole } from '@/lib/permissions-core'
 import { brisbaneToday, calendarDayString } from '@/lib/fitness-days'
 import { getChallengeBoard, getTipOfTheDay, getWellbeingSchedule, getCurrentChallenge } from '@/lib/fitness-data'
@@ -47,7 +49,7 @@ export default async function StaffFitnessPage() {
   const [board, tip, schedule, mine, fitnessLink] = await Promise.all([
     getChallengeBoard(challenge),
     getTipOfTheDay(),
-    getWellbeingSchedule(),
+    getWellbeingSchedule(challenge),
     prisma.fitnessEntry.findMany({
       where: { challengeId: challenge.id, userId: me.id },
       orderBy: { day: 'desc' },
@@ -92,8 +94,8 @@ export default async function StaffFitnessPage() {
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-orange-600">Staff challenge</p>
         <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight sm:text-4xl">{challenge.name}</h1>
         <p className="mt-2.5 max-w-xl text-neutral-500">
-          Ten million steps between us, across September. Walk the long way, take the stairs, get outside at
-          lunch &mdash; it all counts, and it all adds up.
+          Ten million steps between us across September. Walk the long way, take the stairs, get outside at lunch.
+          It all counts.
         </p>
         {!started && (
           <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-orange-50 px-3.5 py-1.5 text-sm font-semibold text-orange-700">
@@ -117,6 +119,12 @@ export default async function StaffFitnessPage() {
               behind={onTrack - board.total}
               startLabel={startLabel}
             />
+          </div>
+        )}
+
+        {started && (
+          <div className="mt-4">
+            <PaceNudge message={paceMessage(pace)} positive={pace.myShareMet || pace.todayToGo === 0} />
           </div>
         )}
 
@@ -155,36 +163,31 @@ export default async function StaffFitnessPage() {
             <div>
               <p className="font-bold text-neutral-950">Step logging opens on {startLabel}</p>
               <p className="mt-0.5 text-sm text-neutral-500">
-                Nothing to do yet &mdash; have a look around, and if you&rsquo;d like your phone to send your steps
-                for you, you can set that up now so it&rsquo;s ready to go on day one.
+                Nothing to do yet. You can link your phone now so it is ready on day one.
               </p>
             </div>
           </section>
         )}
 
-        <Link
-          href="/dashboard/fitness/connect"
-          className="mt-3 flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-5 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-neutral-950 text-white">
-              <Smartphone className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div>
-              <p className="font-bold text-neutral-950">
-                {fitnessLink ? 'Your phone is sending your steps' : 'Let your phone do it for you'}
-              </p>
-              <p className="text-sm text-neutral-500">
-                {fitnessLink
-                  ? fitnessLink.lastUsedAt
-                    ? `Last received ${nf.format(fitnessLink.lastAmount ?? 0)} steps on ${new Intl.DateTimeFormat('en-AU', { timeZone: BNE, day: 'numeric', month: 'short' }).format(fitnessLink.lastUsedAt)}.`
-                    : 'Set up, but nothing has come through yet.'
-                  : 'Send your daily total from Apple Health automatically. Optional, about two minutes.'}
-              </p>
+        {!fitnessLink && (
+          <Link
+            href="/dashboard/fitness/connect"
+            className="mt-3 flex items-center justify-between gap-4 rounded-[28px] border border-neutral-200 p-5 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-neutral-950 text-white">
+                <Smartphone className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="font-bold text-neutral-950">Link your steps to Apple Health</p>
+                <p className="text-sm text-neutral-500">
+                  Your phone sends the daily total on its own. Takes about two minutes.
+                </p>
+              </div>
             </div>
-          </div>
-          <ChevronRight className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
-        </Link>
+            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
+          </Link>
+        )}
 
         {/* ── Day by day ── */}
         {started && (
@@ -215,11 +218,22 @@ export default async function StaffFitnessPage() {
         )}
 
         <div className="mt-5">
-          <WeeklySchedule schedule={schedule} />
+          <WeekSchedule schedule={schedule} />
         </div>
 
+        {fitnessLink && (
+          <div className="mt-5 flex justify-center">
+            <Link
+              href="/dashboard/fitness/connect"
+              className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-600 hover:bg-neutral-50"
+            >
+              <Settings className="h-4 w-4" aria-hidden="true" /> Apple Health settings
+            </Link>
+          </div>
+        )}
+
         <p className="mt-6 text-center text-xs text-neutral-400">
-          Steps are shared with the team so we can cheer each other on. Nothing else from your phone is.
+          Steps are shared with the team. Nothing else from your phone is.
         </p>
       </div>
     </div>

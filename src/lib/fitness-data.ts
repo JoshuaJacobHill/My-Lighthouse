@@ -175,28 +175,65 @@ export interface ScheduleItem {
   leader: string | null
   notes: string | null
   isToday: boolean
+  /** The actual date this weekday falls on in the week being shown, yyyy-mm-dd. */
+  date: string
+  /** "Tuesday 1 September" */
+  dateLabel: string
 }
 
-/** The weekly wellbeing schedule, Monday first, with today flagged. */
-export async function getWellbeingSchedule(): Promise<ScheduleItem[]> {
+/**
+ * The weekly wellbeing schedule with real dates attached.
+ *
+ * Sessions are stored as weekdays because they recur, but "Tuesday" on its own
+ * is ambiguous when you are looking at it on a Thursday. Each one is resolved
+ * to the date it falls on in the current week, clamped into the challenge so
+ * the first week does not advertise sessions from before it started.
+ */
+export async function getWellbeingSchedule(challenge?: {
+  startsAt: Date
+  endsAt: Date
+}): Promise<ScheduleItem[]> {
   const rows = await prisma.wellbeingSession.findMany({
     where: { isActive: true },
     orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }, { sortOrder: 'asc' }],
   })
-  const todayWeekday =
-    ({ Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 } as Record<string, number>)[
-      new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Brisbane', weekday: 'short' }).format(new Date())
-    ] ?? 0
 
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    weekday: r.weekday,
-    startTime: r.startTime,
-    endTime: r.endTime,
-    location: r.location,
-    leader: r.leader,
-    notes: r.notes,
-    isToday: r.weekday === todayWeekday,
-  }))
+  const today = brisbaneToday()
+  const todayDate = calendarDay(today)!
+  const todayWeekday = ((todayDate.getUTCDay() + 6) % 7) + 1 // 1 = Mon … 7 = Sun
+
+  // Monday of the week we are in.
+  const monday = new Date(todayDate.getTime() - (todayWeekday - 1) * 86_400_000)
+
+  const fmt = new Intl.DateTimeFormat('en-AU', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+
+  const items = rows.map((r) => {
+    let date = new Date(monday.getTime() + (r.weekday - 1) * 86_400_000)
+    // During the challenge's first week, roll a session that has already passed
+    // forward to next week rather than showing a date before it began.
+    if (challenge && date < challenge.startsAt) {
+      const next = new Date(date.getTime() + 7 * 86_400_000)
+      if (next <= challenge.endsAt) date = next
+    }
+    return {
+      id: r.id,
+      title: r.title,
+      weekday: r.weekday,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      location: r.location,
+      leader: r.leader,
+      notes: r.notes,
+      isToday: calendarDayString(date) === today,
+      date: calendarDayString(date),
+      dateLabel: fmt.format(date),
+    }
+  })
+
+  return items.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
 }
