@@ -50,12 +50,16 @@ export async function POST(request: NextRequest) {
  * portal in one tap.
  */
 export async function recordSteps(request: NextRequest, rawToken: string) {
-  // The code is short enough to be typed, so the endpoint has to be the thing
-  // that makes guessing pointless. Generous for a phone posting a few times a
-  // day; nowhere near enough to work through 380 billion possibilities.
+  // Two different jobs, so two different limits.
+  //
+  // Guessing is what needs choking, and only *failed* attempts indicate it —
+  // so the per-IP budget is spent on wrong codes, not right ones. Limiting
+  // successful posts per IP would have been actively harmful: the whole team
+  // shares the store's Wi-Fi, so phones posting from one address would have
+  // throttled each other out.
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  if (!rateLimit(`steps:ip:${ip}`, 60, 60_000).ok) {
-    return NextResponse.json({ ok: false, error: 'Too many attempts. Try again shortly.' }, { status: 429 })
+  if (!rateLimit(`steps:fail:${ip}`, 20, 600_000, { peek: true }).ok) {
+    return NextResponse.json({ ok: false, error: 'Too many attempts. Try again later.' }, { status: 429 })
   }
 
   const token = normaliseFitnessCode(rawToken)
@@ -66,7 +70,15 @@ export async function recordSteps(request: NextRequest, rawToken: string) {
   // Same response either way — a wrong token and a revoked one shouldn't be
   // distinguishable from outside.
   if (!link || link.revokedAt) {
+    rateLimit(`steps:fail:${ip}`, 20, 600_000) // spend the budget on the miss
     return NextResponse.json({ ok: false, error: 'Not connected' }, { status: 401 })
+  }
+
+  // A valid code may post as often as it likes — an "App Opened" automation
+  // fires dozens of times a day and that's the intended use. This only catches
+  // a shortcut stuck in a loop.
+  if (!rateLimit(`steps:code:${link.id}`, 240, 3_600_000).ok) {
+    return NextResponse.json({ ok: false, error: 'That code is sending too often.' }, { status: 429 })
   }
 
   let body: unknown

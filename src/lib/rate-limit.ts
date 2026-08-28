@@ -15,10 +15,22 @@ const buckets = new Map<string, Bucket>()
 export function rateLimit(
   key: string,
   limit: number,
-  windowMs: number
+  windowMs: number,
+  options?: { peek?: boolean }
 ): { ok: boolean; retryAfterSeconds: number } {
   const now = Date.now()
   const bucket = buckets.get(key)
+
+  // `peek` reads the budget without spending any of it — for checking whether
+  // a caller is already blocked before deciding if this attempt counts against
+  // them.
+  if (options?.peek) {
+    if (!bucket || now > bucket.resetAt) return { ok: true, retryAfterSeconds: 0 }
+    return {
+      ok: bucket.count < limit,
+      retryAfterSeconds: Math.max(0, Math.ceil((bucket.resetAt - now) / 1000)),
+    }
+  }
 
   if (!bucket || now > bucket.resetAt) {
     buckets.set(key, { count: 1, resetAt: now + windowMs })

@@ -183,6 +183,11 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
             <li>
               <strong>3.</strong> Run it once and allow Health access when asked. That&rsquo;s the opt-in.
             </li>
+            <li>
+              <strong>4.</strong> In the <strong>Automation</strong> tab, add an <strong>App</strong> automation:
+              something you open often, <strong>Is Opened</strong>, <strong>Run Immediately</strong>. Your steps
+              then update all through the day on their own.
+            </li>
           </ol>
           <a
             href={shortcutUrl}
@@ -248,16 +253,26 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
             </p>
           </Step>
 
-          <Step n={5} title="Make it run by itself through the day">
+          <Step n={5} title="Make it run by itself">
             <p>
-              In the <strong>Automation</strong> tab, tap <strong>+</strong>, choose{' '}
-              <strong>Time of Day</strong>, pick a time, repeat <strong>daily</strong>, choose{' '}
-              <strong>Run Immediately</strong> and turn off <strong>Notify When Run</strong>.
+              Go to the <strong>Automation</strong> tab and tap <strong>+</strong>. The obvious choice is{' '}
+              <strong>Time of Day</strong>, but Apple only lets those repeat once a day &mdash; so the better one is{' '}
+              <strong>App</strong>.
             </p>
             <p>
-              <strong>Set up a few at different times</strong> — say 12&nbsp;pm, 4&nbsp;pm, 8&nbsp;pm and
-              11:30&nbsp;pm — and the leaderboard keeps up through the day. Each send replaces the last, so nothing
-              double-counts. Apple only lets these repeat daily, which is why it&rsquo;s a handful rather than hourly.
+              Choose <strong>App</strong>, pick something you open all the time (Messages, Instagram, your
+              bank &mdash; whatever), set it to <strong>Is Opened</strong>, then{' '}
+              <strong>Run Immediately</strong> with <strong>Notify When Run</strong> turned off. Pick your{' '}
+              <strong>Send my steps</strong> shortcut.
+            </p>
+            <p className="rounded-xl bg-neutral-100 px-3.5 py-2.5 text-neutral-700">
+              That&rsquo;s the whole trick: your steps now go up every time you open that app &mdash; dozens of times
+              a day, without you thinking about it. One automation instead of sixteen.
+            </p>
+            <p className="text-neutral-500">
+              Each send replaces the last, so nothing double-counts however often it runs. If you&rsquo;d rather have
+              set times, a Time of Day automation works too &mdash; just add a few (12&nbsp;pm, 4&nbsp;pm,
+              8&nbsp;pm, 11:30&nbsp;pm), since each one can only repeat daily.
             </p>
           </Step>
 
