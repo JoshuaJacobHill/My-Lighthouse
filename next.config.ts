@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  experimental: {
+    // Server Actions default to a 1 MB request body. Both image uploads and
+    // fitness screenshots go through actions, and a phone photo is routinely
+    // several megabytes, so every real upload was rejected by the framework
+    // before our own size check ever ran. The friendlier per feature limits
+    // (5 MB for images, 8 MB for screenshots) stay in the actions themselves.
+    serverActions: { bodySizeLimit: '10mb' },
+  },
   // Hosts we serve images from, so next/image can optimise (resize + WebP/AVIF)
   // rather than shipping full-size originals.
   images: {

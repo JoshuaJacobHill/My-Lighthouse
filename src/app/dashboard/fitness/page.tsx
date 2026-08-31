@@ -46,7 +46,7 @@ export default async function StaffFitnessPage() {
     )
   }
 
-  const [board, tip, schedule, mine, fitnessLink] = await Promise.all([
+  const [board, tip, schedule, mine, eligible, fitnessLink] = await Promise.all([
     getChallengeBoard(challenge),
     getTipOfTheDay(),
     getWellbeingSchedule(challenge),
@@ -55,6 +55,7 @@ export default async function StaffFitnessPage() {
       orderBy: { day: 'desc' },
       select: { day: true, amount: true },
     }),
+    prisma.user.count({ where: { OR: [{ isStaff: true }, { isTrainee: true }], isActive: true } }),
     prisma.fitnessLink.findFirst({
       where: { userId: me.id, revokedAt: null },
       select: { lastUsedAt: true, lastAmount: true },
@@ -77,6 +78,7 @@ export default async function StaffFitnessPage() {
     todaySoFar,
     myToday: existingToday ?? 0,
     myTotal,
+    eligible,
   })
   const startLabel = new Intl.DateTimeFormat('en-AU', {
     timeZone: BNE,

@@ -39,7 +39,11 @@ export function ImageUpload({
       if (res.success && res.url) onChange(res.url)
       else setError(res.error ?? 'Upload failed. Please try again.')
     } catch {
-      setError('Upload failed. Please try again.')
+      setError(
+        file.size > 5 * 1024 * 1024
+          ? `That image is ${(file.size / 1024 / 1024).toFixed(1)} MB. Please keep it under 5 MB.`
+          : 'Upload failed. Please try again.'
+      )
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''

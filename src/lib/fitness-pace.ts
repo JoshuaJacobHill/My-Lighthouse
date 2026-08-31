@@ -47,6 +47,8 @@ export function computePace(input: {
   todaySoFar: number
   myToday: number
   myTotal: number
+  /** How many people could take part, not how many already have. */
+  eligible?: number
 }): Pace {
   const { goal, total, participants, daysTotal, daysElapsed, todaySoFar, myToday, myTotal } = input
 
@@ -57,8 +59,10 @@ export function computePace(input: {
   // Split across the days still to come, today included — otherwise the target
   // is always yesterday's problem.
   const teamPerDay = daysRemaining > 0 ? Math.ceil(remaining / daysRemaining) : remaining
-  // At least one walker, so the sums hold up before anyone has logged anything.
-  const heads = Math.max(1, participants)
+  // Divide by everyone who could take part, not by everyone who already has.
+  // Using the latter meant that on day one, with nobody logged yet, one
+  // person's "share" came out as the entire team's daily target.
+  const heads = Math.max(1, input.eligible ?? participants)
   const personPerDay = Math.ceil(teamPerDay / heads)
 
   const todayToGo = Math.max(0, teamPerDay - todaySoFar)

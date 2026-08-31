@@ -173,19 +173,6 @@ export function TodaysTarget({ pace }: { pace: Pace }) {
       <p className="animate-count-rise mt-1.5 text-[3.25rem] font-extrabold leading-none tracking-tighter tabular-nums sm:text-6xl">
         {nf.format(pace.myToday)}
       </p>
-      <p className="mt-1.5 text-sm text-white/60">
-        {mineDone ? (
-          <span style={{ color: LIME }} className="font-semibold">
-            You have passed your {nf.format(pace.personPerDay)} for today
-          </span>
-        ) : (
-          <>
-            of {nf.format(pace.personPerDay)} today, about {walkingTime(pace.personPerDay - pace.myToday)} more of
-            walking
-          </>
-        )}
-      </p>
-
       <div className="mt-6 rounded-2xl bg-white/10 p-4">
         <div className="flex items-baseline justify-between text-sm">
           <span className="font-semibold">
