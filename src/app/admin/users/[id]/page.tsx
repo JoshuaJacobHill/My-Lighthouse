@@ -78,13 +78,20 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
   const isDonor = (user._count.donations ?? 0) > 0
   const isAdmin = isAdminRole(user.role)
 
-  // Can this admin see this particular person at all? A record is reachable
-  // only through a list they're allowed to browse: a care manager gets
-  // volunteers, staff and trainees; a church manager gets church members; donor
-  // records need giving access. Someone who is only a donor stays invisible to
-  // volunteer-side managers, and vice versa.
+  // Can this admin open this particular record?
+  //
+  // The question is whether the ONLY reason to see this person sits in a
+  // category this admin cannot browse. A donor is hidden from volunteer-side
+  // managers, a church member from care managers, and so on.
+  //
+  // A record in no category at all has nothing to protect, so anyone may open
+  // it. Getting this backwards made every uncategorised account, including our
+  // own admin logins, bounce straight back to the list.
+  const isPeople = vp !== null || user.isStaff || user.isTrainee
+  const inSomeCategory = isPeople || user.isChurchMember || isDonor
   const visibleToMe =
-    (canSeePeople && (vp !== null || user.isStaff || user.isTrainee)) ||
+    !inSomeCategory ||
+    (canSeePeople && isPeople) ||
     (canSeeChurch && user.isChurchMember) ||
     (canSeeDonations && isDonor)
   if (!visibleToMe) redirect('/admin/users')
