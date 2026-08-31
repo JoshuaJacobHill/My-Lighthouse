@@ -251,8 +251,8 @@ export default async function DonorHomePage() {
             >
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Staff</p>
-                <p className="mt-1 text-lg font-bold tracking-tight">Payslips &amp; leave</p>
-                <p className="mt-0.5 text-sm text-neutral-500">Opens Employment Hero</p>
+                <p className="mt-1 text-lg font-bold tracking-tight">Payslips &amp; roster</p>
+                <p className="mt-0.5 text-sm text-neutral-500">Shifts, timesheets and leave</p>
               </div>
               <ExternalLink className="h-5 w-5 shrink-0 text-neutral-400" />
             </a>

@@ -25,6 +25,8 @@ export interface Pace {
   /** Still needed today to stay on the pace above. */
   todayToGo: number
 
+  /** What you have logged today. */
+  myToday: number
   /** Your own total, average per elapsed day, and what you'd need from here. */
   myTotal: number
   myAveragePerDay: number
@@ -43,9 +45,10 @@ export function computePace(input: {
   daysTotal: number
   daysElapsed: number
   todaySoFar: number
+  myToday: number
   myTotal: number
 }): Pace {
-  const { goal, total, participants, daysTotal, daysElapsed, todaySoFar, myTotal } = input
+  const { goal, total, participants, daysTotal, daysElapsed, todaySoFar, myToday, myTotal } = input
 
   const daysRemaining = Math.max(0, daysTotal - daysElapsed + (daysElapsed > 0 ? 1 : 0))
   const remaining = Math.max(0, goal - total)
@@ -77,6 +80,7 @@ export function computePace(input: {
     personPerDay,
     todaySoFar,
     todayToGo,
+    myToday,
     myTotal,
     myAveragePerDay,
     myPerDay,

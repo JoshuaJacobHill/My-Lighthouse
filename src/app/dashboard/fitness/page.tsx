@@ -75,6 +75,7 @@ export default async function StaffFitnessPage() {
     daysTotal: board.days.length,
     daysElapsed: board.days.filter((d) => !d.future).length,
     todaySoFar,
+    myToday: existingToday ?? 0,
     myTotal,
   })
   const startLabel = new Intl.DateTimeFormat('en-AU', {

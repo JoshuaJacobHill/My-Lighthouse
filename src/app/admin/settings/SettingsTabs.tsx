@@ -345,7 +345,7 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             value={values.employment_hero_url ?? 'https://secure.employmenthero.com'}
             onChange={update}
             placeholder="https://secure.employmenthero.com"
-            helpText="Staff see a 'Payslips & leave' shortcut to this on their dashboard. We deliberately link out rather than pull payroll data into this portal."
+            helpText="Staff see a 'Payslips & roster' shortcut to this on their dashboard. We deliberately link out rather than pull payroll data into this portal."
           />
           <div className="rounded-xl border border-gray-200 p-4">
             <p className="text-sm font-medium text-gray-800">Wellbeing schedule</p>

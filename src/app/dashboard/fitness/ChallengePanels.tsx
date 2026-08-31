@@ -159,31 +159,41 @@ export function TipOfTheDay({ tip }: { tip: string }) {
 export function TodaysTarget({ pace }: { pace: Pace }) {
   const covered = pace.todayToGo === 0
   const teamPct = pace.teamPerDay > 0 ? Math.min(100, Math.round((pace.todaySoFar / pace.teamPerDay) * 100)) : 100
+  const mineDone = pace.myToday >= pace.personPerDay
 
   return (
     <section className="rounded-[28px] bg-neutral-950 p-7 text-white">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="text-sm font-medium text-white/60">Your target today</p>
+        <p className="text-sm font-medium text-white/60">Your steps today</p>
         <p className="text-sm text-white/50">
           {pace.daysRemaining} {pace.daysRemaining === 1 ? 'day' : 'days'} left
         </p>
       </div>
 
       <p className="animate-count-rise mt-1.5 text-[3.25rem] font-extrabold leading-none tracking-tighter tabular-nums sm:text-6xl">
-        {nf.format(pace.personPerDay)}
+        {nf.format(pace.myToday)}
       </p>
       <p className="mt-1.5 text-sm text-white/60">
-        steps today, about {walkingTime(pace.personPerDay)} of walking
+        {mineDone ? (
+          <span style={{ color: LIME }} className="font-semibold">
+            You have passed your {nf.format(pace.personPerDay)} for today
+          </span>
+        ) : (
+          <>
+            of {nf.format(pace.personPerDay)} today, about {walkingTime(pace.personPerDay - pace.myToday)} more of
+            walking
+          </>
+        )}
       </p>
 
       <div className="mt-6 rounded-2xl bg-white/10 p-4">
         <div className="flex items-baseline justify-between text-sm">
           <span className="font-semibold">
             {nf.format(pace.todaySoFar)}{' '}
-            <span className="font-normal text-white/50">logged by the team today</span>
+            <span className="font-normal text-white/50">of {nf.format(pace.teamPerDay)} for the team</span>
           </span>
           <span className={covered ? 'font-bold' : 'text-white/60'} style={covered ? { color: LIME } : undefined}>
-            {covered ? 'Target met' : `${nf.format(pace.todayToGo)} to go`}
+            {covered ? 'Done' : `${nf.format(pace.todayToGo)} to go`}
           </span>
         </div>
         <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/15">
@@ -195,9 +205,7 @@ export function TodaysTarget({ pace }: { pace: Pace }) {
             }}
           />
         </div>
-        <p className="mt-2 text-xs text-white/50">
-          The team needs {nf.format(pace.teamPerDay)} a day from here.
-        </p>
+        <p className="mt-2 text-xs text-white/50">Everyone&rsquo;s goal for today</p>
       </div>
     </section>
   )
