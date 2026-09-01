@@ -4,6 +4,7 @@ import { hashPassword } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { ASSIGNABLE_ADMIN_ROLES } from '@/lib/constants'
 import type { UserRole } from '@prisma/client'
+import { findUserByEmail, normaliseEmail } from '@/lib/user-lookup'
 
 async function requireSuperAdmin() {
   const session = await getSession()
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Password must be at least 8 characters.' }, { status: 400 })
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } })
+    const existing = await findUserByEmail(email)
     if (existing) {
       return NextResponse.json({ success: false, error: 'An account with that email already exists.' }, { status: 400 })
     }
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.create({
       data: {
         name,
-        email: email.toLowerCase(),
+        email: normaliseEmail(email),
         passwordHash,
         role: role as UserRole,
         isActive: true,

@@ -10,6 +10,7 @@ import { formatDate } from '@/lib/utils'
 import type { VolunteerStatus, UserRole } from '@prisma/client'
 import { isAdminRole } from '@/lib/permissions-core'
 import { assertCapability } from '@/lib/permissions'
+import { findUserByEmail, normaliseEmail } from '@/lib/user-lookup'
 import type { Capability } from '@/lib/permissions-core'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
@@ -346,21 +347,21 @@ export async function createVolunteerAction(
 
   try {
     // Check for existing user
-    const existing = await prisma.user.findUnique({ where: { email: data.email } })
+    const existing = await findUserByEmail(data.email)
     if (existing) {
       return { success: false, error: 'A user with this email address already exists.' }
     }
 
     const user = await prisma.user.create({
       data: {
-        email: data.email,
+        email: normaliseEmail(data.email),
         name: `${data.firstName} ${data.lastName}`,
         role: 'VOLUNTEER',
         volunteerProfile: {
           create: {
             firstName: data.firstName,
             lastName: data.lastName,
-            email: data.email,
+            email: normaliseEmail(data.email),
             mobile: data.mobile,
             dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
             addressLine1: data.addressLine1 || undefined,

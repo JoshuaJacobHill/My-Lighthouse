@@ -4,6 +4,7 @@ import { getSession, hashPassword, createPasswordResetToken } from '@/lib/auth'
 import { renderTemplate } from '@/lib/email-templates'
 import { sendEmail } from '@/lib/email'
 import { hasCapability } from '@/lib/permissions'
+import { findUserByEmail, normaliseEmail } from '@/lib/user-lookup'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 

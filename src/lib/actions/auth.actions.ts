@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
+import { normaliseEmail } from '@/lib/user-lookup'
 import {
   hashPassword,
   comparePassword,
@@ -122,12 +123,18 @@ export async function loginAction(formData: FormData): Promise<{
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    // Case insensitive, because an address stored with capitals is a different
+    // string to a unique index and would otherwise be impossible to sign in
+    // with. Where more than one row matches, prefer the one that actually has a
+    // password, which is the account someone can authenticate against.
+    const candidates = await prisma.user.findMany({
+      where: { email: { equals: normaliseEmail(email), mode: 'insensitive' } },
       include: {
         volunteerProfile: { select: { id: true, status: true } },
       },
+      take: 5,
     })
+    const user = candidates.find((c) => c.passwordHash) ?? candidates[0] ?? null
 
     if (!user || !user.passwordHash) {
       return { success: false, error: 'Invalid email or password' }
@@ -265,9 +272,10 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
     // account in place, so those supporters aren't blocked from signing up.
     const existing = session
       ? await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, passwordHash: true } })
-      : await prisma.user.findUnique({
-          where: { email: data.email.toLowerCase() },
+      : await prisma.user.findFirst({
+          where: { email: { equals: normaliseEmail(data.email), mode: 'insensitive' } },
           select: { id: true, passwordHash: true },
+          orderBy: { createdAt: 'asc' },
         })
     // Only block when an *anonymous* visitor tries to re-use an email that is
     // already a full account. A signed-in supporter is simply adding a

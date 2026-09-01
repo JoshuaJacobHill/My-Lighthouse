@@ -8,6 +8,7 @@ import { hashPassword, createSession, setSessionCookie, getSession } from '@/lib
 import { validateAccountSetupToken, consumeAccountSetupToken } from '@/lib/account-setup'
 import { claimDonationsForUser } from '@/lib/donations'
 import { rateLimit } from '@/lib/rate-limit'
+import { normaliseEmail } from '@/lib/user-lookup'
 
 interface Result {
   success: boolean
@@ -46,7 +47,7 @@ export async function completeDonorAccountAction(input: CompleteAccountInput): P
   if (!valid) {
     return { success: false, error: 'This link is invalid or has expired. Please request a new one.' }
   }
-  const email = valid.email
+  const email = normaliseEmail(valid.email)
 
   try {
     const now = new Date()
