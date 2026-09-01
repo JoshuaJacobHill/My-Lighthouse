@@ -232,6 +232,16 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
         </p>
       </Panel>
 
+      <Panel title="Or just tap the button">
+        <p>
+          There is an <strong>Update my steps now</strong> button on the challenge page. It runs the shortcut and
+          brings you straight back, so your number is current the moment you look.
+        </p>
+        <p className="text-neutral-500">
+          The automations still earn their keep. They are what makes your total right when everyone else is looking.
+        </p>
+      </Panel>
+
       <Panel title="What we can see">
         <p>
           <strong className="text-neutral-800">Only a step count and a date.</strong> Nothing else from Health. No
