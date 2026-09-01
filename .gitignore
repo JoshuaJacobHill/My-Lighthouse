@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# One-off migration credentials, never committed
+scripts/migrate/.target
+scripts/migrate/.sydney
+scripts/migrate/.sydney-app
