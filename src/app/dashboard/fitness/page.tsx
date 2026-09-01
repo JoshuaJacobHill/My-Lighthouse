@@ -67,6 +67,12 @@ export default async function StaffFitnessPage() {
   const existingToday = mine.find((e) => calendarDayString(e.day) === today)?.amount ?? null
   const pct = Math.min(100, Math.round((board.total / challenge.goal) * 100))
 
+  // A linked phone that has not reported in a day and a half has almost always
+  // been installed without an automation, so it only runs when tapped.
+  const phoneStale =
+    Boolean(fitnessLink) &&
+    (!fitnessLink?.lastUsedAt || Date.now() - fitnessLink.lastUsedAt.getTime() > 36 * 3_600_000)
+
   const started = Date.now() >= challenge.startsAt.getTime()
   const todaySoFar = board.days.find((d) => d.day === today)?.total ?? 0
   const pace = computePace({
@@ -225,7 +231,18 @@ export default async function StaffFitnessPage() {
         </div>
 
         {fitnessLink && (
-          <div className="mt-5 flex justify-center">
+          <div className="mt-5 flex flex-col items-center gap-3">
+            {phoneStale && (
+              <Link
+                href="/dashboard/fitness/connect"
+                className="w-full rounded-2xl bg-amber-50 px-4 py-3 text-center text-sm text-amber-900 hover:bg-amber-100"
+              >
+                <span className="font-semibold">Your phone has stopped sending steps.</span>{' '}
+                {fitnessLink.lastUsedAt
+                  ? 'It probably needs an automation so it runs on its own.'
+                  : 'Run the shortcut once to get started.'}
+              </Link>
+            )}
             <Link
               href="/dashboard/fitness/connect"
               className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-600 hover:bg-neutral-50"

@@ -48,6 +48,37 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
 
   const personalUrl = `${appUrl}/api/fitness/steps/${encodeURIComponent(token ?? '')}`
 
+  // Nothing arriving is the normal failure here, and it is silent: people
+  // install the shortcut, run it once, see it work, and never add the
+  // automation that actually keeps it running.
+  const status = React.useMemo(() => {
+    if (!token) return null
+    if (!lastUsedAt) {
+      return {
+        stale: true,
+        headline: 'Nothing has come through yet',
+        detail: 'Run the shortcut once to check it works, then add the automation so it keeps going on its own.',
+      }
+    }
+    const hours = (Date.now() - new Date(lastUsedAt).getTime()) / 3_600_000
+    const when = new Date(lastUsedAt).toLocaleString('en-AU', {
+      timeZone: 'Australia/Brisbane',
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    const amount = lastAmount != null ? `${lastAmount.toLocaleString('en-AU')} steps` : 'your steps'
+    if (hours > 36) {
+      return {
+        stale: true,
+        headline: 'Your phone has stopped sending',
+        detail: `Last received ${amount} on ${when}. Most likely there is no automation set up, so it only runs when you tap it. Step 4 below.`,
+      }
+    }
+    return { stale: false, headline: 'Working', detail: `Last received ${amount} on ${when}.` }
+  }, [token, lastUsedAt, lastAmount])
+
   async function copyCode() {
     if (!token) return
     try {
@@ -109,17 +140,14 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
 
   return (
     <div className="mt-6">
-      {lastUsedAt && (
-        <div className="mb-4 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-800">
-          Working. Last received {lastAmount != null ? `${lastAmount.toLocaleString('en-AU')} steps ` : ''}
-          {new Date(lastUsedAt).toLocaleString('en-AU', {
-            timeZone: 'Australia/Brisbane',
-            day: 'numeric',
-            month: 'short',
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
-          .
+      {status && (
+        <div
+          className={`mb-4 rounded-2xl px-4 py-3 text-sm ${
+            status.stale ? 'bg-amber-50 text-amber-900' : 'bg-green-50 text-green-800'
+          }`}
+        >
+          <p className="font-semibold">{status.headline}</p>
+          <p className="mt-0.5">{status.detail}</p>
         </div>
       )}
 
