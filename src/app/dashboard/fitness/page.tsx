@@ -5,7 +5,8 @@ import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { LogStepsForm } from './LogStepsForm'
 import { StepsChart } from './StepsChart'
-import { TotalSteps, TopFive, TipOfTheDay, TodaysTarget } from './ChallengePanels'
+import { TotalSteps, TipOfTheDay, TodaysTarget } from './ChallengePanels'
+import { TopFive } from './TopFive'
 import { WeekSchedule } from './WeekSchedule'
 import { PaceNudge } from './PaceNudge'
 import { CheerWall } from './CheerWall'
@@ -229,7 +230,7 @@ export default async function StaffFitnessPage() {
         </div>
 
         <div className="mt-5">
-          <TopFive rows={board.top} />
+          <TopFive top={board.top} />
         </div>
 
         {started && (

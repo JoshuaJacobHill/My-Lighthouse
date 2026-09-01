@@ -2,7 +2,7 @@ import { Medal, Sparkles } from 'lucide-react'
 import { MilestoneTrack, GoalReachedShell, GoalReachedBadge } from './Celebration'
 import { buildMilestones, LIME, GREEN } from '@/lib/fitness-milestones'
 import { paceMessage, walkingTime, type Pace } from '@/lib/fitness-pace'
-import type { Standing, ScheduleItem } from '@/lib/fitness-data'
+import type { ScheduleItem } from '@/lib/fitness-data'
 
 /**
  * The read-only panels of the challenge page, kept apart from the page itself
@@ -93,53 +93,6 @@ export function TotalSteps({
   )
 
   return done ? <GoalReachedShell>{card}</GoalReachedShell> : card
-}
-
-export function TopFive({ rows }: { rows: Standing[] }) {
-  const max = Math.max(1, ...rows.map((r) => r.total))
-  return (
-    <section className="rounded-[28px] border border-neutral-200 p-5 sm:p-6">
-      <h2 className="text-lg font-bold tracking-tight text-neutral-950">Top 5 this month</h2>
-      {rows.length === 0 ? (
-        <p className="mt-2 text-sm text-neutral-500">
-          Nobody has logged any steps yet.
-        </p>
-      ) : (
-        <ol className="mt-4 space-y-3.5">
-          {rows.map((row, i) => (
-            <li key={row.userId}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="flex min-w-0 items-baseline gap-2">
-                  <span
-                    className={`w-5 shrink-0 text-sm font-bold tabular-nums ${i === 0 ? 'text-orange-600' : 'text-neutral-400'}`}
-                  >
-                    {i + 1}
-                  </span>
-                  <span className="truncate font-semibold text-neutral-900">{row.name}</span>
-                  {i === 0 && <Medal className="h-4 w-4 shrink-0 text-orange-500" aria-hidden="true" />}
-                </span>
-                <span className="shrink-0 text-sm font-bold tabular-nums text-neutral-900">
-                  {nf.format(row.total)}
-                </span>
-              </div>
-              <div className="ml-7 mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-100">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.max(2, Math.round((row.total / max) * 100))}%`,
-                    backgroundColor: i === 0 ? '#9a3412' : '#fb923c',
-                  }}
-                />
-              </div>
-              <p className="ml-7 mt-1 text-xs text-neutral-400">
-                {row.days} {row.days === 1 ? 'day' : 'days'} logged
-              </p>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  )
 }
 
 export function TipOfTheDay({ tip }: { tip: string }) {

@@ -54,9 +54,12 @@ export interface Standing {
   days: number
 }
 
+export type LeaderWindow = 'today' | 'week' | 'month'
+
 export interface ChallengeBoard {
   days: DayPoint[]
-  top: Standing[]
+  /** Top five over each window. Same pass, no extra queries. */
+  top: Record<LeaderWindow, Standing[]>
   total: number
   participants: number
   /** Index into `days` for today, or -1 if today sits outside the challenge. */
@@ -99,8 +102,25 @@ export async function getChallengeBoard(challenge: {
   })
 
   const today = brisbaneToday()
+  // Monday of the current week, as a calendar day string, so entries can be
+  // bucketed by comparing strings rather than juggling timezones.
+  const todayDate = calendarDay(today)!
+  const weekday = ((todayDate.getUTCDay() + 6) % 7) + 1 // 1 = Mon
+  const weekStart = calendarDayString(new Date(todayDate.getTime() - (weekday - 1) * 86_400_000))
+
   const byDay = new Map<string, { total: number; walkers: number; leader: { name: string; amount: number } | null }>()
-  const byPerson = new Map<string, Standing>()
+  const byPerson: Record<LeaderWindow, Map<string, Standing>> = {
+    today: new Map(),
+    week: new Map(),
+    month: new Map(),
+  }
+
+  const addTo = (window: LeaderWindow, userId: string, name: string, amount: number) => {
+    const p = byPerson[window].get(userId) ?? { userId, name, total: 0, days: 0 }
+    p.total += amount
+    p.days += 1
+    byPerson[window].set(userId, p)
+  }
 
   for (const e of entries) {
     if (e.amount <= 0) continue
@@ -113,11 +133,13 @@ export async function getChallengeBoard(challenge: {
     if (!d.leader || e.amount > d.leader.amount) d.leader = { name, amount: e.amount }
     byDay.set(key, d)
 
-    const p = byPerson.get(e.userId) ?? { userId: e.userId, name, total: 0, days: 0 }
-    p.total += e.amount
-    p.days += 1
-    byPerson.set(e.userId, p)
+    addTo('month', e.userId, name, e.amount)
+    if (key >= weekStart) addTo('week', e.userId, name, e.amount)
+    if (key === today) addTo('today', e.userId, name, e.amount)
   }
+
+  const rank = (m: Map<string, Standing>) =>
+    [...m.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
 
   const days: DayPoint[] = dayRange(challenge.startsAt, challenge.endsAt).map((day) => {
     const d = byDay.get(day)
@@ -137,11 +159,15 @@ export async function getChallengeBoard(challenge: {
     ? withSteps.reduce((best, d) => (d.total > best.total ? d : best), withSteps[0])
     : null
 
-  const standings = [...byPerson.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+  const standings = rank(byPerson.month)
 
   return {
     days,
-    top: standings.slice(0, 5),
+    top: {
+      today: rank(byPerson.today).slice(0, 5),
+      week: rank(byPerson.week).slice(0, 5),
+      month: standings.slice(0, 5),
+    },
     total: standings.reduce((sum, s) => sum + s.total, 0),
     participants: standings.length,
     todayIndex: days.findIndex((d) => d.day === today),
