@@ -29,13 +29,14 @@ export default async function StaffFitnessPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const me = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, name: true, isStaff: true, isTrainee: true, role: true },
-  })
+  const [me, challenge] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true, name: true, isStaff: true, isTrainee: true, role: true },
+    }),
+    getCurrentChallenge(),
+  ])
   if (!me || !(me.isStaff || me.isTrainee || isAdminRole(me.role))) notFound()
-
-  const challenge = await getCurrentChallenge()
   if (!challenge) {
     return (
       <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">

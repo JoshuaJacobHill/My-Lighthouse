@@ -41,16 +41,47 @@ export default async function DonorHomePage() {
 
   await claimDonationsForUser(session.userId, user.email, user.emailVerified)
 
-  const gifts = await getDonorGifts(session.userId)
+  const isStaffOrTrainee = user.isStaff || user.isTrainee
+
+  // One batch rather than a chain. Each of these was costing its own round trip
+  // to the database, and none of them depend on each other.
+  const [gifts, tithePlan, ehSetting, challenge, stories, events] = await Promise.all([
+    getDonorGifts(session.userId),
+    prisma.donation.findFirst({
+      where: { userId: session.userId, isTithe: true, isRecurring: true },
+      orderBy: { createdAt: 'desc' },
+      select: { amount: true, frequency: true, createdAt: true },
+    }),
+    isStaffOrTrainee
+      ? prisma.appSetting.findUnique({ where: { key: 'employment_hero_url' }, select: { value: true } })
+      : null,
+    isStaffOrTrainee ? getCurrentChallenge() : null,
+    prisma.story.findMany({
+      where: {
+        isPublished: true,
+        ...(user.isChurchMember ? {} : { churchOnly: false }),
+        ...(isStaffOrTrainee ? {} : { staffOnly: false }),
+      },
+      orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
+      take: 6,
+      select: { id: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true },
+    }),
+    prisma.event.findMany({
+      where: {
+        isPublished: true,
+        OR: [{ startsAt: { gte: new Date() } }, { startsAt: null }],
+        ...(user.isChurchMember ? {} : { churchOnly: false }),
+      },
+      orderBy: { startsAt: 'asc' },
+      take: 4,
+      select: { id: true, slug: true, title: true, venue: true, startsAt: true },
+    }),
+  ])
+
   const summary = summariseGifts(gifts)
   const hasGifts = gifts.length > 0
+  const employmentHeroUrl = ehSetting?.value?.trim() || 'https://secure.employmenthero.com'
 
-  // Church givers get their tithe surfaced up top (separate from donations).
-  const tithePlan = await prisma.donation.findFirst({
-    where: { userId: session.userId, isTithe: true, isRecurring: true },
-    orderBy: { createdAt: 'desc' },
-    select: { amount: true, frequency: true },
-  })
   const hasTithe = Boolean(tithePlan)
 
   const vp = user.volunteerProfile
@@ -58,20 +89,8 @@ export default async function DonorHomePage() {
   const firstName = user.name?.split(' ')[0] ?? 'there'
   const live = isDonorPortalEnabled()
 
-  // Church members see church-only stories, staff/trainees see staff-only ones;
-  // everyone else sees the public ones.
-  const isStaffOrTrainee = user.isStaff || user.isTrainee
-
-  // Payroll deliberately stays in Employment Hero — we link out rather than pull
-  // payslips into this portal. Configurable at Admin → Settings → General.
-  const ehSetting = isStaffOrTrainee
-    ? await prisma.appSetting.findUnique({ where: { key: 'employment_hero_url' }, select: { value: true } })
-    : null
-  const employmentHeroUrl = ehSetting?.value?.trim() || 'https://secure.employmenthero.com'
-
-  // The challenge banner. Only queried for staff, and only rendered while a
-  // challenge is actually running — no dead banner sitting there in October.
-  const challenge = isStaffOrTrainee ? await getCurrentChallenge() : null
+  // Payroll deliberately stays in Employment Hero: we link out rather than pull
+  // payslips into this portal. Configurable at Admin, Settings, General.
   let challengeBanner: React.ComponentProps<typeof ChallengeBanner> | null = null
   if (challenge) {
     const agg = await prisma.fitnessEntry.aggregate({
@@ -99,29 +118,7 @@ export default async function DonorHomePage() {
       ),
     }
   }
-  const stories = await prisma.story.findMany({
-    where: {
-      isPublished: true,
-      ...(user.isChurchMember ? {} : { churchOnly: false }),
-      ...(isStaffOrTrainee ? {} : { staffOnly: false }),
-    },
-    orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
-    take: 6,
-    select: { id: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true },
-  })
 
-  // Upcoming events (church members also see church-only ones).
-  const events = await prisma.event.findMany({
-    // Upcoming (dated in the future) OR date-still-TBA events.
-    where: {
-      isPublished: true,
-      OR: [{ startsAt: { gte: new Date() } }, { startsAt: null }],
-      ...(user.isChurchMember ? {} : { churchOnly: false }),
-    },
-    orderBy: { startsAt: 'asc' },
-    take: 4,
-    select: { id: true, slug: true, title: true, venue: true, startsAt: true },
-  })
   const fmtEvent = (d: Date | null) =>
     d
       ? d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Australia/Brisbane' })

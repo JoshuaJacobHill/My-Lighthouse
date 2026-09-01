@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { brisbaneToday, calendarDay, calendarDayString } from '@/lib/fitness-days'
 
@@ -20,18 +21,18 @@ import { brisbaneToday, calendarDay, calendarDayString } from '@/lib/fitness-day
  * ending the test would need someone to remember to switch the other one back
  * on. This way the handover happens on its own.
  */
-export async function getCurrentChallenge() {
+export const getCurrentChallenge = cache(async function getCurrentChallenge() {
   const now = new Date()
-  const running = await prisma.fitnessChallenge.findFirst({
-    where: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
-    orderBy: { startsAt: 'desc' },
-  })
-  if (running) return running
-  return prisma.fitnessChallenge.findFirst({
+  // One query rather than two. Sorting by "is it running right now" first means
+  // the running challenge wins and the next one due to start is the fallback,
+  // without a second round trip to find out.
+  const candidates = await prisma.fitnessChallenge.findMany({
     where: { isActive: true, endsAt: { gte: now } },
     orderBy: { startsAt: 'asc' },
+    take: 5,
   })
-}
+  return candidates.find((c) => c.startsAt <= now) ?? candidates[0] ?? null
+})
 
 export interface DayPoint {
   /** yyyy-mm-dd */

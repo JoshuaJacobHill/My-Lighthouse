@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import crypto from 'crypto'
 import bcryptjs from 'bcryptjs'
 import { cookies } from 'next/headers'
@@ -34,7 +35,19 @@ export async function createSession(userId: string): Promise<string> {
   return token
 }
 
-export async function getSession(): Promise<{
+/**
+ * The signed in user, or null.
+ *
+ * Wrapped in React's `cache` so it runs once per request rather than once per
+ * caller. It was being asked for in the layout, the page, and again inside
+ * permission guards, and every one of those was a fresh query with a join,
+ * across the Pacific to the database. Deduping removed several full round trips
+ * from every single navigation.
+ *
+ * `cache` is scoped to one request, so this never leaks a session between
+ * people, and the cookie read inside stays correct.
+ */
+export const getSession = cache(async function getSession(): Promise<{
   userId: string
   role: string
   volunteerId?: string
@@ -83,7 +96,7 @@ export async function getSession(): Promise<{
   } catch {
     return null
   }
-}
+})
 
 export async function destroySession(): Promise<void> {
   try {

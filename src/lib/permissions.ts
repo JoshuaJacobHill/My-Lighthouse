@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
@@ -12,8 +13,13 @@ export * from '@/lib/permissions-core'
 
 // ─── Session-based helpers ────────────────────────────────────────────────────
 
-/** The signed-in user's role and donations flag, or null if not signed in. */
-export async function getPermissionUser(): Promise<PermissionUser | null> {
+/**
+ * The signed-in user's role and donations flag, or null if not signed in.
+ *
+ * Memoised per request: the layout, the page guard and the nav all need this,
+ * and each one was issuing its own query.
+ */
+export const getPermissionUser = cache(async function getPermissionUser(): Promise<PermissionUser | null> {
   const session = await getSession()
   if (!session) return null
   const user = await prisma.user.findUnique({
@@ -21,7 +27,7 @@ export async function getPermissionUser(): Promise<PermissionUser | null> {
     select: { role: true, canViewDonations: true },
   })
   return user ?? null
-}
+})
 
 /** Every capability the signed-in user holds — for passing into client nav. */
 export async function getCapabilities(): Promise<Capability[]> {
@@ -55,10 +61,7 @@ export async function getDonationsAccess(): Promise<boolean> {
 export async function requireCapability(capability: Capability): Promise<{ userId: string; role: string }> {
   const session = await getSession()
   if (!session) redirect('/login')
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { role: true, canViewDonations: true },
-  })
+  const user = await getPermissionUser()
   if (!user || !isAdminRole(user.role)) redirect('/login')
   if (!can(user, capability)) redirect('/admin')
   return { userId: session.userId, role: session.role }
@@ -70,10 +73,7 @@ export async function requireAnyCapability(
 ): Promise<{ userId: string; role: string; held: Capability[] }> {
   const session = await getSession()
   if (!session) redirect('/login')
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { role: true, canViewDonations: true },
-  })
+  const user = await getPermissionUser()
   if (!user || !isAdminRole(user.role)) redirect('/login')
   const held = capabilities.filter((c) => can(user, c))
   if (held.length === 0) redirect('/admin')
@@ -105,10 +105,7 @@ export async function requireDonationsAccess(): Promise<{ userId: string; role: 
 export async function assertCapability(capability: Capability): Promise<{ userId: string; role: string }> {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { role: true, canViewDonations: true },
-  })
+  const user = await getPermissionUser()
   if (!user || !isAdminRole(user.role) || !can(user, capability)) {
     throw new Error('Insufficient permissions')
   }
@@ -119,10 +116,7 @@ export async function assertCapability(capability: Capability): Promise<{ userId
 export async function assertAnyCapability(capabilities: Capability[]): Promise<{ userId: string; role: string }> {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { role: true, canViewDonations: true },
-  })
+  const user = await getPermissionUser()
   if (!user || !isAdminRole(user.role) || !capabilities.some((c) => can(user, c))) {
     throw new Error('Insufficient permissions')
   }
