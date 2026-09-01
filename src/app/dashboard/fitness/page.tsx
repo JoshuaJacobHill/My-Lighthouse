@@ -8,11 +8,18 @@ import { StepsChart } from './StepsChart'
 import { TotalSteps, TopFive, TipOfTheDay, TodaysTarget } from './ChallengePanels'
 import { WeekSchedule } from './WeekSchedule'
 import { PaceNudge } from './PaceNudge'
+import { CheerWall } from './CheerWall'
 import { SyncNowButton } from './SyncNowButton'
 import { computePace, paceMessage } from '@/lib/fitness-pace'
 import { isAdminRole } from '@/lib/permissions-core'
 import { brisbaneToday, calendarDayString } from '@/lib/fitness-days'
-import { getChallengeBoard, getTipOfTheDay, getWellbeingSchedule, getCurrentChallenge } from '@/lib/fitness-data'
+import {
+  getChallengeBoard,
+  getTipOfTheDay,
+  getWellbeingSchedule,
+  getCurrentChallenge,
+  getTodaysCheers,
+} from '@/lib/fitness-data'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Staff fitness challenge' }
@@ -48,7 +55,7 @@ export default async function StaffFitnessPage() {
     )
   }
 
-  const [board, tip, schedule, mine, eligible, fitnessLink] = await Promise.all([
+  const [board, tip, schedule, mine, eligible, cheers, fitnessLink] = await Promise.all([
     getChallengeBoard(challenge),
     getTipOfTheDay(),
     getWellbeingSchedule(challenge),
@@ -58,6 +65,7 @@ export default async function StaffFitnessPage() {
       select: { day: true, amount: true },
     }),
     prisma.user.count({ where: { OR: [{ isStaff: true }, { isTrainee: true }], isActive: true } }),
+    getTodaysCheers(challenge.id, session.userId),
     prisma.fitnessLink.findFirst({
       where: { userId: me.id, revokedAt: null },
       select: { lastUsedAt: true, lastAmount: true },
@@ -223,6 +231,12 @@ export default async function StaffFitnessPage() {
         <div className="mt-5">
           <TopFive rows={board.top} />
         </div>
+
+        {started && (
+          <div className="mt-5">
+            <CheerWall challengeId={challenge.id} cheers={cheers} />
+          </div>
+        )}
 
         {tip && (
           <div className="mt-5">

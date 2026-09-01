@@ -238,3 +238,34 @@ export async function getWellbeingSchedule(challenge?: {
 
   return items.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
 }
+
+export interface Cheer {
+  id: string
+  body: string
+  name: string
+  mine: boolean
+  at: string
+}
+
+/** Today's notes only. Yesterday's are cleared by the daily cron. */
+export async function getTodaysCheers(challengeId: string, meId: string): Promise<Cheer[]> {
+  const day = calendarDay(brisbaneToday())
+  if (!day) return []
+  const rows = await prisma.challengeCheer.findMany({
+    where: { challengeId, day },
+    select: { id: true, body: true, createdAt: true, userId: true, user: { select: { name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 40,
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    body: r.body,
+    name: firstName(r.user.name),
+    mine: r.userId === meId,
+    at: new Intl.DateTimeFormat('en-AU', {
+      timeZone: 'Australia/Brisbane',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(r.createdAt),
+  }))
+}

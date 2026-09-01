@@ -154,6 +154,7 @@ model User {
   teamInterests TeamInterest[]
   fitnessEntries FitnessEntry[]
   fitnessLink    FitnessLink?
+  cheers         ChallengeCheer[]
   extraEmails    UserEmail[]
   tasksAssigned  StaffTask[]           @relation("TaskAssignee")
   tasksCreated   StaffTask[]           @relation("TaskAssigner")
@@ -1052,6 +1053,7 @@ model FitnessChallenge {
   createdAt DateTime @default(now())
 
   entries FitnessEntry[]
+  cheers  ChallengeCheer[]
 
   @@index([isActive])
 }
@@ -1137,6 +1139,30 @@ model UserEmail {
 
   @@index([userId])
   @@index([verifiedAt])
+}
+
+/**
+ * A note left on the challenge page for the day.
+ *
+ * Deliberately short-lived: only today's are shown, and yesterday's are deleted
+ * by the daily cron. A wall that accumulates goes stale and stops being read,
+ * whereas one that empties every night stays worth looking at, and it lowers
+ * the stakes of posting.
+ */
+model ChallengeCheer {
+  id          String   @id @default(cuid())
+  challengeId String
+  userId      String
+  body        String   @db.Text
+  /** The Brisbane calendar day this belongs to. */
+  day         DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  challenge FitnessChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId, day])
+  @@index([userId])
 }
 
 model WellbeingSession {

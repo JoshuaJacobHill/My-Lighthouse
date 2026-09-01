@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
 import { periodKey, isOverdue } from '@/lib/checklists'
+import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
 import { isAdminRole } from '@/lib/permissions-core'
 
 export const dynamic = 'force-dynamic'
@@ -159,8 +160,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Yesterday's notes on the challenge page. They are meant to last a day,
+    // and the page only ever shows today's, so this is tidying rather than
+    // anything the reader would notice.
+    const day = calendarDay(brisbaneToday())
+    const clearedCheers = day
+      ? (await prisma.challengeCheer.deleteMany({ where: { day: { lt: day } } })).count
+      : 0
+
     return NextResponse.json({
       ok: true,
+      clearedCheers,
       overdueTasks: overdueTasks.length,
       taskEmails,
       outstandingChecklistItems: stillOpen.length,

@@ -175,3 +175,75 @@ export async function readStepsScreenshotAction(formData: FormData): Promise<Scr
     note: reading.note,
   }
 }
+
+// ─── The cheer wall ───────────────────────────────────────────────────────────
+
+const cheerSchema = z.object({
+  challengeId: z.string().min(1),
+  body: z
+    .string()
+    .trim()
+    .min(2, 'Say a little more than that.')
+    .max(280, 'Keep it under 280 characters.'),
+})
+
+/**
+ * Leave a note for the team today.
+ *
+ * Capped at a handful a day per person. Not to police anyone, just so one
+ * enthusiastic morning does not bury everyone else's.
+ */
+export async function postCheerAction(input: {
+  challengeId: string
+  body: string
+}): Promise<Result & { id?: string }> {
+  const me = await requireStaff()
+  if (!me) return { success: false, error: 'This is a staff-only challenge.' }
+
+  const parsed = cheerSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Please check that.' }
+  }
+
+  const day = calendarDay(brisbaneToday())!
+  const today = await prisma.challengeCheer.count({
+    where: { userId: me.userId, challengeId: parsed.data.challengeId, day },
+  })
+  if (today >= 5) {
+    return { success: false, error: 'That is five for today. Save some for tomorrow.' }
+  }
+
+  try {
+    const row = await prisma.challengeCheer.create({
+      data: {
+        challengeId: parsed.data.challengeId,
+        userId: me.userId,
+        body: parsed.data.body,
+        day,
+      },
+      select: { id: true },
+    })
+    revalidatePath('/dashboard/fitness')
+    return { success: true, id: row.id }
+  } catch (err) {
+    console.error('postCheerAction failed', err)
+    return { success: false, error: 'Could not post that. Please try again.' }
+  }
+}
+
+/** Remove a note. Your own, or anyone's if you are an admin. */
+export async function deleteCheerAction(id: string): Promise<Result> {
+  const me = await requireStaff()
+  if (!me) return { success: false, error: 'This is a staff-only challenge.' }
+
+  const user = await prisma.user.findUnique({ where: { id: me.userId }, select: { role: true } })
+  const canRemoveAnyone = isAdminRole(user?.role)
+
+  const deleted = await prisma.challengeCheer.deleteMany({
+    where: { id, ...(canRemoveAnyone ? {} : { userId: me.userId }) },
+  })
+  if (deleted.count === 0) return { success: false, error: 'That note is not yours to remove.' }
+
+  revalidatePath('/dashboard/fitness')
+  return { success: true }
+}
