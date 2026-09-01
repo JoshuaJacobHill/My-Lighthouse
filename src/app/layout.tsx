@@ -25,7 +25,13 @@ export const metadata: Metadata = {
   icons: {
     icon: '/Favicon.png',
     shortcut: '/Favicon.png',
-    apple: '/Favicon.png',
+    // 180px, so the home screen icon is sharp rather than an upscaled favicon.
+    apple: '/apple-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'My Lighthouse',
+    statusBarStyle: 'default',
   },
   openGraph: {
     siteName: 'My Lighthouse Portal',

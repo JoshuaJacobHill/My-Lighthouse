@@ -235,6 +235,17 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
         </p>
       </Panel>
 
+      <Panel title="Put it on your home screen">
+        <p>
+          In Safari, tap the share button, then <strong>Add to Home Screen</strong>. The portal opens like an app,
+          and there is an <strong>Update my steps now</strong> button on the challenge page that runs the shortcut
+          without leaving your phone.
+        </p>
+        <p className="text-neutral-500">
+          Handy if you would rather check and update in one go than trust an automation to do it.
+        </p>
+      </Panel>
+
       <Panel title="Rather not bother?">
         <p>
           Type your daily total on the challenge page. Five seconds, nothing to set up, counts exactly the same.

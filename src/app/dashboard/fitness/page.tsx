@@ -8,6 +8,7 @@ import { StepsChart } from './StepsChart'
 import { TotalSteps, TopFive, TipOfTheDay, TodaysTarget } from './ChallengePanels'
 import { WeekSchedule } from './WeekSchedule'
 import { PaceNudge } from './PaceNudge'
+import { SyncNowButton } from './SyncNowButton'
 import { computePace, paceMessage } from '@/lib/fitness-pace'
 import { isAdminRole } from '@/lib/permissions-core'
 import { brisbaneToday, calendarDayString } from '@/lib/fitness-days'
@@ -229,6 +230,8 @@ export default async function StaffFitnessPage() {
         <div className="mt-5">
           <WeekSchedule schedule={schedule} />
         </div>
+
+        {fitnessLink && <SyncNowButton />}
 
         {fitnessLink && (
           <div className="mt-5 flex flex-col items-center gap-3">
