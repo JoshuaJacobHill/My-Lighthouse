@@ -180,8 +180,7 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
               </>,
               <>Run it once and allow Health access. That is the opt in.</>,
               <>
-                In the <strong>Automation</strong> tab tap <strong>+</strong>, choose <strong>App</strong>, pick
-                something you open often, set <strong>Is Opened</strong> and <strong>Run Immediately</strong>.
+                Set up the automations below so it runs without you.
               </>,
             ]}
           />
@@ -208,15 +207,28 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
       )}
 
       {/* ── Everything else, out of the way ── */}
-      <Panel title="What that automation does">
+      <Panel title="Set the automations">
         <p>
-          Your steps send every time you open that app. Usually dozens of times a day, so the leaderboard keeps up
-          without you thinking about it.
+          The shortcut only runs when something tells it to, so add these once in the{' '}
+          <strong>Automation</strong> tab of the Shortcuts app. Tap <strong>+</strong>, then{' '}
+          <strong>Time of Day</strong>, and choose <strong>Run Immediately</strong> with{' '}
+          <strong>Notify When Run</strong> turned off.
         </p>
-        <p>Each send replaces the last one, so nothing double counts.</p>
+        <ul className="ml-4 list-disc space-y-1">
+          <li>
+            <strong>12pm daily.</strong> Keeps the leaderboard live through the afternoon.
+          </li>
+          <li>
+            <strong>11pm daily.</strong> Catches the full day before it rolls over.
+          </li>
+        </ul>
+        <p>
+          Want it even fresher? Add a third automation using <strong>App</strong> instead of Time of Day, pick
+          something you open often and set <strong>Is Opened</strong>. Your steps then send dozens of times a day.
+        </p>
         <p className="text-neutral-500">
-          Prefer set times? Use a <strong>Time of Day</strong> automation instead. Apple only lets those repeat daily,
-          so add a few: midday, 4pm, 8pm and 11:30pm.
+          Each send replaces the last, so nothing double counts no matter how many you add. Apple only lets a Time of
+          Day automation repeat daily, which is why it takes two rather than one.
         </p>
       </Panel>
 

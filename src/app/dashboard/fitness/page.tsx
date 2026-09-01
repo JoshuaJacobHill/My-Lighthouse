@@ -132,6 +132,8 @@ export default async function StaffFitnessPage() {
           </div>
         )}
 
+        {fitnessLink && started && <SyncNowButton />}
+
         {started && (
           <div className="mt-4">
             <PaceNudge message={paceMessage(pace)} positive={pace.myShareMet || pace.todayToGo === 0} />
@@ -230,8 +232,6 @@ export default async function StaffFitnessPage() {
         <div className="mt-5">
           <WeekSchedule schedule={schedule} />
         </div>
-
-        {fitnessLink && <SyncNowButton />}
 
         {fitnessLink && (
           <div className="mt-5 flex flex-col items-center gap-3">
