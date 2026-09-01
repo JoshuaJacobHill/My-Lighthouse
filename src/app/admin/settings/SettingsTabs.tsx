@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Save, Loader2, Plus, Trash2, UserPlus, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import { USER_ROLES, ASSIGNABLE_ADMIN_ROLES, ADMIN_ROLE_DESCRIPTIONS } from '@/lib/constants'
+import { PromoteUser } from '@/components/admin/PromoteUser'
 
 /** Badge colour per admin role — purple for the widest access, down to teal. */
 const ROLE_BADGE: Record<string, string> = {
@@ -502,12 +503,15 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             <h2 className="text-base font-semibold text-gray-900">Admin Users</h2>
             <button
               onClick={() => setAddAdminOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors"
+              className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <UserPlus className="h-4 w-4" />
-              Add Admin
+              New account
             </button>
           </div>
+
+          {/* Most of the time the person already has a login, so this comes first. */}
+          <PromoteUser />
 
           <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
             <table className="w-full text-sm">

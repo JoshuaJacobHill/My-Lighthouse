@@ -103,6 +103,20 @@ export function AdminSidebar({ collapsed = false, onCollapsedChange, capabilitie
   const isActive = (href: string) =>
     href === '/admin' ? pathname === '/admin' : pathname.startsWith(href)
 
+  const backToPortal = (
+    <Link
+      href="/dashboard"
+      title={collapsed ? 'My dashboard' : undefined}
+      className={clsx(
+        'flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50',
+        collapsed && 'justify-center'
+      )}
+    >
+      <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden="true" />
+      {!collapsed && <span>My dashboard</span>}
+    </Link>
+  )
+
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Logo area */}
@@ -142,6 +156,7 @@ export function AdminSidebar({ collapsed = false, onCollapsedChange, capabilitie
             collapsed={collapsed}
           />
         ))}
+        <div className="mt-4 border-t border-gray-200 pt-4">{backToPortal}</div>
       </nav>
 
       {/* Collapse toggle (desktop) */}
@@ -230,6 +245,7 @@ export function AdminSidebar({ collapsed = false, onCollapsedChange, capabilitie
                   collapsed={false}
                 />
               ))}
+              <div className="mt-4 border-t border-gray-200 pt-4">{backToPortal}</div>
             </nav>
           </aside>
         </div>

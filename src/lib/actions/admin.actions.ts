@@ -7,7 +7,7 @@ import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 import { wrapEmailHtml } from '@/lib/email-html'
 import { formatDate } from '@/lib/utils'
-import type { VolunteerStatus } from '@prisma/client'
+import type { VolunteerStatus, UserRole } from '@prisma/client'
 import { isAdminRole } from '@/lib/permissions-core'
 import { assertCapability } from '@/lib/permissions'
 import type { Capability } from '@/lib/permissions-core'
@@ -1094,4 +1094,111 @@ export async function sendAccountInviteAction(
 
   revalidatePath(`/admin/users/${userId}`)
   return { success: true, sentTo: user.email }
+}
+
+// ─── Admin roles on existing accounts ─────────────────────────────────────────
+
+const ADMIN_ROLES_SET = new Set(['SUPER_ADMIN', 'ADMIN', 'CARE_MANAGER', 'CHURCH_MANAGER'])
+
+export interface UserSearchResult {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  canViewDonations: boolean
+}
+
+/**
+ * Find an existing account to give an admin role to.
+ *
+ * Only reachable by someone who can already assign roles, so it deliberately
+ * searches every account rather than the scoped user lists.
+ */
+export async function searchUsersForRoleAction(query: string): Promise<UserSearchResult[]> {
+  try {
+    await assertCapability('system.users')
+  } catch {
+    return []
+  }
+  const q = query.trim()
+  if (q.length < 2) return []
+
+  return prisma.user.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { email: { contains: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+      ],
+    },
+    select: { id: true, name: true, email: true, role: true, canViewDonations: true },
+    orderBy: { name: 'asc' },
+    take: 8,
+  })
+}
+
+/**
+ * Give an existing account an admin role, or take one away.
+ *
+ * Two guards worth keeping: an account with no password cannot be made an
+ * admin, because nobody has ever proved they control it; and the last active
+ * super admin cannot be demoted, since that would lock everyone out of role
+ * management with no way back in.
+ */
+export async function setUserRoleAction(
+  userId: string,
+  role: string,
+  canViewDonations: boolean
+): Promise<{ success: boolean; error?: string }> {
+  let me: { userId: string }
+  try {
+    me = await assertCapability('system.users')
+  } catch (err) {
+    return { success: false, error: (err as Error).message }
+  }
+
+  if (role !== 'VOLUNTEER' && !ADMIN_ROLES_SET.has(role)) {
+    return { success: false, error: 'That is not a role you can assign here.' }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, passwordHash: true, email: true },
+  })
+  if (!user) return { success: false, error: 'That account no longer exists.' }
+
+  if (ADMIN_ROLES_SET.has(role) && !user.passwordHash) {
+    return {
+      success: false,
+      error: 'That account has no password yet. Send them a set-password invite first, then make them an admin.',
+    }
+  }
+
+  if (user.role === 'SUPER_ADMIN' && role !== 'SUPER_ADMIN') {
+    const others = await prisma.user.count({
+      where: { role: 'SUPER_ADMIN', isActive: true, id: { not: userId } },
+    })
+    if (others === 0) {
+      return { success: false, error: 'That is the only super admin. Make someone else one first.' }
+    }
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: role as UserRole,
+        // Only a generic ADMIN uses this flag; the scoped roles carry their own.
+        canViewDonations: role === 'ADMIN' ? canViewDonations : false,
+      },
+    })
+    console.info(`[roles] ${me.userId} set ${user.email} to ${role}`)
+  } catch (err) {
+    console.error('setUserRoleAction failed', err)
+    return { success: false, error: 'Could not save that. Please try again.' }
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath(`/admin/users/${userId}`)
+  return { success: true }
 }

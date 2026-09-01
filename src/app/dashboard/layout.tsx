@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { canAccessDonorPortal } from '@/lib/features'
 import { PortalShell } from '@/components/layout/PortalShell'
+import { isAdminRole } from '@/lib/permissions-core'
 
 /**
  * Portal layout — the shared shell for donors and volunteers.
@@ -38,6 +39,7 @@ export default async function DonorLayout({ children }: { children: React.ReactN
       isVolunteer={Boolean(user.volunteerProfile)}
       hasGiven={(user._count.donations ?? 0) > 0}
       isStaff={user.isStaff || user.isTrainee}
+      isAdmin={isAdminRole(user.role)}
     >
       {children}
     </PortalShell>

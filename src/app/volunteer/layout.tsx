@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { PortalShell } from '@/components/layout/PortalShell'
+import { isAdminRole } from '@/lib/permissions-core'
 import prisma from '@/lib/prisma'
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
     where: { id: session.userId },
     select: {
       name: true,
+      role: true,
       volunteerProfile: { select: { id: true } },
       _count: { select: { donations: true } },
     },
@@ -21,6 +23,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
       userName={user?.name ?? 'Volunteer'}
       isVolunteer={Boolean(user?.volunteerProfile)}
       hasGiven={(user?._count.donations ?? 0) > 0}
+      isAdmin={isAdminRole(user?.role)}
     >
       {children}
     </PortalShell>

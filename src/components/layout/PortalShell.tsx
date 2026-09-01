@@ -17,6 +17,7 @@ import {
   Footprints,
   CheckSquare,
   Newspaper,
+  Shield,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Avatar } from '@/components/ui/avatar'
@@ -33,6 +34,8 @@ export interface PortalCapabilities {
   hasGiven: boolean
   /** Staff or trainee — unlocks the internal staff area. */
   isStaff?: boolean
+  /** Shows a way back to the admin panel. */
+  isAdmin?: boolean
   // Future: isPartner (corporate) adds its own items + dashboard section.
 }
 
@@ -47,6 +50,7 @@ export function PortalShell({
   isVolunteer,
   hasGiven,
   isStaff,
+  isAdmin,
 }: {
   children: React.ReactNode
   userName: string
@@ -130,6 +134,16 @@ export function PortalShell({
     { href: accountHref, label: 'Account', icon: User, active: onAccount },
   ]
 
+  const adminLink = isAdmin ? (
+    <Link
+      href="/admin"
+      className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+    >
+      <Shield className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>Admin panel</span>
+    </Link>
+  ) : null
+
   const handleSignOut = async () => {
     await fetch('/api/auth/signout', { method: 'POST' })
     router.push('/login')
@@ -164,6 +178,7 @@ export function PortalShell({
           )
         })}
       </ul>
+      {adminLink && <div className="mt-4 border-t border-gray-200 pt-4">{adminLink}</div>}
     </nav>
   )
 
