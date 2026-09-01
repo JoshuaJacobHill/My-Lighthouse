@@ -113,27 +113,37 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
   // ── Not set up yet ──
   if (!token) {
     return (
-      <div className="mt-6">
-        <button
+      <div className="mt-6 space-y-4">
+        <section className="rounded-[28px] border border-neutral-200 p-5">
+          <h2 className="text-sm font-bold text-neutral-900">On iPhone</h2>
+          <p className="mt-2 text-sm text-neutral-600">
+            Get your personal code, install a shortcut, and your phone sends your steps on its own.
+          </p>
+          <div className="mt-4">
+            <button
           type="button"
           onClick={connect}
           disabled={isPending}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3.5 font-bold text-white shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600 disabled:opacity-60"
         >
-          {isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Setting up
-            </>
-          ) : (
-            <>
-              <Smartphone className="h-4 w-4" aria-hidden="true" /> Get my code
-            </>
-          )}
-        </button>
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        <p className="mt-3 text-center text-sm text-neutral-500">
-          Takes about two minutes on an iPhone. Nothing sends until you finish.
-        </p>
+              {isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Setting up
+                </>
+              ) : (
+                <>
+                  <Smartphone className="h-4 w-4" aria-hidden="true" /> Get my code
+                </>
+              )}
+            </button>
+          </div>
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          <p className="mt-3 text-sm text-neutral-500">
+            About two minutes. Nothing sends until you finish.
+          </p>
+        </section>
+
+        <AndroidSetup />
       </div>
     )
   }
@@ -257,35 +267,9 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
         </p>
       </Panel>
 
-      <Panel title="Put it on your home screen">
-        <p>
-          In Safari, tap the share button, then <strong>Add to Home Screen</strong>. The portal opens like an app,
-          and there is an <strong>Update my steps now</strong> button on the challenge page that runs the shortcut
-          without leaving your phone.
-        </p>
-        <p className="text-neutral-500">
-          Handy if you would rather check and update in one go than trust an automation to do it.
-        </p>
-      </Panel>
-
-      <Panel title="On Android?">
-        <p>
-          Android keeps step data on the phone and has nothing like Shortcuts, so there is no automatic option. It
-          does have one thing iPhones do not though.
-        </p>
-        <p>
-          <strong>Add the portal to your home screen</strong> in Chrome, using the menu, then{' '}
-          <strong>Add to Home screen</strong>. My Lighthouse then appears in your share sheet.
-        </p>
-        <p>
-          After that, logging your steps is: screenshot your step count, tap <strong>Share</strong>, pick{' '}
-          <strong>My Lighthouse</strong>, confirm the number. Three taps from wherever you are, no opening the portal
-          and hunting for a button.
-        </p>
-        <p className="text-neutral-500">
-          We read the number and the date off the picture and throw it away. It is never stored.
-        </p>
-      </Panel>
+      <div className="mt-4">
+        <AndroidSetup />
+      </div>
 
       <details className="group mt-4 rounded-2xl border border-neutral-200 p-5">
         <summary className="cursor-pointer list-none text-sm font-bold text-neutral-900">
@@ -360,5 +344,36 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
         make one.
       </p>
     </div>
+  )
+}
+
+/**
+ * Android setup. Shown to everyone, because it needs no code and no shortcut,
+ * and because an Android user hitting an iPhone flow has nothing to do.
+ */
+export function AndroidSetup() {
+  return (
+    <section className="rounded-[28px] border border-neutral-200 p-5">
+      <h2 className="text-sm font-bold text-neutral-900">On Android</h2>
+      <p className="mt-2 text-sm text-neutral-600">
+        Android keeps step data on the phone and has nothing like Shortcuts, so there is no fully automatic option.
+        It does have one thing iPhones do not.
+      </p>
+      <Steps
+        items={[
+          <>
+            In Chrome, open the menu and tap <strong>Add to Home screen</strong>. My Lighthouse then appears in your
+            share sheet.
+          </>,
+          <>Screenshot your step count from whichever health app you use.</>,
+          <>
+            Tap <strong>Share</strong>, pick <strong>My Lighthouse</strong>, then confirm the number we read.
+          </>,
+        ]}
+      />
+      <p className="mt-4 text-sm text-neutral-500">
+        No code and no shortcut needed. We read the number and the date off the picture and throw it away.
+      </p>
+    </section>
   )
 }

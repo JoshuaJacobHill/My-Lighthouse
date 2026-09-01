@@ -40,10 +40,10 @@ export default async function ConnectFitnessPage() {
           <ArrowLeft className="h-4 w-4" /> Back to the challenge
         </Link>
 
-        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Send your steps automatically</h1>
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Sending your steps</h1>
         <p className="mt-2.5 text-neutral-500">
-          Your phone already counts your steps. This lets it send the daily total across on its own. Completely
-          optional.
+          Your phone already counts your steps. Set it up once and you stop having to think about it. Different on
+          iPhone and Android, so both are below.
         </p>
 
         <ConnectHealth

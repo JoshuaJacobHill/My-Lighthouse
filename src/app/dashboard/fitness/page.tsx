@@ -191,9 +191,9 @@ export default async function StaffFitnessPage() {
                 <Smartphone className="h-5 w-5" aria-hidden="true" />
               </span>
               <div>
-                <p className="font-bold text-neutral-950">Link your steps to Apple Health</p>
+                <p className="font-bold text-neutral-950">Set up automatic steps</p>
                 <p className="text-sm text-neutral-500">
-                  Your phone sends the daily total on its own. Takes about two minutes.
+                  Apple Health on iPhone, or share a screenshot on Android. Two minutes either way.
                 </p>
               </div>
             </div>
@@ -250,7 +250,7 @@ export default async function StaffFitnessPage() {
               href="/dashboard/fitness/connect"
               className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-600 hover:bg-neutral-50"
             >
-              <Settings className="h-4 w-4" aria-hidden="true" /> Apple Health settings
+              <Settings className="h-4 w-4" aria-hidden="true" /> Step sending settings
             </Link>
           </div>
         )}
