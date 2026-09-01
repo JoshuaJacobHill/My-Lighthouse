@@ -17,6 +17,20 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: '#f97316',
+    // Android only, and genuinely useful here: an installed web app can appear
+    // in the system share sheet. Screenshot your step count, tap Share, pick
+    // My Lighthouse, and the image goes straight to the reader. No opening the
+    // portal and hunting for an upload button.
+    //
+    // iOS does not implement this, which is fine, because iOS has Shortcuts.
+    share_target: {
+      action: '/api/fitness/share',
+      method: 'POST',
+      enctype: 'multipart/form-data',
+      params: {
+        files: [{ name: 'screenshot', accept: ['image/png', 'image/jpeg', 'image/webp'] }],
+      },
+    },
     icons: [
       { src: '/logo-square.png', sizes: '1083x1083', type: 'image/png', purpose: 'any' },
       { src: '/logo-square.png', sizes: '1083x1083', type: 'image/png', purpose: 'maskable' },

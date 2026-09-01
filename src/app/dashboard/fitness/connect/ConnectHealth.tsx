@@ -268,13 +268,22 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
         </p>
       </Panel>
 
-      <Panel title="Rather not bother?">
+      <Panel title="On Android?">
         <p>
-          Type your daily total on the challenge page. Five seconds, nothing to set up, counts exactly the same.
+          Android keeps step data on the phone and has nothing like Shortcuts, so there is no automatic option. It
+          does have one thing iPhones do not though.
         </p>
         <p>
-          You can also upload a screenshot of your health app and we will read the number off it, then throw the
-          picture away. That is the option for Android, which keeps step data locked to the phone.
+          <strong>Add the portal to your home screen</strong> in Chrome, using the menu, then{' '}
+          <strong>Add to Home screen</strong>. My Lighthouse then appears in your share sheet.
+        </p>
+        <p>
+          After that, logging your steps is: screenshot your step count, tap <strong>Share</strong>, pick{' '}
+          <strong>My Lighthouse</strong>, confirm the number. Three taps from wherever you are, no opening the portal
+          and hunting for a button.
+        </p>
+        <p className="text-neutral-500">
+          We read the number and the date off the picture and throw it away. It is never stored.
         </p>
       </Panel>
 
