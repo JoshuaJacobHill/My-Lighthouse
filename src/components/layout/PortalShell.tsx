@@ -137,6 +137,10 @@ export function PortalShell({
 
   const adminLink = isAdmin ? (
     <Link
+      // Always on screen, so Next would prefetch every one of these on every
+      // render — each a full dynamic render with its own session query. The page
+      // being waited on then queues behind four nobody asked for.
+      prefetch={false}
       href="/admin"
       className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
     >
@@ -163,6 +167,10 @@ export function PortalShell({
           return (
             <li key={item.href}>
               <Link
+                // Always on screen, so Next would prefetch every one of these on every
+                // render — each a full dynamic render with its own session query. The page
+                // being waited on then queues behind four nobody asked for.
+                prefetch={false}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={clsx(
@@ -282,6 +290,10 @@ function TabLink({
 }) {
   return (
     <Link
+      // Always on screen, so Next would prefetch every one of these on every
+      // render — each a full dynamic render with its own session query. The page
+      // being waited on then queues behind four nobody asked for.
+      prefetch={false}
       href={href}
       aria-current={active ? 'page' : undefined}
       className={clsx(

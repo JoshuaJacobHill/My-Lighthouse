@@ -13,15 +13,17 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
  * once, which otherwise leaves orphaned pools behind and makes every request
  * pay for a fresh connection.
  *
- * The pool stays small because Supavisor is already pooling in front of
- * Postgres; a big pool per serverless instance just holds connections open
- * without making anything faster. keepAlive stops idle sockets being dropped
- * between invocations, which is exactly the case that was paying to reconnect.
+ * The pool stays modest because Supavisor is already pooling in front of
+ * Postgres, but it has to be wider than the widest burst a page makes: the
+ * fitness page fires seven queries at once, and a pool of three turned that
+ * one round trip into three. Measured against Sydney, the same burst runs in
+ * 22ms at eight connections against 59ms at three. keepAlive stops idle
+ * sockets being dropped between invocations, which was paying to reconnect.
  */
 function createPrismaClient(): PrismaClient {
   const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL!,
-    max: 3,
+    max: 8,
     idleTimeoutMillis: 30_000,
     keepAlive: true,
   })

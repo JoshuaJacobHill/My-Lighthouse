@@ -1,6 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import prisma from '@/lib/prisma'
 import { canAccessDonorPortal } from '@/lib/features'
 import { PortalShell } from '@/components/layout/PortalShell'
 import { isAdminRole } from '@/lib/permissions-core'
@@ -15,19 +14,9 @@ export default async function DonorLayout({ children }: { children: React.ReactN
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: {
-      name: true,
-      email: true,
-      role: true,
-      isStaff: true,
-      isTrainee: true,
-      volunteerProfile: { select: { id: true } },
-      _count: { select: { donations: true } },
-    },
-  })
-  if (!user) redirect('/login')
+  // Everything here came back with the session query, so there is no second
+  // round trip. This used to be a serial findUnique on every dashboard page.
+  const user = session.user
 
   if (!canAccessDonorPortal({ email: user.email, role: user.role })) {
     notFound()
@@ -36,8 +25,8 @@ export default async function DonorLayout({ children }: { children: React.ReactN
   return (
     <PortalShell
       userName={user.name ?? 'Friend'}
-      isVolunteer={Boolean(user.volunteerProfile)}
-      hasGiven={(user._count.donations ?? 0) > 0}
+      isVolunteer={user.hasVolunteerProfile}
+      hasGiven={user.donationCount > 0}
       isStaff={user.isStaff || user.isTrainee}
       isAdmin={isAdminRole(user.role)}
     >

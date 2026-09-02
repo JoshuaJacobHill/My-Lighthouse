@@ -51,6 +51,21 @@ export const getSession = cache(async function getSession(): Promise<{
   userId: string
   role: string
   volunteerId?: string
+  /**
+   * The signed-in person, from the join this query already does. It used to be
+   * fetched here and thrown away, so the portal layout ran a second, serial
+   * query for fields that were sitting in memory. Additive on purpose: the 88
+   * existing callers keep working untouched.
+   */
+  user: {
+    name: string | null
+    email: string
+    role: string
+    isStaff: boolean
+    isTrainee: boolean
+    hasVolunteerProfile: boolean
+    donationCount: number
+  }
 } | null> {
   try {
     const cookieStore = await cookies()
@@ -70,6 +85,9 @@ export const getSession = cache(async function getSession(): Promise<{
             volunteerProfile: {
               select: { id: true },
             },
+            // Only ever used as a "has this person ever given?" flag. Counted
+            // here, on an indexed column, to save the layout a round trip.
+            _count: { select: { donations: true } },
           },
         },
       },
@@ -92,6 +110,15 @@ export const getSession = cache(async function getSession(): Promise<{
       userId: session.userId,
       role: session.user.role,
       volunteerId: session.user.volunteerProfile?.id ?? undefined,
+      user: {
+        name: session.user.name,
+        email: session.user.email,
+        role: session.user.role,
+        isStaff: session.user.isStaff,
+        isTrainee: session.user.isTrainee,
+        hasVolunteerProfile: Boolean(session.user.volunteerProfile),
+        donationCount: session.user._count.donations,
+      },
     }
   } catch {
     return null
