@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Avatar } from '@/components/ui/avatar'
+import { PullToRefresh } from './PullToRefresh'
 
 interface NavItem {
   href: string
@@ -247,8 +248,11 @@ export function PortalShell({
         )}
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 pb-28 lg:p-6" id="main-content">
-          {children}
+        <main
+          className="flex-1 overflow-y-auto overscroll-y-contain p-4 pb-28 lg:p-6"
+          id="main-content"
+        >
+          <PullToRefresh>{children}</PullToRefresh>
         </main>
 
         {/* Mobile bottom tab bar — Home · Volunteer · Give · Account */}
