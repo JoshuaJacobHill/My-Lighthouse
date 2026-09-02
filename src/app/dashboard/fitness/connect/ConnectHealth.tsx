@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Loader2, Copy, Check, Smartphone, Link2Off, Download } from 'lucide-react'
 import { connectFitnessAction, disconnectFitnessAction } from '@/lib/actions/fitness.actions'
 
@@ -40,7 +39,6 @@ function Steps({ items }: { items: React.ReactNode[] }) {
 }
 
 export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, lastAmount }: Props) {
-  const router = useRouter()
   const [token, setToken] = React.useState(initialToken)
   const [copied, setCopied] = React.useState(false)
   const [error, setError] = React.useState('')
@@ -96,7 +94,6 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
       const res = await connectFitnessAction()
       if (!res.success) return setError(res.error ?? 'Something went wrong. Please try again.')
       setToken(res.token ?? null)
-      router.refresh()
     })
   }
 
@@ -106,7 +103,6 @@ export function ConnectHealth({ initialToken, appUrl, shortcutUrl, lastUsedAt, l
       const res = await disconnectFitnessAction()
       if (!res.success) return setError(res.error ?? 'Something went wrong. Please try again.')
       setToken(null)
-      router.refresh()
     })
   }
 

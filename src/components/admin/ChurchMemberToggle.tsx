@@ -1,12 +1,10 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Church } from 'lucide-react'
 import { setChurchMemberAction } from '@/lib/actions/team.actions'
 
 export function ChurchMemberToggle({ userId, initial }: { userId: string; initial: boolean }) {
-  const router = useRouter()
   const [on, setOn] = React.useState(initial)
   const [pending, startTransition] = React.useTransition()
 
@@ -16,7 +14,6 @@ export function ChurchMemberToggle({ userId, initial }: { userId: string; initia
     startTransition(async () => {
       const res = await setChurchMemberAction(userId, next)
       if (!res.success) setOn(!next)
-      router.refresh()
     })
   }
 

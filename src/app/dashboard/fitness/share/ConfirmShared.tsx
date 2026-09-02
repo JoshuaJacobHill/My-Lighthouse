@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, Loader2, AlertCircle } from 'lucide-react'
 import { logFitnessAction } from '@/lib/actions/fitness.actions'
@@ -20,7 +19,6 @@ export function ConfirmShared({
   day: string
   assumed: boolean
 }) {
-  const router = useRouter()
   const [saved, setSaved] = React.useState(false)
   const [error, setError] = React.useState('')
   const [pending, startTransition] = React.useTransition()
@@ -38,7 +36,6 @@ export function ConfirmShared({
       const res = await logFitnessAction({ challengeId, day, amount: String(steps) })
       if (!res.success) return setError(res.error ?? 'Could not save that.')
       setSaved(true)
-      router.refresh()
     })
   }
 

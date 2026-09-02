@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Loader2, Check, AlertCircle, ImageUp, RotateCcw } from 'lucide-react'
 import { logFitnessAction, readStepsScreenshotAction } from '@/lib/actions/fitness.actions'
 
@@ -31,7 +30,6 @@ export function LogStepsForm({
   existingToday: number | null
   screenshotEnabled?: boolean
 }) {
-  const router = useRouter()
   const fileRef = React.useRef<HTMLInputElement>(null)
 
   const [reading, setReading] = React.useState(false)
@@ -81,7 +79,6 @@ export function LogStepsForm({
       if (!res.success) return setError(res.error ?? 'Could not save that.')
       setSaved(true)
       setFound(null)
-      router.refresh()
     })
   }
 

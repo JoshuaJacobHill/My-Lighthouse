@@ -2,28 +2,20 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { PortalShell } from '@/components/layout/PortalShell'
 import { isAdminRole } from '@/lib/permissions-core'
-import prisma from '@/lib/prisma'
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: {
-      name: true,
-      role: true,
-      volunteerProfile: { select: { id: true } },
-      _count: { select: { donations: true } },
-    },
-  })
+  // Came back with the session; this used to be a second serial query.
+  const user = session.user
 
   return (
     <PortalShell
-      userName={user?.name ?? 'Volunteer'}
-      isVolunteer={Boolean(user?.volunteerProfile)}
-      hasGiven={(user?._count.donations ?? 0) > 0}
-      isAdmin={isAdminRole(user?.role)}
+      userName={user.name ?? 'Volunteer'}
+      isVolunteer={user.hasVolunteerProfile}
+      hasGiven={user.donationCount > 0}
+      isAdmin={isAdminRole(user.role)}
     >
       {children}
     </PortalShell>

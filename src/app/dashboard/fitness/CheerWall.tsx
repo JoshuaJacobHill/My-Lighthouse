@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Loader2, Send, X, MessageCircle } from 'lucide-react'
 import { postCheerAction, deleteCheerAction } from '@/lib/actions/fitness.actions'
 import type { Cheer } from '@/lib/fitness-data'
@@ -16,7 +15,6 @@ const MAX = 280
  * what the space is for gets you encouragement.
  */
 export function CheerWall({ challengeId, cheers }: { challengeId: string; cheers: Cheer[] }) {
-  const router = useRouter()
   const [body, setBody] = React.useState('')
   const [error, setError] = React.useState('')
   const [pending, startTransition] = React.useTransition()
@@ -28,7 +26,6 @@ export function CheerWall({ challengeId, cheers }: { challengeId: string; cheers
       const res = await postCheerAction({ challengeId, body })
       if (!res.success) return setError(res.error ?? 'Could not post that.')
       setBody('')
-      router.refresh()
     })
   }
 
@@ -37,7 +34,8 @@ export function CheerWall({ challengeId, cheers }: { challengeId: string; cheers
     startTransition(async () => {
       const res = await deleteCheerAction(id)
       if (!res.success) return setError(res.error ?? 'Could not remove that.')
-      router.refresh()
+      // The action revalidates /dashboard/fitness; refreshing too would render
+      // the page a second time for nothing.
     })
   }
 

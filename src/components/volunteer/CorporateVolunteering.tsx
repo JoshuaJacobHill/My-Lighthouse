@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Building2, CalendarDays, Plus, Check } from 'lucide-react'
 import { addCorporateSessionAction, requestCorporateDayAction } from '@/lib/actions/corporate.actions'
 
@@ -28,7 +27,6 @@ export function CorporateVolunteering({
   companyName: string
   sessions: CorporateSessionView[]
 }) {
-  const router = useRouter()
   const [booking, setBooking] = React.useState(false)
   const [adding, setAdding] = React.useState(false)
   const [booked, setBooked] = React.useState(false)
@@ -65,7 +63,6 @@ export function CorporateVolunteering({
       })
       if (!res.success) return setError(res.error ?? 'Something went wrong.')
       setAdding(false)
-      router.refresh()
     })
   }
 

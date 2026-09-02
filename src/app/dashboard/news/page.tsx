@@ -19,11 +19,8 @@ export default async function NewsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { isChurchMember: true, isStaff: true, isTrainee: true },
-  })
-  if (!user) redirect('/login')
+  // Came back with the session; this used to be a second serial query.
+  const user = session.user
 
   const isStaffOrTrainee = user.isStaff || user.isTrainee
   const stories = await prisma.story.findMany({

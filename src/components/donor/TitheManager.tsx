@@ -43,7 +43,6 @@ export function TitheManager({ tithe }: { tithe: TitheView }) {
         return
       }
       setEditing(false)
-      router.refresh()
     })
   }
 

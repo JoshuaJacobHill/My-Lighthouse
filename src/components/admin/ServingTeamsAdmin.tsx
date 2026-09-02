@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Plus, Users } from 'lucide-react'
 import { createServingTeamAction, setServingTeamActiveAction } from '@/lib/actions/team.actions'
 
@@ -15,7 +14,6 @@ interface TeamRow {
 }
 
 export function ServingTeamsAdmin({ teams }: { teams: TeamRow[] }) {
-  const router = useRouter()
   const [name, setName] = React.useState('')
   const [description, setDescription] = React.useState('')
   const [pending, startTransition] = React.useTransition()
@@ -32,14 +30,12 @@ export function ServingTeamsAdmin({ teams }: { teams: TeamRow[] }) {
       }
       setName('')
       setDescription('')
-      router.refresh()
     })
   }
 
   function toggle(id: string, active: boolean) {
     startTransition(async () => {
       await setServingTeamActiveAction(id, active)
-      router.refresh()
     })
   }
 

@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
 import { getSession } from '@/lib/auth'
-import prisma from '@/lib/prisma'
 import { isAdminRole } from '@/lib/permissions-core'
 import { getCurrentChallenge } from '@/lib/fitness-data'
 import { decodeDraft } from '@/lib/step-draft'
@@ -20,10 +19,8 @@ export default async function SharePage({
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const me = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { isStaff: true, isTrainee: true, role: true },
-  })
+  // Came back with the session; this used to be a second serial query.
+  const me = session.user
   if (!me || !(me.isStaff || me.isTrainee || isAdminRole(me.role))) notFound()
 
   const params = await searchParams

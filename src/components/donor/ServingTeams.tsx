@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Check, ArrowRight } from 'lucide-react'
 import { expressTeamInterestAction, withdrawTeamInterestAction } from '@/lib/actions/team.actions'
 
@@ -23,14 +22,12 @@ export function ServingTeams({ teams }: { teams: ServingTeamCard[] }) {
 }
 
 function TeamCard({ team }: { team: ServingTeamCard }) {
-  const router = useRouter()
   const [pending, startTransition] = React.useTransition()
 
   function toggle() {
     startTransition(async () => {
       if (team.joined) await withdrawTeamInterestAction(team.id)
       else await expressTeamInterestAction(team.id)
-      router.refresh()
     })
   }
 

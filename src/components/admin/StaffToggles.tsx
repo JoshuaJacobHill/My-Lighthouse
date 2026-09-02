@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Briefcase, GraduationCap } from 'lucide-react'
 import { setStaffAction, setTraineeAction } from '@/lib/actions/team.actions'
 
@@ -60,7 +59,6 @@ export function StaffToggles({
   isStaff: boolean
   isTrainee: boolean
 }) {
-  const router = useRouter()
   return (
     <>
       <Toggle
@@ -70,7 +68,6 @@ export function StaffToggles({
         icon={Briefcase}
         onToggle={async (next) => {
           const res = await setStaffAction(userId, next)
-          router.refresh()
           return res.success
         }}
       />
@@ -81,7 +78,6 @@ export function StaffToggles({
         icon={GraduationCap}
         onToggle={async (next) => {
           const res = await setTraineeAction(userId, next)
-          router.refresh()
           return res.success
         }}
       />

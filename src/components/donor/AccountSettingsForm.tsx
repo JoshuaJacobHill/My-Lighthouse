@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { updateDonorAccountAction, type UpdateDonorAccountInput } from '@/lib/actions/donor-account.actions'
@@ -11,7 +10,6 @@ export function AccountSettingsForm({
 }: {
   initial: { name: string; email: string; company: string; phone: string; address: string; consentEmailUpdates: boolean }
 }) {
-  const router = useRouter()
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [saved, setSaved] = React.useState(false)
@@ -33,7 +31,6 @@ export function AccountSettingsForm({
     setSaving(false)
     if (res.success) {
       setSaved(true)
-      router.refresh()
     } else {
       setError(res.error ?? 'Something went wrong. Please try again.')
     }

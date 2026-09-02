@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { HandHeart, Check } from 'lucide-react'
 import { signUpEventVolunteerAction } from '@/lib/actions/event-public.actions'
 
@@ -18,7 +17,6 @@ export function EventVolunteerSignup({
   initialName?: string
   initialEmail?: string
 }) {
-  const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [name, setName] = React.useState(initialName ?? '')
   const [email, setEmail] = React.useState(initialEmail ?? '')
@@ -40,7 +38,6 @@ export function EventVolunteerSignup({
         return
       }
       setDone(true)
-      router.refresh()
     })
   }
 

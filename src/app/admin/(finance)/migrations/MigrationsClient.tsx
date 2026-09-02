@@ -73,7 +73,6 @@ export function MigrationsClient({ funds, intents }: { funds: FundOption[]; inte
     startTransition(async () => {
       const res = await sendMigrationEmailAction(id)
       setNotice(res.success ? 'Email sent.' : res.error ?? 'Could not send.')
-      router.refresh()
     })
   }
 
@@ -82,7 +81,6 @@ export function MigrationsClient({ funds, intents }: { funds: FundOption[]; inte
     startTransition(async () => {
       const res = await sendAllPendingMigrationEmailsAction()
       setNotice(`Sent ${res.sent} email(s)${res.failed ? `, ${res.failed} failed` : ''}.`)
-      router.refresh()
     })
   }
 
@@ -90,7 +88,6 @@ export function MigrationsClient({ funds, intents }: { funds: FundOption[]; inte
     if (!confirm('Cancel this donor’s migration? Their link will stop working.')) return
     startTransition(async () => {
       await cancelMigrationIntentAction(id)
-      router.refresh()
     })
   }
 

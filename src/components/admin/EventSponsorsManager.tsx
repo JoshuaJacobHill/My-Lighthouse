@@ -129,7 +129,6 @@ export function EventSponsorsManager({ eventId, sponsors }: { eventId: string; s
                     }
                     setError(null)
                     setEditingId(null)
-                    router.refresh()
                   })
                 }
               />

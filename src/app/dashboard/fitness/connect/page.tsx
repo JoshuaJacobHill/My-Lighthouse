@@ -15,10 +15,8 @@ export default async function ConnectFitnessPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const me = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, isStaff: true, isTrainee: true, role: true },
-  })
+  // Came back with the session; this used to be a second serial query.
+  const me = session.user
   if (!me || !(me.isStaff || me.isTrainee || isAdminRole(me.role))) notFound()
 
   const [link, shortcutSetting] = await Promise.all([

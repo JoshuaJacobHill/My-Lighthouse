@@ -23,11 +23,9 @@ export default async function StaffTasksPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const me = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, isStaff: true, isTrainee: true, role: true },
-  })
-  const allowed = me?.isStaff || me?.isTrainee || isAdminRole(me?.role)
+  // Came back with the session; this used to be a second serial query.
+  const me = session.user
+  const allowed = me.isStaff || me.isTrainee || isAdminRole(me.role)
   if (!allowed) notFound()
 
   const [tasks, items] = await Promise.all([

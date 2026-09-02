@@ -58,12 +58,17 @@ export const getSession = cache(async function getSession(): Promise<{
    * existing callers keep working untouched.
    */
   user: {
+    id: string
     name: string | null
     email: string
     role: string
     isStaff: boolean
     isTrainee: boolean
+    isChurchMember: boolean
+    emailVerified: Date | null
     hasVolunteerProfile: boolean
+    /** Status of the volunteer profile, when there is one. */
+    volunteerStatus: string | null
     donationCount: number
   }
 } | null> {
@@ -83,7 +88,7 @@ export const getSession = cache(async function getSession(): Promise<{
         user: {
           include: {
             volunteerProfile: {
-              select: { id: true },
+              select: { id: true, status: true },
             },
             // Only ever used as a "has this person ever given?" flag. Counted
             // here, on an indexed column, to save the layout a round trip.
@@ -111,12 +116,16 @@ export const getSession = cache(async function getSession(): Promise<{
       role: session.user.role,
       volunteerId: session.user.volunteerProfile?.id ?? undefined,
       user: {
+        id: session.userId,
         name: session.user.name,
         email: session.user.email,
         role: session.user.role,
         isStaff: session.user.isStaff,
         isTrainee: session.user.isTrainee,
+        isChurchMember: session.user.isChurchMember,
+        emailVerified: session.user.emailVerified,
         hasVolunteerProfile: Boolean(session.user.volunteerProfile),
+        volunteerStatus: session.user.volunteerProfile?.status ?? null,
         donationCount: session.user._count.donations,
       },
     }

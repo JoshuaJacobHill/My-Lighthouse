@@ -66,7 +66,9 @@ export async function logFitnessAction(input: LogFitnessInput): Promise<Result> 
     create: { challengeId, userId: me.userId, day: dayDate, amount },
   })
 
-  revalidatePath('/staff/fitness')
+  // Was '/staff/fitness', a route that does not exist, so this revalidate
+  // did nothing and the client had to refresh by hand.
+  revalidatePath('/dashboard/fitness')
   return { success: true }
 }
 

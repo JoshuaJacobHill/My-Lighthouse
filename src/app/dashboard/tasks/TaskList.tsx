@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Check, Clock, AlertTriangle, MapPin } from 'lucide-react'
 import { setTaskStatusAction, toggleChecklistAction } from '@/lib/actions/tasks.actions'
 
@@ -49,7 +48,6 @@ function Tick({ done, onToggle, pending }: { done: boolean; onToggle: () => void
 }
 
 export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: ChecklistRow[] }) {
-  const router = useRouter()
   const [pending, startTransition] = React.useTransition()
 
   const groups = [
@@ -76,9 +74,12 @@ export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: Ch
                   done={t.done}
                   pending={pending}
                   onToggle={() =>
+                    // The action revalidates /dashboard/tasks, so Next returns
+                    // the re-rendered page in the action's own response. Asking
+                    // the router to refresh as well rendered the whole page a
+                    // second time, in series, on every single tick.
                     startTransition(async () => {
                       await setTaskStatusAction(t.id, !t.done)
-                      router.refresh()
                     })
                   }
                 />
@@ -129,7 +130,6 @@ export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: Ch
                   onToggle={() =>
                     startTransition(async () => {
                       await toggleChecklistAction(c.id, !c.done)
-                      router.refresh()
                     })
                   }
                 />
