@@ -2,6 +2,8 @@
 
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { revalidatePath } from 'next/cache'
+import { notify } from '@/lib/notifications'
 import { sendEmail } from '@/lib/email'
 import { renderTemplate } from '@/lib/email-templates'
 import { format } from 'date-fns'
@@ -577,6 +579,43 @@ async function requireAdminSessionForShifts(): Promise<void> {
   await assertCapability('care.people')
 }
 
+// ─── Volunteer: accept a shift you have been asked to cover ──────────────────
+
+/**
+ * Accept a requested shift.
+ *
+ * A SCHEDULED assignment is a question — "are you free on the 12th?" — and this
+ * is the answer. Declining goes through cancelShiftAction, which already exists
+ * and records CANCELLED_BY_VOLUNTEER.
+ */
+export async function confirmShiftAssignmentAction(assignmentId: string): Promise<ActionResult> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Not signed in.' }
+  if (!session.volunteerId) return { success: false, error: 'No volunteer profile.' }
+
+  try {
+    // Scoped to this volunteer, so nobody can confirm on someone else's behalf.
+    const updated = await prisma.shiftAssignment.updateMany({
+      where: {
+        id: assignmentId,
+        volunteerId: session.volunteerId,
+        status: 'SCHEDULED',
+      },
+      data: { status: 'CONFIRMED', confirmedAt: new Date() },
+    })
+    if (updated.count === 0) {
+      return { success: false, error: 'That shift is no longer waiting on an answer.' }
+    }
+
+    revalidatePath('/volunteer/roster')
+    revalidatePath('/volunteer/shifts')
+    return { success: true }
+  } catch (err) {
+    console.error('[confirmShiftAssignmentAction]', err)
+    return { success: false, error: 'Could not confirm that shift. Please try again.' }
+  }
+}
+
 export async function adminBookShiftForVolunteerAction(
   volunteerId: string,
   input: { locationId: string; date: string; startTime: string; endTime: string; frequency: 'ONCE' | 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY' }
@@ -647,6 +686,31 @@ export async function adminBookShiftForVolunteerAction(
         const booked = await bookAssignment(futureShiftId)
         if (booked) bookedCount++
       }
+    }
+
+    // Ask them, rather than assuming. The roster page is where they answer.
+    const asked = await prisma.volunteerProfile.findUnique({
+      where: { id: volunteerId },
+      select: { userId: true },
+    })
+    if (asked?.userId) {
+      const when = new Intl.DateTimeFormat('en-AU', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        timeZone: 'Australia/Brisbane',
+      }).format(new Date(date))
+      await notify({
+        audience: { kind: 'users', ids: [asked.userId] },
+        category: 'SHIFT',
+        title: 'Volunteer request',
+        body:
+          bookedCount > 1
+            ? `Are you free from ${when}? ${bookedCount} shifts at ${location.name}.`
+            : `Are you free ${when} at ${location.name}?`,
+        href: '/volunteer/roster',
+        actionLabel: 'View shift',
+      })
     }
 
     return { success: true, bookedCount }

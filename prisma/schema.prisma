@@ -109,35 +109,35 @@ enum UserRole {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified DateTime?
-  passwordHash  String?
-  name          String?
+  id               String    @id @default(cuid())
+  email            String    @unique
+  emailVerified    DateTime?
+  passwordHash     String?
+  name             String?
   // Optional company/organisation the supporter represents (unlocks corporate
   // volunteering). Set explicitly on their profile, or inferred from giving /
   // corporate volunteer history.
-  company       String?
-  role          UserRole  @default(VOLUNTEER)
-  isActive      Boolean   @default(true)
+  company          String?
+  role             UserRole  @default(VOLUNTEER)
+  isActive         Boolean   @default(true)
   // Admin permission: may see donations, donors, funds, fundraisers & events
   // (the money/PII side). SUPER_ADMIN always can; grant to specific ADMINs.
-  canViewDonations Boolean @default(false)
+  canViewDonations Boolean   @default(false)
   // Display picture / avatar (may be a data URL, e.g. an uploaded sponsor logo).
-  imageUrl      String?   @db.Text
+  imageUrl         String?   @db.Text
   // Church member — sees church-only news, events & serving teams (in addition
   // to all Lighthouse Care content). Auto-set when they tithe; admin-toggleable.
-  isChurchMember Boolean @default(false)
+  isChurchMember   Boolean   @default(false)
   // Staff member — an employee. Sees staff-only news, tasks, checklists and the
   // staff wellbeing/fitness challenges. A flag rather than a role, because staff
   // are usually volunteers and/or donors too and must keep those capabilities.
-  isStaff        Boolean @default(false)
+  isStaff          Boolean   @default(false)
   // Trainee — supported employment/traineeship. Sees their hours, achievements,
   // required tasks and training modules, and can be assigned tasks with staff.
-  isTrainee      Boolean @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastLoginAt   DateTime?
+  isTrainee        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastLoginAt      DateTime?
 
   accounts            Account[]
   sessions            UserSession[]
@@ -147,11 +147,11 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   // Donor & fundraising (additive — see docs/donor-portal-plan.md)
-  donorProfile DonorProfile?
-  donations    Donation[]
-  sponsorships Sponsorship[]
-  ticketOrders TicketOrder[]
-  teamInterests TeamInterest[]
+  donorProfile   DonorProfile?
+  donations      Donation[]
+  sponsorships   Sponsorship[]
+  ticketOrders   TicketOrder[]
+  teamInterests  TeamInterest[]
   fitnessEntries FitnessEntry[]
   fitnessLink    FitnessLink?
   cheers         ChallengeCheer[]
@@ -159,6 +159,9 @@ model User {
   tasksAssigned  StaffTask[]           @relation("TaskAssignee")
   tasksCreated   StaffTask[]           @relation("TaskAssigner")
   checklistDone  ChecklistCompletion[]
+
+  notifications     NotificationRecipient[]
+  notificationsSent Notification[]          @relation("NotificationSender")
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -669,37 +672,37 @@ model DonorProfile {
 // ─── Fund / designation (where the money goes) ────────────────────────────────
 
 model Fund {
-  id          String    @id @default(cuid())
-  name        String
-  slug        String    @unique
-  description String?   @db.Text
-  isActive    Boolean   @default(true)
+  id                 String    @id @default(cuid())
+  name               String
+  slug               String    @unique
+  description        String?   @db.Text
+  isActive           Boolean   @default(true)
   // When true, the public progress widget (raised vs goal) may be embedded for
   // this fund on lighthousecare.org.au. Independent of isActive so totals can be
   // shown/hidden without affecting whether the fund accepts gifts.
-  showPublicProgress Boolean @default(false)
+  showPublicProgress Boolean   @default(false)
   // Which Stripe account this fund's gifts deposit to (e.g. "CARE" or "CHURCH").
   // Resolved to real keys in src/lib/stripe-accounts.ts. Falls back to CARE if
   // the chosen account isn't configured yet.
-  depositAccount String @default("CARE")
-  goalAmount  Decimal?  @db.Decimal(10, 2)
+  depositAccount     String    @default("CARE")
+  goalAmount         Decimal?  @db.Decimal(10, 2)
   // Per-fund giving amounts shown on the donate/give forms. Empty = use the
   // app defaults. suggestedAmount is the highlighted anchor; impactLabels maps
   // "amount" -> a short impact line (e.g. {"25":"a full trolley for a family"}).
-  presetAmounts   Int[]   @default([])
-  suggestedAmount Int?
-  impactLabels    Json?
-  defaultFrequency String? // once | weekly | fortnightly | monthly
+  presetAmounts      Int[]     @default([])
+  suggestedAmount    Int?
+  impactLabels       Json?
+  defaultFrequency   String? // once | weekly | fortnightly | monthly
   // Optional image + short tagline for the appeal card on the donor dashboard.
-  imageUrl    String?
-  tagline     String?
+  imageUrl           String?
+  tagline            String?
   // Feature this fund as an "appeal" on the donor dashboard (raised vs goal).
-  showOnDashboard Boolean @default(false)
-  startsAt    DateTime?
-  endsAt      DateTime?
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  showOnDashboard    Boolean   @default(false)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   donations    Donation[]
   fundraisers  Fundraiser[]
@@ -768,38 +771,38 @@ model TeamInterest {
 // ─── Donation (one row per completed gift) ────────────────────────────────────
 
 model Donation {
-  id                  String         @id @default(cuid())
-  userId              String? // null until matched to an account by email
-  donorEmail          String
-  donorName           String?
-  donorCompany        String? // optional company / organisation on the gift
-  message             String?        @db.Text // optional public message shown on the donor wall
-  amount              Decimal        @db.Decimal(10, 2)
-  currency            String         @default("AUD")
+  id                    String         @id @default(cuid())
+  userId                String? // null until matched to an account by email
+  donorEmail            String
+  donorName             String?
+  donorCompany          String? // optional company / organisation on the gift
+  message               String?        @db.Text // optional public message shown on the donor wall
+  amount                Decimal        @db.Decimal(10, 2)
+  currency              String         @default("AUD")
   // Payment provider for this gift (e.g. STRIPE). Kept provider-neutral so a
   // gateway can change without a schema migration.
-  provider              String       @default("STRIPE")
+  provider              String         @default("STRIPE")
   // Null for offline / imported gifts (no gateway transaction). Unique when set.
-  providerTransactionId String?      @unique
-  fundId              String? // reconcilable; defaults to General once seeded
-  fundraiserId        String?
-  sponsorshipId       String?
-  isRecurring         Boolean        @default(false)
+  providerTransactionId String?        @unique
+  fundId                String? // reconcilable; defaults to General once seeded
+  fundraiserId          String?
+  sponsorshipId         String?
+  isRecurring           Boolean        @default(false)
   // Church tithe gift — kept separate from regular giving (excluded from the
   // dashboard total; managed in its own "Tithes" area). Deposits to CHURCH.
-  isTithe             Boolean        @default(false)
-  source              DonationSource @default(DONATE_PAGE)
+  isTithe               Boolean        @default(false)
+  source                DonationSource @default(DONATE_PAGE)
   // Set when a gift originates from re-confirming a migrated recurring donor
   // (e.g. "shout_for_good"). Lets reporting tell migrated donors from new ones.
-  migratedFrom        String?
+  migratedFrom          String?
   // Richer detail for the giving-history view (backfilled for imported gifts,
   // set on new gifts where known). All optional.
-  description         String? // what the gift was for, e.g. "$25 Trolley"
-  frequency           String? // One-off | Weekly | Fortnightly | Monthly
-  paymentMethod       String? // e.g. Visa, Mastercard, Apple Pay, PayPal
-  taxReceiptEligible  Boolean        @default(true)
-  taxReceiptIssued    Boolean        @default(false)
-  createdAt           DateTime       @default(now())
+  description           String? // what the gift was for, e.g. "$25 Trolley"
+  frequency             String? // One-off | Weekly | Fortnightly | Monthly
+  paymentMethod         String? // e.g. Visa, Mastercard, Apple Pay, PayPal
+  taxReceiptEligible    Boolean        @default(true)
+  taxReceiptIssued      Boolean        @default(false)
+  createdAt             DateTime       @default(now())
 
   user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   fund        Fund?        @relation(fields: [fundId], references: [id], onDelete: SetNull)
@@ -816,18 +819,18 @@ model Donation {
 // ─── Sponsorship (recurring commitment) ───────────────────────────────────────
 
 model Sponsorship {
-  id                   String            @id @default(cuid())
-  userId               String
-  amount               Decimal           @db.Decimal(10, 2)
-  frequency            String            @default("MONTHLY")
-  fundId               String?
-  provider             String            @default("STRIPE")
+  id                      String            @id @default(cuid())
+  userId                  String
+  amount                  Decimal           @db.Decimal(10, 2)
+  frequency               String            @default("MONTHLY")
+  fundId                  String?
+  provider                String            @default("STRIPE")
   // Provider reference for the recurring arrangement — with Stripe, the Stripe
   // Billing subscription id (native recurring; no scheduler of our own needed).
-  providerSubscriptionRef String?        @unique
-  status               SponsorshipStatus @default(ACTIVE)
-  startedAt            DateTime          @default(now())
-  cancelledAt          DateTime?
+  providerSubscriptionRef String?           @unique
+  status                  SponsorshipStatus @default(ACTIVE)
+  startedAt               DateTime          @default(now())
+  cancelledAt             DateTime?
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   fund      Fund?      @relation(fields: [fundId], references: [id], onDelete: SetNull)
@@ -843,9 +846,9 @@ model Fundraiser {
   id             String    @id @default(cuid())
   title          String
   slug           String    @unique
-  storyHeading   String?   // optional heading above the story (e.g. "Building with Purpose")
+  storyHeading   String? // optional heading above the story (e.g. "Building with Purpose")
   story          String    @db.Text
-  contentBlocks  Json?     // rich sections below the story (image+text, video) — see the public page
+  contentBlocks  Json? // rich sections below the story (image+text, video) — see the public page
   imageUrl       String?
   goalAmount     Decimal?  @db.Decimal(10, 2)
   raisedAmount   Decimal   @default(0) @db.Decimal(10, 2)
@@ -868,28 +871,28 @@ model Fundraiser {
 // ─── Event ticketing ──────────────────────────────────────────────────────────
 
 model Event {
-  id          String    @id @default(cuid())
-  title       String
-  slug        String    @unique
-  description String    @db.Text
-  imageUrl    String?
-  venue       String?
-  startsAt    DateTime? // null = date To Be Advised (e.g. collecting sponsors early)
-  endsAt      DateTime?
-  fundId      String?
-  capacity    Int?
-  isPublished Boolean   @default(false)
+  id                String    @id @default(cuid())
+  title             String
+  slug              String    @unique
+  description       String    @db.Text
+  imageUrl          String?
+  venue             String?
+  startsAt          DateTime? // null = date To Be Advised (e.g. collecting sponsors early)
+  endsAt            DateTime?
+  fundId            String?
+  capacity          Int?
+  isPublished       Boolean   @default(false)
   // When true, only church members see this event.
-  churchOnly  Boolean   @default(false)
+  churchOnly        Boolean   @default(false)
   // Optional per-event sections (e.g. the Good Food Festival).
-  allowVolunteers   Boolean @default(false)
+  allowVolunteers   Boolean   @default(false)
   volunteerCapacity Int?
-  allowDonations    Boolean @default(false)
-  allowSponsors     Boolean @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  allowDonations    Boolean   @default(false)
+  allowSponsors     Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  fund        Fund?         @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  fund        Fund?            @relation(fields: [fundId], references: [id], onDelete: SetNull)
   ticketTypes TicketType[]
   orders      TicketOrder[]
   volunteers  EventVolunteer[]
@@ -962,16 +965,16 @@ model TicketType {
 }
 
 model TicketOrder {
-  id                  String            @id @default(cuid())
-  userId              String? // matched by email
-  purchaserName       String
-  purchaserEmail      String
-  eventId             String
-  amountTotal         Decimal           @db.Decimal(10, 2)
-  provider            String            @default("STRIPE")
-  providerTransactionId String?         @unique
-  status              TicketOrderStatus @default(CONFIRMED)
-  createdAt           DateTime          @default(now())
+  id                    String            @id @default(cuid())
+  userId                String? // matched by email
+  purchaserName         String
+  purchaserEmail        String
+  eventId               String
+  amountTotal           Decimal           @db.Decimal(10, 2)
+  provider              String            @default("STRIPE")
+  providerTransactionId String?           @unique
+  status                TicketOrderStatus @default(CONFIRMED)
+  createdAt             DateTime          @default(now())
 
   user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -1080,12 +1083,10 @@ model FitnessEntry {
 // Rotating encouragement shown to staff — one per day, cycled by date.
 /**
  * Opt-in link between a staff member and their phone's health data.
- *
  * Apple Health can't be read from a web page — HealthKit is native-only — so
  * the phone pushes to us instead: an iOS Shortcut reads today's step count and
  * POSTs it with this token. Nothing exists until the person creates it, and
  * revoking is a single row update.
- *
  * The token is write-only by design: it can add a step count for its owner and
  * nothing else. It reads no personal data, so a leaked token means someone
  * could fudge one person's step tally — annoying, not harmful — and it can be
@@ -1108,19 +1109,16 @@ model FitnessLink {
 
 /**
  * A recurring staff wellbeing session — the weekly health schedule.
- *
  * Times are plain strings on purpose ("11:30"). These are wall-clock slots in a
  * printed-on-the-fridge sense, not instants: nobody wants "Tuesday 11:30" to
  * drift because of a timezone conversion.
  */
 /**
  * An extra email address on an account.
- *
  * The primary address stays on `User.email` — this table holds only the
  * additional ones, so nothing that already reads `user.email` changes meaning.
  * Someone might sign up with their work address and later give with a personal
  * one; linking the two brings the giving history together.
- *
  * A row is worthless until `verifiedAt` is set. Verification is what proves the
  * person actually controls the address, and nothing — no donation claiming, no
  * merging — happens before it.
@@ -1143,7 +1141,6 @@ model UserEmail {
 
 /**
  * A note left on the challenge page for the day.
- *
  * Deliberately short-lived: only today's are shown, and yesterday's are deleted
  * by the daily cron. A wall that accumulates goes stale and stops being read,
  * whereas one that empties every night stays worth looking at, and it lowers
@@ -1154,7 +1151,9 @@ model ChallengeCheer {
   challengeId String
   userId      String
   body        String   @db.Text
-  /** The Brisbane calendar day this belongs to. */
+  /**
+   * The Brisbane calendar day this belongs to.
+   */
   day         DateTime @db.Date
   createdAt   DateTime @default(now())
 
@@ -1230,20 +1229,20 @@ enum TaskPriority {
 // A one-off job assigned to a staff member or trainee ("take the cardboard bins
 // out for the truck"). Assignment emails the person; overdue ones are chased.
 model StaffTask {
-  id           String       @id @default(cuid())
-  title        String
-  description  String?      @db.Text
-  status       TaskStatus   @default(OPEN)
-  priority     TaskPriority @default(NORMAL)
-  dueAt        DateTime?
-  locationId   String?
-  assignedToId String? // null = anyone on shift can pick it up
-  assignedById String
-  completedAt  DateTime?
+  id            String       @id @default(cuid())
+  title         String
+  description   String?      @db.Text
+  status        TaskStatus   @default(OPEN)
+  priority      TaskPriority @default(NORMAL)
+  dueAt         DateTime?
+  locationId    String?
+  assignedToId  String? // null = anyone on shift can pick it up
+  assignedById  String
+  completedAt   DateTime?
   completedById String?
-  remindedAt   DateTime? // last overdue chase, so we nag once a day at most
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  remindedAt    DateTime? // last overdue chase, so we nag once a day at most
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   assignedTo User?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -1299,4 +1298,73 @@ model ChecklistCompletion {
 
   @@unique([itemId, periodKey])
   @@index([periodKey])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+//
+// A notification is a POINTER, never the record itself. The task lives in
+// StaffTask, the story in Story, the shift in ShiftAssignment; this only says
+// "something happened, here is where to look". That is what makes "clear all"
+// safe — clearing can never destroy work — and it means the destination page
+// always shows current state rather than a stale copy of it.
+//
+// Fan-out is on write: sending resolves the audience and writes one recipient
+// row per person. With a few hundred users that is nothing, and it makes unread
+// counts, per-person read state and "did they see it?" ordinary queries instead
+// of an audience rule re-evaluated on every page load.
+// ---------------------------------------------------------------------------
+
+enum NotificationCategory {
+  STORY
+  TASK
+  SHIFT
+  CHALLENGE
+  GIVING
+  ADMIN
+  GENERAL
+}
+
+model Notification {
+  id          String               @id @default(cuid())
+  category    NotificationCategory @default(GENERAL)
+  /// The thing itself, shown in bold: "Pack shelves", "Cindy's Story".
+  title       String
+  /// One line about what happened.
+  body        String               @db.Text
+  /// Where tapping it goes. Required: every notification is clickable.
+  href        String
+  /// Call to action, e.g. "View now", "Read now". Defaults per category in code.
+  actionLabel String?
+  /// The audience rule this was sent to, kept for the audit trail. The
+  /// recipient rows remain the source of truth for who actually received it.
+  audience    Json?
+  createdById String?
+  createdAt   DateTime             @default(now())
+
+  createdBy  User?                   @relation("NotificationSender", fields: [createdById], references: [id], onDelete: SetNull)
+  recipients NotificationRecipient[]
+
+  @@index([createdAt])
+  @@index([category])
+}
+
+model NotificationRecipient {
+  id             String    @id @default(cuid())
+  notificationId String
+  userId         String
+  /// Set when the person taps it, or when they open the panel.
+  readAt         DateTime?
+  /// Set by "clear all", or by the ageing-out job. Hidden from the feed.
+  dismissedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  // The feed query: mine, not cleared, newest first.
+  @@index([userId, dismissedAt, createdAt])
+  // The badge query: mine, unread, not cleared.
+  @@index([userId, readAt, dismissedAt])
 }

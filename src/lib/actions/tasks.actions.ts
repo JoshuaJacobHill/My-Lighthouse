@@ -9,6 +9,7 @@ import { wrapEmailHtml } from '@/lib/email-html'
 import { periodKey } from '@/lib/checklists'
 import { isAdminRole } from '@/lib/permissions-core'
 import { assertCapability } from '@/lib/permissions'
+import { notify } from '@/lib/notifications'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 const P = 'margin:0 0 18px 0;line-height:1.7;color:#374151;font-size:15px;'
@@ -120,6 +121,30 @@ export async function createTaskAction(input: CreateTaskInput): Promise<Result> 
     } catch (err) {
       console.error('task assignment email failed', err)
     }
+  }
+
+  if (task.assignedToId) {
+    const due = task.dueAt
+      ? new Intl.DateTimeFormat('en-AU', {
+          timeZone: 'Australia/Brisbane',
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        }).format(task.dueAt)
+      : null
+    await notify({
+      audience: { kind: 'users', ids: [task.assignedToId] },
+      category: 'TASK',
+      title: task.title,
+      body: due
+        ? `You have a new task assigned to you, due ${due}.`
+        : 'You have one new task assigned to you.',
+      href: '/dashboard/tasks',
+      actionLabel: 'View now',
+      createdById: session.userId,
+      // No point telling someone they assigned themselves a task.
+      exceptUserId: session.userId,
+    })
   }
 
   revalidatePath('/admin/tasks')

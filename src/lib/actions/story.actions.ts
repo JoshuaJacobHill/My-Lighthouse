@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { notify, type Audience } from '@/lib/notifications'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { storySchema, type StoryInput } from '@/lib/validations'
@@ -12,12 +13,13 @@ interface ActionResult {
   storyId?: string
 }
 
-async function requireAdminSession(): Promise<void> {
+async function requireAdminSession() {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
   if (!isAdminRole(session.role)) {
     throw new Error('Insufficient permissions')
   }
+  return session
 }
 
 /**
@@ -75,9 +77,39 @@ function revalidate() {
   revalidatePath('/dashboard')
 }
 
+/**
+ * Tell people a story has gone live.
+ *
+ * The audience comes from the story's own visibility flags, so a staff-only
+ * story never reaches volunteers. Only fired the first time it publishes —
+ * editing a typo should not tell 400 people to read it again.
+ */
+async function announceStory(
+  story: { title: string; slug: string; churchOnly: boolean; staffOnly: boolean },
+  senderId?: string,
+) {
+  const audience: Audience = story.staffOnly
+    ? { kind: 'staffAndTrainees' }
+    : story.churchOnly
+      ? { kind: 'church' }
+      : { kind: 'everyone' }
+
+  await notify({
+    audience,
+    category: 'STORY',
+    title: story.title,
+    body: 'Lighthouse shared a good news story',
+    href: `/dashboard/news?story=${encodeURIComponent(story.slug)}`,
+    actionLabel: 'Read now',
+    createdById: senderId,
+    exceptUserId: senderId,
+  })
+}
+
 export async function createStoryAction(input: StoryInput): Promise<ActionResult> {
+  let session
   try {
-    await requireAdminSession()
+    session = await requireAdminSession()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
@@ -110,9 +142,12 @@ export async function createStoryAction(input: StoryInput): Promise<ActionResult
         publishedAt: data.isPublished ? new Date() : null,
         sortOrder: data.sortOrder ?? 0,
       },
-      select: { id: true },
+      select: { id: true, title: true, slug: true, churchOnly: true, staffOnly: true },
     })
     revalidate()
+    if (data.isPublished ?? false) {
+      await announceStory(story, session?.userId)
+    }
     return { success: true, storyId: story.id }
   } catch (err) {
     console.error('createStoryAction failed', err)
@@ -121,8 +156,9 @@ export async function createStoryAction(input: StoryInput): Promise<ActionResult
 }
 
 export async function updateStoryAction(storyId: string, input: StoryInput): Promise<ActionResult> {
+  let session
   try {
-    await requireAdminSession()
+    session = await requireAdminSession()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
@@ -136,7 +172,7 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
   try {
     const existing = await prisma.story.findUnique({
       where: { id: storyId },
-      select: { id: true, publishedAt: true, churchOnly: true },
+      select: { id: true, publishedAt: true, isPublished: true, churchOnly: true },
     })
     if (!existing) return { success: false, error: 'Story not found' }
 
@@ -168,6 +204,18 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
       },
     })
     revalidate()
+    const goingLive = (data.isPublished ?? false) && !existing.isPublished
+    if (goingLive) {
+      await announceStory(
+        {
+          title: data.title,
+          slug,
+          churchOnly: data.churchOnly ?? false,
+          staffOnly: data.staffOnly ?? false,
+        },
+        session?.userId,
+      )
+    }
     return { success: true, storyId }
   } catch (err) {
     console.error('updateStoryAction failed', err)

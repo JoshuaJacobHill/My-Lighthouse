@@ -22,6 +22,7 @@ import {
 import { clsx } from 'clsx'
 import { Avatar } from '@/components/ui/avatar'
 import { PullToRefresh } from './PullToRefresh'
+import { NotificationBell } from './NotificationBell'
 
 interface NavItem {
   href: string
@@ -52,9 +53,12 @@ export function PortalShell({
   hasGiven,
   isStaff,
   isAdmin,
+  unreadCount = 0,
 }: {
   children: React.ReactNode
   userName: string
+  /** Drives the dot on the bell. Opening the feed clears it. */
+  unreadCount?: number
 } & PortalCapabilities) {
   const pathname = usePathname()
   const router = useRouter()
@@ -227,15 +231,18 @@ export function PortalShell({
             <Avatar name={displayName} size="sm" />
             <span className="text-sm font-semibold text-gray-900">{displayName}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setMobileOpen((o) => !o)}
-            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={mobileOpen}
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell unreadCount={unreadCount} />
+            <button
+              type="button"
+              onClick={() => setMobileOpen((o) => !o)}
+              className="rounded-md p-2 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileOpen}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </header>
 
         {/* Mobile dropdown nav */}

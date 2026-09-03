@@ -2,7 +2,12 @@
 
 import * as React from 'react'
 import { useTransition } from 'react'
-import { bookCustomShiftAction, cancelShiftAction, type RecurringFrequency } from '@/lib/actions/shift.actions'
+import {
+  bookCustomShiftAction,
+  cancelShiftAction,
+  confirmShiftAssignmentAction,
+  type RecurringFrequency,
+} from '@/lib/actions/shift.actions'
 import { useToast } from '@/components/ui/toast'
 import { Loader2, Calendar, MapPin, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -74,13 +79,17 @@ function getTodayStr(): string {
 function BookedShiftCard({
   shift,
   onCancel,
+  onAccept,
   pending,
 }: {
   shift: BookedShift
   onCancel: (shiftId: string) => void
+  onAccept: (assignmentId: string) => void
   pending: boolean
 }) {
   const canCancel = shift.status === 'SCHEDULED' || shift.status === 'CONFIRMED'
+  // SCHEDULED means "can you?" — it is a request until they say yes.
+  const awaitingAnswer = shift.status === 'SCHEDULED'
 
   return (
     <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
@@ -99,22 +108,37 @@ function BookedShiftCard({
             {shift.location}
             {shift.title && <span className="text-gray-400">· {shift.title}</span>}
           </div>
-          <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
-            Booked
-          </span>
+          {awaitingAnswer ? (
+            <span className="inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">
+              Awaiting your answer
+            </span>
+          ) : (
+            <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+              Confirmed
+            </span>
+          )}
         </div>
         {canCancel && (
-          <div className="shrink-0">
+          <div className="flex shrink-0 gap-2">
+            {awaitingAnswer && (
+              <button
+                type="button"
+                onClick={() => onAccept(shift.assignmentId)}
+                disabled={pending}
+                className="inline-flex items-center gap-2 rounded-full bg-orange-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                Accept
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onCancel(shift.shiftId)}
               disabled={pending}
-              className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
             >
-              {pending ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : null}
-              Cancel booking
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+              {awaitingAnswer ? 'Decline' : 'Cancel booking'}
             </button>
           </div>
         )}
@@ -160,6 +184,21 @@ export default function RosterClient({ locations, bookedShifts }: RosterClientPr
         router.refresh()
       } else {
         toast.error('Could not cancel', result.error ?? 'Please try again.')
+      }
+    })
+  }
+
+  function handleAccept(assignmentId: string) {
+    const shift = bookedShifts.find((b) => b.assignmentId === assignmentId)
+    setPendingShiftId(shift?.shiftId ?? null)
+    startTransition(async () => {
+      const result = await confirmShiftAssignmentAction(assignmentId)
+      setPendingShiftId(null)
+      if (result.success) {
+        toast.success('Thanks for confirming', 'You are down for that shift.')
+        // No router.refresh(): the action revalidates this page already.
+      } else {
+        toast.error('Could not confirm', result.error ?? 'Please try again.')
       }
     })
   }
@@ -331,6 +370,7 @@ export default function RosterClient({ locations, bookedShifts }: RosterClientPr
                 key={shift.assignmentId}
                 shift={shift}
                 onCancel={handleCancel}
+                onAccept={handleAccept}
                 pending={isPending && pendingShiftId === shift.shiftId}
               />
             ))}

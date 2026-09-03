@@ -33,6 +33,7 @@ export default async function NewsPage() {
     take: 60,
     select: {
       id: true,
+      slug: true,
       title: true,
       category: true,
       excerpt: true,

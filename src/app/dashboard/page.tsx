@@ -64,7 +64,7 @@ export default async function DonorHomePage() {
       },
       orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
       take: 6,
-      select: { id: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true },
+      select: { id: true, slug: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true },
     }),
     prisma.event.findMany({
       where: {

@@ -1,11 +1,13 @@
 'use client'
 
 import * as React from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ImageIcon, X, ArrowUpRight } from 'lucide-react'
 import { Markdown } from '@/components/ui/Markdown'
 
 export interface StoryCard {
   id: string
+  slug: string
   title: string
   category: string
   excerpt: string | null
@@ -15,6 +17,16 @@ export interface StoryCard {
 
 export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
   const [active, setActive] = React.useState<StoryCard | null>(null)
+  const params = useSearchParams()
+
+  // Opened straight from a notification: /dashboard/news?story=cindys-story
+  // lands on the post itself rather than on the list of everything.
+  const wanted = params.get('story')
+  React.useEffect(() => {
+    if (!wanted) return
+    const match = stories.find((s) => s.slug === wanted)
+    if (match) setActive(match)
+  }, [wanted, stories])
 
   React.useEffect(() => {
     if (!active) return
