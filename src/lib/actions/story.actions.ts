@@ -88,10 +88,13 @@ async function announceStory(
   story: { title: string; slug: string; churchOnly: boolean; staffOnly: boolean },
   senderId?: string,
 ) {
-  const audience: Audience = story.staffOnly
-    ? { kind: 'staffAndTrainees' }
-    : story.churchOnly
-      ? { kind: 'church' }
+  // Mirror exactly who can see it. The news page hides a staff-only story from
+  // non-staff and a church-only story from non-members, so a story carrying
+  // both flags needs both — notifying either group alone would tell people
+  // about something they cannot open.
+  const audience: Audience =
+    story.staffOnly || story.churchOnly
+      ? { kind: 'flags', staff: story.staffOnly || undefined, church: story.churchOnly || undefined }
       : { kind: 'everyone' }
 
   await notify({

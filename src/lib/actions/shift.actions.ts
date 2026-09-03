@@ -34,6 +34,14 @@ function matchesFrequency(anchorDate: Date, shiftDate: Date, frequency: Exclude<
 
 // ─── Book a shift ─────────────────────────────────────────────────────────────
 
+/**
+ * Self-booking goes straight to CONFIRMED.
+ *
+ * SCHEDULED now means "an admin has asked, waiting on an answer". Someone who
+ * chose their own shift has already answered, so asking them to confirm their
+ * own choice would be nonsense — and would show "awaiting your answer" against
+ * every shift they picked.
+ */
 export async function bookShiftAction(
   shiftId: string,
   frequency: RecurringFrequency = 'ONE_OFF',
@@ -67,11 +75,11 @@ export async function bookShiftAction(
     if (existing) {
       await prisma.shiftAssignment.update({
         where: { id: existing.id },
-        data: { status: 'SCHEDULED', cancelledAt: null, cancelReason: null },
+        data: { status: 'CONFIRMED', confirmedAt: new Date(), cancelledAt: null, cancelReason: null },
       })
     } else {
       await prisma.shiftAssignment.create({
-        data: { shiftId, volunteerId, status: 'SCHEDULED' },
+        data: { shiftId, volunteerId, status: 'CONFIRMED', confirmedAt: new Date() },
       })
     }
 
@@ -114,7 +122,7 @@ export async function bookShiftAction(
 
         if (toBook.length > 0) {
           await prisma.shiftAssignment.createMany({
-            data: toBook.map(sid => ({ shiftId: sid, volunteerId, status: 'SCHEDULED' })),
+            data: toBook.map(sid => ({ shiftId: sid, volunteerId, status: 'CONFIRMED' as const, confirmedAt: new Date() })),
             skipDuplicates: true,
           })
           bookedCount += toBook.length
@@ -283,12 +291,12 @@ export async function bookCustomShiftAction(input: {
         }
         await prisma.shiftAssignment.update({
           where: { id: existing.id },
-          data: { status: 'SCHEDULED', cancelledAt: null, cancelReason: null },
+          data: { status: 'CONFIRMED', confirmedAt: new Date(), cancelledAt: null, cancelReason: null },
         })
         return true
       }
       await prisma.shiftAssignment.create({
-        data: { shiftId, volunteerId, status: 'SCHEDULED' },
+        data: { shiftId, volunteerId, status: 'CONFIRMED', confirmedAt: new Date() },
       })
       return true
     }
@@ -573,10 +581,11 @@ export async function editShiftBookingAction(
 
 // ─── Admin: book a shift for a volunteer ─────────────────────────────────────
 
-async function requireAdminSessionForShifts(): Promise<void> {
+async function requireAdminSessionForShifts() {
   const session = await getSession()
   if (!session) throw new Error('Not authenticated')
   await assertCapability('care.people')
+  return session
 }
 
 // ─── Volunteer: accept a shift you have been asked to cover ──────────────────
@@ -620,8 +629,9 @@ export async function adminBookShiftForVolunteerAction(
   volunteerId: string,
   input: { locationId: string; date: string; startTime: string; endTime: string; frequency: 'ONCE' | 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY' }
 ): Promise<ActionResult> {
+  let adminSession: Awaited<ReturnType<typeof requireAdminSessionForShifts>>
   try {
-    await requireAdminSessionForShifts()
+    adminSession = await requireAdminSessionForShifts()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
@@ -650,12 +660,17 @@ export async function adminBookShiftForVolunteerAction(
         }
         await prisma.shiftAssignment.update({
           where: { id: existing.id },
-          data: { status: 'SCHEDULED', cancelledAt: null, cancelReason: null },
+          data: {
+            status: 'SCHEDULED',
+            cancelledAt: null,
+            cancelReason: null,
+            createdById: adminSession.userId,
+          },
         })
         return true
       }
       await prisma.shiftAssignment.create({
-        data: { shiftId, volunteerId, status: 'SCHEDULED' },
+        data: { shiftId, volunteerId, status: 'SCHEDULED', createdById: adminSession.userId },
       })
       return true
     }

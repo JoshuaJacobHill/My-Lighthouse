@@ -26,6 +26,12 @@ export type Audience =
   | { kind: 'trainees' }
   | { kind: 'staffAndTrainees' }
   | { kind: 'church' }
+  /**
+   * Both conditions at once, for content gated on more than one flag. A story
+   * marked staff-only AND church-only is visible to neither group alone, so
+   * telling either one on its own would notify people who cannot open it.
+   */
+  | { kind: 'flags'; staff?: boolean; church?: boolean }
   | { kind: 'volunteers'; status?: string }
   | { kind: 'donors' }
   | { kind: 'team'; teamId: string }
@@ -46,6 +52,12 @@ export function describeAudience(a: Audience): string {
       return 'Staff and trainees'
     case 'church':
       return 'Church members'
+    case 'flags': {
+      const parts: string[] = []
+      if (a.staff) parts.push('staff and trainees')
+      if (a.church) parts.push('church members')
+      return parts.length === 0 ? 'Everyone' : `Both ${parts.join(' and ')}`
+    }
     case 'volunteers':
       return a.status ? `Volunteers (${a.status.toLowerCase()})` : 'Volunteers'
     case 'donors':
@@ -66,6 +78,8 @@ export function audienceCapability(a: Audience): Capability | null {
   switch (a.kind) {
     case 'church':
       return 'church.members'
+    case 'flags':
+      return a.church ? 'church.members' : null
     case 'team':
       return 'church.teams'
     case 'volunteers':
@@ -95,6 +109,12 @@ function audienceWhere(a: Audience): Prisma.UserWhereInput {
       return { ...active, OR: [{ isStaff: true }, { isTrainee: true }] }
     case 'church':
       return { ...active, isChurchMember: true }
+    case 'flags': {
+      const AND: Prisma.UserWhereInput[] = []
+      if (a.staff) AND.push({ OR: [{ isStaff: true }, { isTrainee: true }] })
+      if (a.church) AND.push({ isChurchMember: true })
+      return AND.length === 0 ? active : { ...active, AND }
+    }
     case 'volunteers':
       return {
         ...active,

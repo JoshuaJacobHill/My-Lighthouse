@@ -314,7 +314,10 @@ export async function GET(request: NextRequest) {
 
       if (recurringPrefs.length > 0) {
         // For each pref, find newly created shifts that match
-        type AssignRow = { shiftId: string; volunteerId: string; status: 'SCHEDULED' }
+        // CONFIRMED, not SCHEDULED: these come from the volunteer's own
+        // recurring booking, so they have already said yes. SCHEDULED is
+        // reserved for an admin asking someone who has not answered.
+        type AssignRow = { shiftId: string; volunteerId: string; status: 'CONFIRMED'; confirmedAt: Date }
         const toAssign: AssignRow[] = []
 
         for (const pref of recurringPrefs) {
@@ -334,7 +337,12 @@ export async function GET(request: NextRequest) {
             if (pref.frequency === 'FORTNIGHTLY') matches = diffDays % 14 === 0
             if (pref.frequency === 'MONTHLY')     matches = diffDays % 28 === 0
             if (!matches) continue
-            toAssign.push({ shiftId: s.id, volunteerId: pref.volunteerId, status: 'SCHEDULED' })
+            toAssign.push({
+              shiftId: s.id,
+              volunteerId: pref.volunteerId,
+              status: 'CONFIRMED',
+              confirmedAt: new Date(),
+            })
           }
         }
 

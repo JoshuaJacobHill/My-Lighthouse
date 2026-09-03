@@ -3,7 +3,9 @@ import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { periodKey, periodLabel, isOverdue } from '@/lib/checklists'
 import { TaskList, type TaskRow, type ChecklistRow } from './TaskList'
+import { CreateTask } from './CreateTask'
 import { isAdminRole } from '@/lib/permissions-core'
+import { hasCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Tasks & checklists' }
@@ -27,6 +29,24 @@ export default async function StaffTasksPage() {
   const me = session.user
   const allowed = me.isStaff || me.isTrainee || isAdminRole(me.role)
   if (!allowed) notFound()
+
+  // Care Managers (and admins) can hand out work from here, not just tick it
+  // off. Gated on the capability, never on the role.
+  const canAssign = await hasCapability('care.tasks')
+  const [assignable, locations] = canAssign
+    ? await Promise.all([
+        prisma.user.findMany({
+          where: { isActive: true, OR: [{ isStaff: true }, { isTrainee: true }] },
+          select: { id: true, name: true, email: true },
+          orderBy: { name: 'asc' },
+        }),
+        prisma.location.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        }),
+      ])
+    : [[], []]
 
   const [tasks, items] = await Promise.all([
     // Mine, plus anything unassigned that anyone on shift can pick up.
@@ -119,6 +139,15 @@ export default async function StaffTasksPage() {
             ? 'Everything is done. Great work.'
             : `${outstanding} thing${outstanding === 1 ? '' : 's'} still to do.`}
         </p>
+
+        {canAssign && (
+          <div className="mt-8">
+            <CreateTask
+              staff={assignable.map((a) => ({ id: a.id, name: a.name ?? a.email }))}
+              locations={locations}
+            />
+          </div>
+        )}
 
         <div className="mt-8">
           <TaskList tasks={taskRows} checklist={checklistRows} />

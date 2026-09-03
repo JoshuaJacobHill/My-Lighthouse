@@ -49,6 +49,11 @@ function Tick({ done, onToggle, pending }: { done: boolean; onToggle: () => void
 
 export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: ChecklistRow[] }) {
   const [pending, startTransition] = React.useTransition()
+  const [tab, setTab] = React.useState<'OPEN' | 'DONE'>('OPEN')
+
+  const openTasks = tasks.filter((t) => !t.done)
+  const doneTasks = tasks.filter((t) => t.done)
+  const shownTasks = tab === 'OPEN' ? openTasks : doneTasks
 
   const groups = [
     { key: 'DAILY', label: 'Daily' },
@@ -61,14 +66,33 @@ export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: Ch
     <div className="space-y-8">
       {/* Assigned tasks */}
       <section>
-        <h2 className="text-xl font-bold tracking-tight">My tasks</h2>
-        {tasks.length === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-bold tracking-tight">My tasks</h2>
+          {/* Finished work moves out of the way rather than disappearing: still
+              there to check, just not in front of what is left to do. */}
+          <div className="flex rounded-full border border-neutral-200 p-0.5">
+            {(['OPEN', 'DONE'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={
+                  'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ' +
+                  (tab === t ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:text-neutral-800')
+                }
+              >
+                {t === 'OPEN' ? `To do${openTasks.length ? ` (${openTasks.length})` : ''}` : 'Completed'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {shownTasks.length === 0 ? (
           <p className="mt-3 rounded-[28px] border border-dashed border-neutral-300 px-5 py-8 text-center text-sm text-neutral-500">
-            Nothing assigned right now. Nice.
+            {tab === 'OPEN' ? 'Nothing assigned right now. Nice.' : 'Nothing completed yet.'}
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
-            {tasks.map((t) => (
+            {shownTasks.map((t) => (
               <li key={t.id} className="flex items-start gap-4 p-4">
                 <Tick
                   done={t.done}
