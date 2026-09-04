@@ -1,7 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import { Check, Clock, AlertTriangle, MapPin } from 'lucide-react'
+import { Check, Clock, AlertTriangle, MapPin, MessageCircle } from 'lucide-react'
+import { CommentThread } from '@/components/comments/CommentThread'
+import type { CommentView } from '@/lib/comments'
 import { setTaskStatusAction, toggleChecklistAction } from '@/lib/actions/tasks.actions'
 
 export interface TaskRow {
@@ -47,9 +49,20 @@ function Tick({ done, onToggle, pending }: { done: boolean; onToggle: () => void
   )
 }
 
-export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: ChecklistRow[] }) {
+export function TaskList({
+  tasks,
+  checklist,
+  commentsByTask = {},
+}: {
+  tasks: TaskRow[]
+  checklist: ChecklistRow[]
+  commentsByTask?: Record<string, CommentView[]>
+}) {
   const [pending, startTransition] = React.useTransition()
   const [tab, setTab] = React.useState<'OPEN' | 'DONE'>('OPEN')
+  // One thread open at a time: a task row is small, and several expanded at
+  // once turns the list into a wall.
+  const [openThread, setOpenThread] = React.useState<string | null>(null)
 
   const openTasks = tasks.filter((t) => !t.done)
   const doneTasks = tasks.filter((t) => t.done)
@@ -93,7 +106,8 @@ export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: Ch
         ) : (
           <ul className="mt-3 divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
             {shownTasks.map((t) => (
-              <li key={t.id} className="flex items-start gap-4 p-4">
+              <li key={t.id} className="p-4">
+                <div className="flex items-start gap-4">
                 <Tick
                   done={t.done}
                   pending={pending}
@@ -130,8 +144,26 @@ export function TaskList({ tasks, checklist }: { tasks: TaskRow[]; checklist: Ch
                       </span>
                     )}
                     {t.assignedTo && <span>For {t.assignedTo}</span>}
+                    <button
+                      type="button"
+                      onClick={() => setOpenThread((cur) => (cur === t.id ? null : t.id))}
+                      aria-expanded={openThread === t.id}
+                      className="inline-flex items-center gap-1 font-semibold text-neutral-600 hover:text-neutral-900"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                      {(commentsByTask[t.id]?.length ?? 0) > 0
+                        ? `${commentsByTask[t.id]!.length} comment${commentsByTask[t.id]!.length === 1 ? '' : 's'}`
+                        : 'Comment'}
+                    </button>
                   </div>
                 </div>
+                </div>
+
+                {openThread === t.id && (
+                  <div className="mt-4 border-t border-neutral-100 pt-4">
+                    <CommentThread taskId={t.id} comments={commentsByTask[t.id] ?? []} compact />
+                  </div>
+                )}
               </li>
             ))}
           </ul>

@@ -76,10 +76,7 @@ export function NotificationFeed({ items }: { items: FeedItem[] }) {
     return (
       <div className="rounded-[28px] border border-dashed border-neutral-300 px-6 py-14 text-center">
         <Bell className="mx-auto h-8 w-8 text-neutral-300" aria-hidden="true" />
-        <p className="mt-3 font-bold text-neutral-900">You&apos;re all caught up</p>
-        <p className="mt-1 text-sm text-neutral-500">
-          Anything new — a story, a task, a shift request — will turn up here.
-        </p>
+        <p className="mt-3 font-bold text-neutral-900">No new notifications</p>
       </div>
     )
   }

@@ -162,6 +162,8 @@ model User {
 
   notifications     NotificationRecipient[]
   notificationsSent Notification[]          @relation("NotificationSender")
+  comments          Comment[]
+  commentMentions   CommentMention[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -732,6 +734,8 @@ model Story {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  comments Comment[]
+
   @@index([isPublished])
 }
 
@@ -1247,6 +1251,7 @@ model StaffTask {
   location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   assignedTo User?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   assignedBy User      @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: Cascade)
+  comments   Comment[]
 
   @@index([status])
   @@index([assignedToId])
@@ -1367,4 +1372,52 @@ model NotificationRecipient {
   @@index([userId, dismissedAt, createdAt])
   // The badge query: mine, unread, not cleared.
   @@index([userId, readAt, dismissedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Comments
+//
+// One model for both stories and tasks, with a nullable foreign key each way
+// rather than a generic (type, id) pair: the database keeps referential
+// integrity, deletes cascade on their own, and Prisma can join without a
+// discriminator. Exactly one of storyId / taskId is set.
+//
+// Unlike a challenge cheer these are permanent. A conversation about a task is
+// part of the record of that task.
+// ---------------------------------------------------------------------------
+
+model Comment {
+  id        String    @id @default(cuid())
+  body      String    @db.Text
+  authorId  String
+  storyId   String?
+  taskId    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Set when the author changes it, so the UI can be honest about edits.
+  editedAt  DateTime?
+
+  author   User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  story    Story?           @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  task     StaffTask?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  mentions CommentMention[]
+
+  @@index([storyId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([authorId])
+}
+
+/// Who was tagged in a comment. Stored rather than parsed out of the text at
+/// read time, so a rename cannot silently break a mention and notifying is a
+/// join instead of a regex.
+model CommentMention {
+  id        String @id @default(cuid())
+  commentId String
+  userId    String
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([userId])
 }

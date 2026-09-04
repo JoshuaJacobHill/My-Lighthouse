@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
+import { commentsForStories } from '@/lib/story-comments'
 import { getCurrentChallenge } from '@/lib/fitness-data'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { ChallengeBanner } from '@/components/dashboard/ChallengeBanner'
@@ -64,7 +65,7 @@ export default async function DonorHomePage() {
       },
       orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
       take: 6,
-      select: { id: true, slug: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true },
+      select: { id: true, slug: true, title: true, category: true, excerpt: true, imageUrl: true, externalUrl: true, publishedAt: true },
     }),
     prisma.event.findMany({
       where: {
@@ -199,6 +200,15 @@ export default async function DonorHomePage() {
         </section>
   )
 
+  const viewer = {
+    id: session.userId,
+    role: session.role,
+    isStaff: user.isStaff,
+    isTrainee: user.isTrainee,
+    isChurchMember: user.isChurchMember,
+  }
+  const commentsByStory = await commentsForStories(stories.map((s) => s.id), viewer)
+
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
       <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
@@ -300,7 +310,7 @@ export default async function DonorHomePage() {
                 Good news &amp; <span className="font-extrabold">stories</span>
               </h2>
             </div>
-            <StoriesGrid stories={stories} />
+            <StoriesGrid stories={stories} commentsByStory={commentsByStory} />
           </section>
         ) : (
           <section className="rounded-[28px] border border-dashed border-neutral-300 p-10 text-center">

@@ -4,29 +4,57 @@ import * as React from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ImageIcon, X, ArrowUpRight } from 'lucide-react'
 import { Markdown } from '@/components/ui/Markdown'
+import { MessageCircle } from 'lucide-react'
+import { CommentThread } from '@/components/comments/CommentThread'
+import type { CommentView } from '@/lib/comments'
 
 export interface StoryCard {
   id: string
   slug: string
   title: string
+  /** When it went live. Null while a story is still a draft. */
+  publishedAt: Date | null
   category: string
   excerpt: string | null
   imageUrl: string | null
   externalUrl: string | null
 }
 
-export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
-  const [active, setActive] = React.useState<StoryCard | null>(null)
+function posted(at: Date | null): string | null {
+  if (!at) return null
+  return new Intl.DateTimeFormat('en-AU', {
+    timeZone: 'Australia/Brisbane',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(at))
+}
+
+export function StoriesGrid({
+  stories,
+  commentsByStory = {},
+}: {
+  stories: StoryCard[]
+  /**
+   * Comments for every story on the page, fetched with the stories rather than
+   * on open. Opening a story is the one thing in the portal that feels instant,
+   * and a round trip on click would spend that.
+   */
+  commentsByStory?: Record<string, CommentView[]>
+}) {
   const params = useSearchParams()
 
   // Opened straight from a notification: /dashboard/news?story=cindys-story
-  // lands on the post itself rather than on the list of everything.
+  // lands on the post itself rather than the list of everything. Resolved as
+  // the initial state rather than in an effect, so there is no extra render and
+  // no setState-during-effect. The trade-off is that it is read once, on mount:
+  // arriving from elsewhere works, changing ?story= while already here does not.
+  // Deriving it from the URL every render would fix that but costs a navigation
+  // to open a story, and opening a story being instant is the point.
   const wanted = params.get('story')
-  React.useEffect(() => {
-    if (!wanted) return
-    const match = stories.find((s) => s.slug === wanted)
-    if (match) setActive(match)
-  }, [wanted, stories])
+  const [active, setActive] = React.useState<StoryCard | null>(
+    () => (wanted ? stories.find((s) => s.slug === wanted) ?? null : null),
+  )
 
   React.useEffect(() => {
     if (!active) return
@@ -59,8 +87,21 @@ export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
             </div>
             <div className="p-6">
               <h3 className="text-lg font-bold leading-snug tracking-tight">{s.title}</h3>
+              {posted(s.publishedAt) && (
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  {posted(s.publishedAt)}
+                </p>
+              )}
               {s.excerpt && <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{s.excerpt}</p>}
-              <div className="mt-3 flex items-center justify-end text-neutral-400">
+              <div className="mt-3 flex items-center justify-between text-neutral-400">
+                {(commentsByStory[s.id]?.length ?? 0) > 0 ? (
+                  <span className="flex items-center gap-1.5 text-xs font-semibold">
+                    <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    {commentsByStory[s.id]!.length}
+                  </span>
+                ) : (
+                  <span />
+                )}
                 <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </div>
             </div>
@@ -92,6 +133,11 @@ export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               <h3 className="text-2xl font-bold tracking-tight">{active.title}</h3>
+              {posted(active.publishedAt) && (
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  {posted(active.publishedAt)}
+                </p>
+              )}
               {active.excerpt ? (
                 <Markdown source={active.excerpt} className="mt-3 leading-relaxed text-neutral-600" />
               ) : (
@@ -107,6 +153,18 @@ export function StoriesGrid({ stories }: { stories: StoryCard[] }) {
                   Read the full story <ArrowUpRight className="h-4 w-4" />
                 </a>
               )}
+
+              <div className="mt-8 border-t border-neutral-100 pt-6">
+                <h4 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
+                  Comments
+                </h4>
+                <div className="mt-4">
+                  <CommentThread
+                    storyId={active.id}
+                    comments={commentsByStory[active.id] ?? []}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

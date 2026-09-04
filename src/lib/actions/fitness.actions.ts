@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { notify } from '@/lib/notifications'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { isAdminRole } from '@/lib/permissions-core'
@@ -15,16 +16,13 @@ interface Result {
 }
 
 /** Staff (and trainees) only — this is an internal wellbeing feature. */
-async function requireStaff(): Promise<{ userId: string } | null> {
+async function requireStaff(): Promise<{ userId: string; name: string | null } | null> {
   const session = await getSession()
   if (!session) return null
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { isStaff: true, isTrainee: true, role: true },
-  })
-  const allowed =
-    user?.isStaff || user?.isTrainee || isAdminRole(user?.role)
-  return allowed ? { userId: session.userId } : null
+  // All of this came back with the session; it used to be a second query.
+  const { isStaff, isTrainee, role, name } = session.user
+  const allowed = isStaff || isTrainee || isAdminRole(role)
+  return allowed ? { userId: session.userId, name } : null
 }
 
 const schema = z.object({
@@ -226,6 +224,20 @@ export async function postCheerAction(input: {
       select: { id: true },
     })
     revalidatePath('/dashboard/fitness')
+
+    // Everyone on the challenge, not just people who have already posted: the
+    // whole point of the wall is that the encouragement is seen.
+    await notify({
+      audience: { kind: 'staffAndTrainees' },
+      category: 'CHALLENGE',
+      title: 'September Steps',
+      body: `${me.name?.split(' ')[0] ?? 'Someone'} left a note on the challenge wall`,
+      href: '/dashboard/fitness',
+      actionLabel: 'Read it',
+      createdById: me.userId,
+      exceptUserId: me.userId,
+    })
+
     return { success: true, id: row.id }
   } catch (err) {
     console.error('postCheerAction failed', err)

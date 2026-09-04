@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { periodKey, periodLabel, isOverdue } from '@/lib/checklists'
 import { TaskList, type TaskRow, type ChecklistRow } from './TaskList'
 import { CreateTask } from './CreateTask'
+import { commentsForTasks } from '@/lib/story-comments'
 import { isAdminRole } from '@/lib/permissions-core'
 import { hasCapability } from '@/lib/permissions'
 
@@ -126,6 +127,17 @@ export default async function StaffTasksPage() {
     }
   })
 
+  const commentsByTask = await commentsForTasks(
+    taskRows.map((t) => t.id),
+    {
+      id: me.id,
+      role: me.role,
+      isStaff: me.isStaff,
+      isTrainee: me.isTrainee,
+      isChurchMember: me.isChurchMember,
+    },
+  )
+
   const outstanding =
     taskRows.filter((t) => !t.done).length + checklistRows.filter((c) => !c.done).length
 
@@ -150,7 +162,7 @@ export default async function StaffTasksPage() {
         )}
 
         <div className="mt-8">
-          <TaskList tasks={taskRows} checklist={checklistRows} />
+          <TaskList tasks={taskRows} checklist={checklistRows} commentsByTask={commentsByTask} />
         </div>
       </div>
     </div>

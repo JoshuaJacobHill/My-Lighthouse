@@ -3,6 +3,7 @@ import { Newspaper } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
+import { commentsForStories } from '@/lib/story-comments'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'News & updates' }
@@ -36,11 +37,21 @@ export default async function NewsPage() {
       slug: true,
       title: true,
       category: true,
+      publishedAt: true,
       excerpt: true,
       imageUrl: true,
       externalUrl: true,
     },
   })
+
+  const viewer = {
+    id: session.userId,
+    role: session.role,
+    isStaff: user.isStaff,
+    isTrainee: user.isTrainee,
+    isChurchMember: user.isChurchMember,
+  }
+  const commentsByStory = await commentsForStories(stories.map((s) => s.id), viewer)
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
@@ -56,7 +67,7 @@ export default async function NewsPage() {
 
         {stories.length > 0 ? (
           <div className="mt-8">
-            <StoriesGrid stories={stories} />
+            <StoriesGrid stories={stories} commentsByStory={commentsByStory} />
           </div>
         ) : (
           <section className="mt-8 rounded-[28px] border border-dashed border-neutral-300 p-10 text-center">
