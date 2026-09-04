@@ -164,6 +164,7 @@ model User {
   notificationsSent Notification[]          @relation("NotificationSender")
   comments          Comment[]
   commentMentions   CommentMention[]
+  pushSubscriptions PushSubscription[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -1419,5 +1420,40 @@ model CommentMention {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([commentId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Web push
+//
+// One row per device, not per person: the same someone on a phone and a laptop
+// is two subscriptions, and revoking one must not silence the other. The
+// endpoint is the natural key — the browser issues it and it is unique per
+// device per site.
+//
+// iOS only delivers push to a site installed on the home screen (16.4+), and
+// only after the person has granted permission there. Android and desktop
+// Chrome have no such rule.
+// ---------------------------------------------------------------------------
+
+model PushSubscription {
+  id         String    @id @default(cuid())
+  userId     String
+  /// The push service URL the browser gave us. Unique per device per site.
+  endpoint   String    @unique
+  /// Keys the push service needs to encrypt a payload for this device.
+  p256dh     String
+  auth       String
+  /// Roughly which device this is, so someone can tell their phone from their
+  /// laptop when turning one off.
+  label      String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  /// Consecutive send failures. A subscription that keeps failing is dead and
+  /// gets removed rather than retried forever.
+  failures   Int       @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }

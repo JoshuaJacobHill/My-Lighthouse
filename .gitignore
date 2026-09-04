@@ -46,3 +46,5 @@ next-env.d.ts
 scripts/migrate/.target
 scripts/migrate/.sydney
 scripts/migrate/.sydney-app
+# Any dotfile in here holds credentials — keys, connection strings.
+scripts/migrate/.*

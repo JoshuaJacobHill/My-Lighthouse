@@ -4,6 +4,7 @@ import { ArrowLeft, KeyRound, HandHeart, ArrowRight, Church } from 'lucide-react
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AccountSettingsForm } from '@/components/donor/AccountSettingsForm'
+import { PushToggle } from '@/components/notifications/PushToggle'
 import { LinkedEmails } from '@/components/donor/LinkedEmails'
 
 export const dynamic = 'force-dynamic'
@@ -61,6 +62,10 @@ export default async function DonorAccountPage() {
             consentEmailUpdates: user.donorProfile?.consentEmailUpdates ?? false,
           }}
         />
+      </div>
+
+      <div className="mt-6">
+        <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
       </div>
 
       <LinkedEmails

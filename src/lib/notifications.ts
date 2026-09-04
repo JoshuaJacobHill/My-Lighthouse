@@ -14,6 +14,7 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma, NotificationCategory } from '@prisma/client'
 import type { Capability } from '@/lib/permissions-core'
+import { pushToUsers } from '@/lib/push'
 
 /**
  * Who a notification goes to, as a rule rather than a list of ids. Stored on
@@ -193,6 +194,16 @@ export async function notify(input: NotifyInput): Promise<number> {
         },
       },
       select: { id: true },
+    })
+
+    // Push last, and separately: the in-app notification is the record, this is
+    // only a nudge to a phone. It swallows its own failures.
+    await pushToUsers(userIds, {
+      title: input.title,
+      body: input.body,
+      href: input.href,
+      // One notification per thing, replacing rather than stacking.
+      tag: `${input.category}:${input.href}`,
     })
 
     return userIds.length
