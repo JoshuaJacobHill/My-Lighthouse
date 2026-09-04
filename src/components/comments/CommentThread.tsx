@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { Loader2, Trash2, AtSign, Send } from 'lucide-react'
+import { MentionInput, type Person } from './MentionInput'
 import {
   postCommentAction,
   deleteCommentAction,
@@ -73,27 +74,19 @@ export function CommentThread({
 
   // Tagged people are tracked by id as they are chosen, not parsed back out of
   // the text, so an edited name cannot silently break the mention.
-  const [tagged, setTagged] = React.useState<{ id: string; name: string }[]>([])
-  const [picker, setPicker] = React.useState(false)
-  const [people, setPeople] = React.useState<{ id: string; name: string }[] | null>(null)
-  const [filter, setFilter] = React.useState('')
+  const [tagged, setTagged] = React.useState<Person[]>([])
+  const [people, setPeople] = React.useState<Person[] | null>(null)
 
   const visible = comments.filter((c) => !removed.has(c.id))
 
-  function openPicker() {
-    setPicker((was) => !was)
-    if (people === null) {
-      void taggableUsersAction({ storyId, taskId }).then(setPeople)
-    }
+  function loadPeople() {
+    if (people === null) void taggableUsersAction({ storyId, taskId }).then(setPeople)
   }
 
-  function addTag(u: { id: string; name: string }) {
-    if (!tagged.some((t) => t.id === u.id)) {
-      setTagged((prev) => [...prev, u])
-      setBody((prev) => (prev ? `${prev.trimEnd()} @${u.name} ` : `@${u.name} `))
-    }
-    setPicker(false)
-    setFilter('')
+  // The button is for thumbs: it types the @ for you and the same menu opens.
+  function startTag() {
+    loadPeople()
+    setBody((prev) => (prev && !prev.endsWith(' ') ? `${prev} @` : `${prev}@`))
   }
 
   function submit() {
@@ -132,8 +125,6 @@ export function CommentThread({
     })
   }
 
-  const shown = people?.filter((p) => p.name.toLowerCase().includes(filter.toLowerCase())) ?? []
-
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {visible.length > 0 && (
@@ -168,43 +159,16 @@ export function CommentThread({
       )}
 
       <div className="space-y-2">
-        <textarea
+        <MentionInput
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={setBody}
+          people={people}
+          tagged={tagged}
+          onTag={(p) => setTagged((prev) => (prev.some((t) => t.id === p.id) ? prev : [...prev, p]))}
+          onLoadPeople={loadPeople}
           rows={compact ? 2 : 3}
           placeholder={visible.length === 0 ? 'Say something kind…' : 'Add a comment…'}
-          className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
         />
-
-        {picker && (
-          <div className="rounded-xl border border-neutral-200 p-2">
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Search people…"
-              className="w-full rounded-lg border border-neutral-200 px-2 py-1.5 text-sm focus:border-orange-500 focus:outline-none"
-            />
-            <ul className="mt-2 max-h-40 overflow-y-auto">
-              {people === null ? (
-                <li className="px-2 py-1.5 text-sm text-neutral-400">Loading…</li>
-              ) : shown.length === 0 ? (
-                <li className="px-2 py-1.5 text-sm text-neutral-400">Nobody matches.</li>
-              ) : (
-                shown.slice(0, 30).map((u) => (
-                  <li key={u.id}>
-                    <button
-                      type="button"
-                      onClick={() => addTag(u)}
-                      className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
-                    >
-                      {u.name}
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-        )}
 
         {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
 
@@ -224,8 +188,7 @@ export function CommentThread({
           </button>
           <button
             type="button"
-            onClick={openPicker}
-            aria-expanded={picker}
+            onClick={startTag}
             className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-2 text-sm font-semibold text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
           >
             <AtSign className="h-4 w-4" aria-hidden="true" />
