@@ -109,35 +109,39 @@ enum UserRole {
 }
 
 model User {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  emailVerified    DateTime?
-  passwordHash     String?
-  name             String?
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  emailVerified          DateTime?
+  passwordHash           String?
+  name                   String?
   // Optional company/organisation the supporter represents (unlocks corporate
   // volunteering). Set explicitly on their profile, or inferred from giving /
   // corporate volunteer history.
-  company          String?
-  role             UserRole  @default(VOLUNTEER)
-  isActive         Boolean   @default(true)
+  company                String?
+  role                   UserRole  @default(VOLUNTEER)
+  isActive               Boolean   @default(true)
   // Admin permission: may see donations, donors, funds, fundraisers & events
   // (the money/PII side). SUPER_ADMIN always can; grant to specific ADMINs.
-  canViewDonations Boolean   @default(false)
+  canViewDonations       Boolean   @default(false)
+  /// Sees the sales and marketing report. Switched on per person, like
+  /// canViewDonations, because store revenue and ad spend are not something
+  /// every admin needs to see.
+  canViewBusinessReports Boolean   @default(false)
   // Display picture / avatar (may be a data URL, e.g. an uploaded sponsor logo).
-  imageUrl         String?   @db.Text
+  imageUrl               String?   @db.Text
   // Church member — sees church-only news, events & serving teams (in addition
   // to all Lighthouse Care content). Auto-set when they tithe; admin-toggleable.
-  isChurchMember   Boolean   @default(false)
+  isChurchMember         Boolean   @default(false)
   // Staff member — an employee. Sees staff-only news, tasks, checklists and the
   // staff wellbeing/fitness challenges. A flag rather than a role, because staff
   // are usually volunteers and/or donors too and must keep those capabilities.
-  isStaff          Boolean   @default(false)
+  isStaff                Boolean   @default(false)
   // Trainee — supported employment/traineeship. Sees their hours, achievements,
   // required tasks and training modules, and can be assigned tasks with staff.
-  isTrainee        Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  lastLoginAt      DateTime?
+  isTrainee              Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  lastLoginAt            DateTime?
 
   accounts            Account[]
   sessions            UserSession[]
@@ -1456,4 +1460,132 @@ model PushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Business reporting
+//
+// Nothing here is fetched when the page renders. A cron pulls each source into
+// these tables and the page reads Postgres, because five external APIs on a
+// render would be slow, rate-limited, and dark whenever a vendor is. It also
+// keeps history the vendors may not: once a day is written it is ours.
+//
+// Money is integer cents throughout. Floats and money do not mix.
+// ---------------------------------------------------------------------------
+
+enum SalesChannel {
+  IN_STORE
+  CLICK_AND_COLLECT
+  HOME_DELIVERY
+}
+
+/// One row per day, store and channel. Day/week/month/year are aggregations of
+/// this, so the toggles need no separate storage and can never disagree.
+model SalesFact {
+  id           String       @id @default(cuid())
+  /// Brisbane calendar day, stored as a plain date — see lib/fitness-days.ts
+  /// for why that is midnight UTC rather than a local-midnight instant.
+  day          DateTime     @db.Date
+  store        String
+  channel      SalesChannel
+  orders       Int          @default(0)
+  revenueCents Int          @default(0)
+  /// Which feed produced this, e.g. "gap-solutions" or "myfoodlink". Part of
+  /// the key so two systems reporting the same day cannot silently overwrite
+  /// each other — if they disagree we want to see both and find out why.
+  source       String
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([day, store, channel, source])
+  @@index([day])
+  @@index([store, day])
+}
+
+enum SocialPlatform {
+  FACEBOOK
+  INSTAGRAM
+  TIKTOK
+  MAILCHIMP
+}
+
+enum SocialKind {
+  ORGANIC
+  PAID
+}
+
+/// A post, ad or campaign, with whatever metrics its platform gives us.
+/// Deliberately one table: "top performing across everything" is the question
+/// being asked, and that is a sort, not a union of four shapes.
+model SocialPost {
+  id           String         @id @default(cuid())
+  platform     SocialPlatform
+  kind         SocialKind
+  /// The platform's own id, so re-fetching updates rather than duplicates.
+  externalId   String
+  publishedAt  DateTime
+  caption      String?        @db.Text
+  permalink    String?
+  thumbnailUrl String?
+
+  /// Meta retired `impressions` on 15 Nov 2025 (page_impressions →
+  /// page_media_view, post_impressions → post_media_view) and Instagram
+  /// dropped it for `views` in April 2025. TikTok counts video views. So
+  /// `views` is the field that exists on every platform; do not reintroduce
+  /// impressions, it fetches nothing.
+  views       Int @default(0)
+  reach       Int @default(0)
+  /// Likes, comments, shares, saves — whatever the platform counts as
+  /// engagement, summed, because the mix differs per platform and the
+  /// comparison people actually make is across platforms.
+  engagements Int @default(0)
+  clicks      Int @default(0)
+  /// Paid only. Organic rows leave this at zero.
+  spendCents  Int @default(0)
+  conversions Int @default(0)
+
+  fetchedAt DateTime @default(now())
+
+  @@unique([platform, externalId])
+  @@index([platform, publishedAt])
+  @@index([publishedAt])
+}
+
+/// Every ingestion attempt, so a broken feed looks different from a quiet week.
+/// Without this a failed pull and genuinely zero sales render identically, and
+/// someone makes a decision on a number that was never fetched.
+model IngestRun {
+  id         String    @id @default(cuid())
+  source     String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean   @default(false)
+  rows       Int       @default(0)
+  error      String?   @db.Text
+
+  @@index([source, startedAt])
+}
+
+/// Per-day performance for a paid ad.
+///
+/// Organic posts are correctly filtered by when they were published — a post
+/// belongs to the day it went up. An ad does not: one created in July can be
+/// the biggest spender in September, so filtering paid by publish date would
+/// answer the wrong question. Day grain fixes that, and "top paid this month"
+/// becomes an aggregation over the days in the month, matching how SalesFact
+/// already works.
+model AdDayStat {
+  id          String         @id @default(cuid())
+  platform    SocialPlatform
+  /// The platform's ad id. Metadata for it lives on SocialPost.
+  externalId  String
+  day         DateTime       @db.Date
+  views       Int            @default(0)
+  reach       Int            @default(0)
+  clicks      Int            @default(0)
+  spendCents  Int            @default(0)
+  conversions Int            @default(0)
+  fetchedAt   DateTime       @default(now())
+
+  @@unique([platform, externalId, day])
+  @@index([day])
 }

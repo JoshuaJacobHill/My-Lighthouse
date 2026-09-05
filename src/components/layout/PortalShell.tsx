@@ -8,6 +8,7 @@ import {
   Heart,
   HandHeart,
   Receipt,
+  TrendingUp,
   Calendar,
   Clock,
   User,
@@ -34,6 +35,8 @@ interface NavItem {
 export interface PortalCapabilities {
   isVolunteer: boolean
   hasGiven: boolean
+  /** Sales and marketing report — the per-person switch, not a role. */
+  canSeeReports?: boolean
   /** Staff or trainee — unlocks the internal staff area. */
   isStaff?: boolean
   /** Shows a way back to the admin panel. */
@@ -53,6 +56,7 @@ export function PortalShell({
   hasGiven,
   isStaff,
   isAdmin,
+  canSeeReports,
   unreadCount = 0,
 }: {
   children: React.ReactNode
@@ -82,6 +86,11 @@ export function PortalShell({
           { href: '/dashboard/news', label: 'News & updates', icon: Newspaper },
           { href: '/dashboard/fitness', label: 'Staff fitness', icon: Footprints },
         ]
+      : []),
+    // Only for the people it has been switched on for, so it is invisible to
+    // everyone else rather than there-but-forbidden.
+    ...(canSeeReports
+      ? [{ href: '/dashboard/business', label: 'Sales & marketing', icon: TrendingUp }]
       : []),
     isVolunteer
       ? { href: '/volunteer/profile', label: 'My profile', icon: User }

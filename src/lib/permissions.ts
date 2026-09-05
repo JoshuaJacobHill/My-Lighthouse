@@ -24,7 +24,7 @@ export const getPermissionUser = cache(async function getPermissionUser(): Promi
   if (!session) return null
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, canViewDonations: true },
+    select: { role: true, canViewDonations: true, canViewBusinessReports: true },
   })
   return user ?? null
 })

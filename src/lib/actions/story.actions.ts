@@ -46,7 +46,7 @@ async function currentPermissionUser(): Promise<PermissionUser> {
   if (!session) throw new Error('Not authenticated')
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, canViewDonations: true },
+    select: { role: true, canViewDonations: true, canViewBusinessReports: true },
   })
   if (!user) throw new Error('Not authenticated')
   return user

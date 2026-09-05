@@ -44,6 +44,8 @@ export type Capability =
   | 'system.settings'
   /** Creating admins and assigning roles. */
   | 'system.users'
+  /** Store sales, order volumes and marketing performance. */
+  | 'business.reports'
 
 /**
  * Giving and donor-contact capabilities that a generic ADMIN only holds when
@@ -70,18 +72,26 @@ const ROLE_CAPABILITIES: Record<string, Capability[]> = {
     'church.stories',
     'church.teams',
     'system.settings',
+    'business.reports',
   ],
   // Staff, volunteers and trainees; project tasks; Care good news. No giving
   // data of any kind, and no church contact details.
-  CARE_MANAGER: ['care.people', 'care.tasks', 'care.stories'],
+  CARE_MANAGER: ['care.people', 'care.tasks', 'care.stories', 'business.reports'],
   // The church side: member contact details, tithe transactions, church stories
   // and serving teams. No volunteer or staff management, no Care donor data.
-  CHURCH_MANAGER: ['church.members', 'church.giving', 'church.stories', 'church.teams'],
+  CHURCH_MANAGER: [
+    'church.members',
+    'church.giving',
+    'church.stories',
+    'church.teams',
+    'business.reports',
+  ],
 }
 
 export interface PermissionUser {
   role: string | null
   canViewDonations: boolean
+  canViewBusinessReports: boolean
 }
 
 /** Does this user hold this capability? SUPER_ADMIN always does. */
@@ -90,6 +100,10 @@ export function can(user: PermissionUser, capability: Capability): boolean {
   const held = ROLE_CAPABILITIES[user.role ?? ''] ?? []
   if (!held.includes(capability)) return false
   if (user.role === 'ADMIN' && ADMIN_OPT_IN.includes(capability) && user.canViewDonations !== true) return false
+  // Store revenue and ad spend are switched on per person, whatever the role.
+  // Listing it against the admin roles above only makes them eligible; this is
+  // what actually grants it, so adding someone is a tick rather than a deploy.
+  if (capability === 'business.reports' && user.canViewBusinessReports !== true) return false
   return true
 }
 

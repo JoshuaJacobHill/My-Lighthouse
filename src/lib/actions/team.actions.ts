@@ -110,3 +110,27 @@ export async function setTraineeAction(userId: string, isTrainee: boolean): Prom
   revalidatePath(`/admin/users/${userId}`)
   return { success: true }
 }
+
+/**
+ * Switch the sales and marketing report on for one person.
+ *
+ * Deliberately its own action rather than folded into the admin settings form:
+ * this is store revenue and ad spend, and granting it should be a considered,
+ * visible act on that person's page — not a checkbox someone ticks in passing
+ * while editing a name.
+ *
+ * SUPER_ADMIN only, because the people who can see the money should be chosen
+ * by the person who owns it.
+ */
+export async function setBusinessReportsAction(
+  userId: string,
+  canViewBusinessReports: boolean,
+): Promise<Result> {
+  const session = await getSession()
+  if (session?.role !== 'SUPER_ADMIN') {
+    return { success: false, error: 'Only a super admin can grant this.' }
+  }
+  await prisma.user.update({ where: { id: userId }, data: { canViewBusinessReports } })
+  revalidatePath(`/admin/users/${userId}`)
+  return { success: true }
+}
