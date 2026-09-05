@@ -76,6 +76,8 @@ async function graphAll<T>(
   params: Record<string, string>,
   token: string,
   maxPages = 40,
+  /** True when maxPages is a deliberate cap rather than a runaway guard. */
+  capIsIntentional = false,
 ): Promise<T[]> {
   const out: T[] = []
   let next: string | null = null
@@ -87,7 +89,9 @@ async function graphAll<T>(
     next = res.paging?.next ?? null
     if (!next) return out
   }
-  console.warn(`graphAll(${path}) stopped at the page cap — data may be incomplete`)
+  if (!capIsIntentional) {
+    console.warn(`graphAll(${path}) stopped at the page cap — data may be incomplete`)
+  }
   return out
 }
 
@@ -220,6 +224,7 @@ async function ingestFacebookPosts(cfg: Cfg, pt: string): Promise<number> {
     { fields: 'id,message,story,created_time,permalink_url', limit: '25' },
     pt,
     Math.ceil(POST_LIMIT / 25),
+    true, // we only ever want the most recent POST_LIMIT posts
   )
 
   let written = 0

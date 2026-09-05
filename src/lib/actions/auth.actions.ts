@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { subscribe } from '@/lib/integrations/mailchimp'
 import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
@@ -371,6 +372,14 @@ export async function registerVolunteerAction(formData: FormData): Promise<{
           volunteerProfile: volunteerProfileCreate,
         },
       })
+    })
+
+    // Onto the supporter audience, tagged. Fire and forget on purpose: a
+    // marketing platform having a moment must never fail a volunteer signup.
+    void subscribe(data.email, {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      tags: ['Volunteer'],
     })
 
     // Send confirmation email — fire and forget, don't block registration

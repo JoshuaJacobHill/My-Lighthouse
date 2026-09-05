@@ -26,6 +26,10 @@
     {
       "path": "/api/cron/ingest-meta",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/ingest-mailchimp",
+      "schedule": "20 18 * * *"
     }
   ]
 }

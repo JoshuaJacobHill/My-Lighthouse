@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { subscribe } from '@/lib/integrations/mailchimp'
 import { headers } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { hashPassword, createSession, setSessionCookie } from '@/lib/auth'
@@ -133,6 +134,15 @@ export async function createAccountAction(
       where: { userId: user.id },
       update: { displayName: name },
       create: { userId: user.id, displayName: name },
+    })
+
+    // Onto the supporter audience, tagged. Fire and forget: creating an
+    // account must not depend on Mailchimp being up.
+    const [first, ...rest] = name.trim().split(/\s+/)
+    void subscribe(email, {
+      firstName: first,
+      lastName: rest.join(' ') || null,
+      tags: ['Donor'],
     })
 
     // Confirmation link — verifies the address and links any giving.
