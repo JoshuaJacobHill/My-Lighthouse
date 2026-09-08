@@ -159,9 +159,6 @@ export default async function AccountPage() {
                 <span className="block font-semibold text-neutral-900">
                   Want to volunteer with us?
                 </span>
-                <span className="block text-sm text-neutral-600">
-                  Give your time alongside your generosity.
-                </span>
               </span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 text-orange-400" aria-hidden="true" />

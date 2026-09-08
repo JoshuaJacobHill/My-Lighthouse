@@ -189,7 +189,6 @@ export default async function DonorHomePage() {
               ) : (
                 <>
                   <p className="text-2xl font-bold tracking-tight">Volunteer with us</p>
-                  <p className="mt-1 text-sm text-neutral-500">Give your time alongside your generosity.</p>
                 </>
               )}
               <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-orange-600">

@@ -63,9 +63,6 @@ export default function LoginPage() {
 
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Sign In</h1>
-        <p className="mt-1.5 text-sm text-gray-500">
-          Welcome back — let&apos;s get you signed in.
-        </p>
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
