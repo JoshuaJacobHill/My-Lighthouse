@@ -5,6 +5,8 @@ import { periodKey, periodLabel, isOverdue } from '@/lib/checklists'
 import { TaskList, type TaskRow, type ChecklistRow } from './TaskList'
 import { CreateTask } from './CreateTask'
 import { commentsForTasks } from '@/lib/story-comments'
+import { getChecklistMonth } from '@/lib/checklist-leaderboard'
+import { ChecklistLeaderboard } from './ChecklistLeaderboard'
 import { isAdminRole } from '@/lib/permissions-core'
 import { hasCapability } from '@/lib/permissions'
 
@@ -75,6 +77,7 @@ export default async function StaffTasksPage() {
       orderBy: [{ frequency: 'asc' }, { sortOrder: 'asc' }, { title: 'asc' }],
       select: {
         id: true,
+        section: true,
         title: true,
         description: true,
         frequency: true,
@@ -115,6 +118,7 @@ export default async function StaffTasksPage() {
     const done = doneMap.has(mapKey)
     return {
       id: i.id,
+      section: i.section,
       title: i.title,
       description: i.description,
       frequency: i.frequency,
@@ -126,6 +130,8 @@ export default async function StaffTasksPage() {
       doneBy: doneMap.get(mapKey) ?? null,
     }
   })
+
+  const month = await getChecklistMonth()
 
   const commentsByTask = await commentsForTasks(
     taskRows.map((t) => t.id),
@@ -158,6 +164,12 @@ export default async function StaffTasksPage() {
               staff={assignable.map((a) => ({ id: a.id, name: a.name ?? a.email }))}
               locations={locations}
             />
+          </div>
+        )}
+
+        {month.standings.length > 0 && (
+          <div className="mt-8">
+            <ChecklistLeaderboard month={month} meId={me.id} />
           </div>
         )}
 

@@ -1283,6 +1283,10 @@ model ChecklistItem {
   title       String
   description String?            @db.Text
   frequency   ChecklistFrequency @default(DAILY)
+  /// Heading this item sits under — "Shop Floor & Customer Areas", "Warehouse".
+  /// Without it the daily list is fifty-odd undifferentiated checkboxes, which
+  /// nobody works through twice.
+  section     String?
   locationId  String? // null = applies everywhere
   // Hard deadline inside the period — "HH:MM" Brisbane. Past this, it's overdue.
   dueTime     String?
