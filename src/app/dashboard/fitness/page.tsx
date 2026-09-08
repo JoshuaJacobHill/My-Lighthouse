@@ -9,8 +9,8 @@ import { TotalSteps, TipOfTheDay, TodaysTarget } from './ChallengePanels'
 import { getChallengeWeeks } from '@/lib/fitness-weeks'
 import { TopFive } from './TopFive'
 import { WeekWinners } from './WeekWinners'
-import { FairPlayNote, FairPlayNotice } from './FairPlay'
-import { FAIR_PLAY_NOTICE } from '@/lib/fair-play'
+import { FairPlayNotice, FairPlayReminder } from './FairPlay'
+import { FAIR_PLAY_NOTICE, FAIR_PLAY_REMINDER, reminderIsLive } from '@/lib/fair-play'
 import { WeekSchedule } from './WeekSchedule'
 import { PaceNudge } from './PaceNudge'
 import { CheerWall } from './CheerWall'
@@ -83,10 +83,13 @@ export default async function StaffFitnessPage() {
   ])
 
   // Shown until they say they have read it; a fresh send clears the ack.
-  const notice =
-    fairPlay?.fairPlayNoticeAt != null &&
-    (fairPlay.fairPlayNoticeAckAt == null ||
-      fairPlay.fairPlayNoticeAckAt < fairPlay.fairPlayNoticeAt)
+  // The personal notice stays until an admin withdraws it — acknowledging
+  // records that it was read without taking it down.
+  const notice = fairPlay?.fairPlayNoticeAt != null
+
+  // Everyone else, until it expires on the 10th. Never both: being told the
+  // general version as well would only muddy a message addressed to you.
+  const reminder = !notice && reminderIsLive()
 
   const today = brisbaneToday()
   const myTotal = mine.reduce((sum, e) => sum + e.amount, 0)
@@ -145,6 +148,15 @@ export default async function StaffFitnessPage() {
             <FairPlayNotice
               heading={FAIR_PLAY_NOTICE.heading}
               paragraphs={FAIR_PLAY_NOTICE.paragraphs}
+            />
+          </div>
+        )}
+
+        {reminder && (
+          <div className="mt-6">
+            <FairPlayReminder
+              heading={FAIR_PLAY_REMINDER.heading}
+              paragraphs={FAIR_PLAY_REMINDER.paragraphs}
             />
           </div>
         )}
@@ -252,12 +264,6 @@ export default async function StaffFitnessPage() {
               behind={onTrack - board.total}
               startLabel={startLabel}
             />
-          </div>
-        )}
-
-        {started && (
-          <div className="mt-5">
-            <FairPlayNote />
           </div>
         )}
 
