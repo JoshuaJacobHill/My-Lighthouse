@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { CheckCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -102,6 +103,18 @@ const STEP_TITLES = [
 
 const BLUE_CARD_OPTIONS = ['Not Applicable', 'Pending', 'Current', 'Expired']
 
+/**
+ * Used twice: to validate what someone types, and to decide whether what we
+ * already hold is good enough to not ask again. A stored phone number that
+ * wouldn't pass validation has to be shown, or the applicant would be blocked
+ * by an error on a field they cannot see.
+ */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^(\+61|0)[234578]\d{8}$/
+
+/** Which of the step-one questions the account already answers. */
+type KnownFields = { name: boolean; email: boolean; mobile: boolean }
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Format "HH:MM" → "9:00 am" for display */
@@ -114,18 +127,55 @@ function formatTimeLabel(t: string): string {
 
 // ─── Subform components ───────────────────────────────────────────────────────
 
+/** What we already know, shown instead of asked. */
+function KnownDetails({ prefill, known }: { prefill: SignupPrefill; known: KnownFields }) {
+  const contact = [
+    known.email ? prefill.email : null,
+    known.mobile ? prefill.mobile : null,
+  ].filter(Boolean)
+
+  return (
+    <div className="rounded-2xl border border-orange-100 bg-orange-50 p-4">
+      <p className="text-sm font-semibold text-gray-900">
+        {known.name
+          ? `Applying as ${prefill.firstName} ${prefill.lastName}`
+          : 'Using your account details'}
+      </p>
+      {contact.length > 0 && (
+        <p className="mt-0.5 text-sm text-gray-700">{contact.join(' · ')}</p>
+      )}
+      <p className="mt-2 text-xs text-gray-600">
+        Taken from your account, so there&apos;s no need to type it again.{' '}
+        <Link
+          href="/dashboard/account/details"
+          className="font-medium text-orange-600 underline hover:text-orange-700"
+        >
+          Change these details
+        </Link>
+      </p>
+    </div>
+  )
+}
+
 function Step1({
   data,
   onChange,
   errors,
+  known,
+  prefill,
 }: {
   data: FormData
   onChange: (patch: Partial<FormData>) => void
   errors: Record<string, string>
+  known: KnownFields
+  prefill?: SignupPrefill
 }) {
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {prefill && (known.name || known.email || known.mobile) && (
+        <KnownDetails prefill={prefill} known={known} />
+      )}
+      <div className={known.name ? 'hidden' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}>
         <Input
           label="First name *"
           value={data.firstName}
@@ -143,6 +193,7 @@ function Step1({
           autoComplete="family-name"
         />
       </div>
+      <div className={known.email ? 'hidden' : undefined}>
       <Input
         label="Email address *"
         type="email"
@@ -152,6 +203,8 @@ function Step1({
         error={errors.email}
         autoComplete="email"
       />
+      </div>
+      <div className={known.mobile ? 'hidden' : undefined}>
       <Input
         label="Phone number *"
         type="tel"
@@ -162,6 +215,7 @@ function Step1({
         error={errors.mobile}
         autoComplete="tel"
       />
+      </div>
       <Input
         label="Date of birth"
         type="date"
@@ -733,6 +787,7 @@ export default function SignupClient({
   prefill?: SignupPrefill
   isLoggedIn?: boolean
 }) {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>({ ...INITIAL_FORM, ...prefill })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -741,6 +796,21 @@ export default function SignupClient({
   const [success, setSuccess] = useState(false)
 
   const totalSteps = 4
+
+  /**
+   * Don't ask what the account already answers. Gated on the value actually
+   * being usable — a name we only hold one word of, or a phone number stored in
+   * a shape validation rejects, still has to be asked for, or the applicant
+   * would hit an error on a question that isn't on screen.
+   */
+  const known: KnownFields = React.useMemo(() => {
+    if (!isLoggedIn || !prefill) return { name: false, email: false, mobile: false }
+    return {
+      name: Boolean(prefill.firstName?.trim() && prefill.lastName?.trim()),
+      email: Boolean(prefill.email && EMAIL_RE.test(prefill.email)),
+      mobile: Boolean(prefill.mobile && PHONE_RE.test(prefill.mobile.replace(/\s/g, ''))),
+    }
+  }, [isLoggedIn, prefill])
 
   function patch(update: Partial<FormData>) {
     setFormData((prev) => ({ ...prev, ...update }))
@@ -753,9 +823,9 @@ export default function SignupClient({
       if (!formData.firstName.trim()) errs.firstName = 'First name is required'
       if (!formData.lastName.trim()) errs.lastName = 'Last name is required'
       if (!formData.email.trim()) errs.email = 'Email address is required'
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Please enter a valid email address'
+      else if (!EMAIL_RE.test(formData.email)) errs.email = 'Please enter a valid email address'
       if (!formData.mobile.trim()) errs.mobile = 'Phone number is required'
-      else if (!/^(\+61|0)[234578]\d{8}$/.test(formData.mobile.replace(/\s/g, '')))
+      else if (!PHONE_RE.test(formData.mobile.replace(/\s/g, '')))
         errs.mobile = 'Please enter a valid Australian phone number (mobile or landline)'
       if (!formData.preferredStore) errs.preferredStore = 'Please select your preferred store'
       if (formData.postcode && !/^\d{4}$/.test(formData.postcode))
@@ -878,16 +948,18 @@ export default function SignupClient({
               Thank you for signing up, {formData.firstName}!
             </h1>
             <p className="mt-4 text-gray-600 leading-relaxed">
-              Please check your email for next steps. You&apos;ll need to log in and complete your
-              induction before you can start volunteering.
+              {isLoggedIn
+                ? 'Check your email for next steps — there’s an induction to complete before your first shift.'
+                : 'Please check your email for next steps. You’ll need to log in and complete your induction before you can start volunteering.'}
             </p>
             <p className="mt-2 text-sm text-gray-500">
               Welcome to the Lighthouse Care volunteer family. We&apos;re so glad you&apos;re here.
             </p>
             <div className="mt-8">
-              <Link href="/login">
+              {/* Already signed in? Sending them to a login screen makes no sense. */}
+              <Link href={isLoggedIn ? '/volunteer' : '/login'}>
                 <Button size="lg" className="w-full sm:w-auto">
-                  Sign In to Your Account
+                  {isLoggedIn ? 'Go to my volunteer portal' : 'Sign In to Your Account'}
                 </Button>
               </Link>
             </div>
@@ -902,6 +974,19 @@ export default function SignupClient({
   return (
     <div className="py-10 px-4">
       <div className="mx-auto max-w-2xl">
+        {/* Step one had no way back at all. From step two on, the form's own
+            Back button is the one that matters, so only one is ever on screen. */}
+        {step === 1 && (
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="mb-6 inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            Back
+          </button>
+        )}
+
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">Become a Volunteer</h1>
@@ -947,7 +1032,15 @@ export default function SignupClient({
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} noValidate>
-              {step === 1 && <Step1 data={formData} onChange={patch} errors={errors} />}
+              {step === 1 && (
+                <Step1
+                  data={formData}
+                  onChange={patch}
+                  errors={errors}
+                  known={known}
+                  prefill={prefill}
+                />
+              )}
               {step === 2 && <Step2 data={formData} onChange={patch} errors={errors} />}
               {step === 3 && <Step3 data={formData} onChange={patch} errors={errors} />}
               {step === 4 && <Step4 data={formData} onChange={patch} errors={errors} isLoggedIn={isLoggedIn} />}
