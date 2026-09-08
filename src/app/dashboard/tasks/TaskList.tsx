@@ -18,6 +18,12 @@ export interface TaskRow {
   done: boolean
 }
 
+export interface PeriodHeadings {
+  DAILY: { title: string; remaining: string | null }
+  WEEKLY: { title: string; remaining: string | null }
+  MONTHLY: { title: string; remaining: string | null }
+}
+
 export interface ChecklistRow {
   id: string
   area: string | null
@@ -54,10 +60,13 @@ function Tick({ done, onToggle, pending }: { done: boolean; onToggle: () => void
 export function TaskList({
   tasks,
   checklist,
+  headings,
   commentsByTask = {},
 }: {
   tasks: TaskRow[]
   checklist: ChecklistRow[]
+  /** Computed on the server so the date is Brisbane's, not the device's. */
+  headings: PeriodHeadings
   commentsByTask?: Record<string, CommentView[]>
 }) {
   const [pending, startTransition] = React.useTransition()
@@ -274,6 +283,15 @@ export function TaskList({
               )}
             </button>
           ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-2">
+          <h3 className="text-2xl font-extrabold tracking-tight">{headings[freq].title}</h3>
+          {headings[freq].remaining && (
+            <span className="text-lg font-semibold text-neutral-400">
+              {headings[freq].remaining}
+            </span>
+          )}
         </div>
 
         {sections.length === 0 ? (

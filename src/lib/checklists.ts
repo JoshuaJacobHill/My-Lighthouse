@@ -51,7 +51,7 @@ export function periodKey(frequency: ChecklistFrequency, at: Date = new Date()):
 }
 
 /** Human label for the current period, for the UI. */
-export function periodLabel(frequency: ChecklistFrequency, at: Date = new Date()): string {
+export function periodLabel(frequency: ChecklistFrequency): string {
   if (frequency === 'DAILY') return 'today'
   if (frequency === 'WEEKLY') return 'this week'
   return 'this month'
@@ -61,8 +61,10 @@ export function periodLabel(frequency: ChecklistFrequency, at: Date = new Date()
  * Is this occurrence past its hard deadline and still not done?
  *
  * DAILY  — overdue after dueTime on the day.
- * WEEKLY — overdue after dueTime on its weekday (defaults to Sunday, so it stays
- *          actionable all week rather than nagging on Monday morning).
+ * WEEKLY — overdue after dueTime on its weekday. Defaults to Saturday, because
+ *          that is when the trading week ends here; the ISO week key still runs
+ *          to Sunday, so a job missed on Saturday is overdue but can still be
+ *          ticked into the same week.
  * MONTHLY— overdue after dueTime on its day of month (defaults to the last day).
  */
 export function isOverdue(
@@ -76,7 +78,7 @@ export function isOverdue(
   if (item.frequency === 'DAILY') return pastTimeToday
 
   if (item.frequency === 'WEEKLY') {
-    const target = item.weekday ?? 7
+    const target = item.weekday ?? 6 // Saturday
     if (p.weekday > target) return true
     return p.weekday === target && pastTimeToday
   }
@@ -86,4 +88,67 @@ export function isOverdue(
   const target = Math.min(item.dayOfMonth ?? lastDay, lastDay)
   if (p.d > target) return true
   return p.d === target && pastTimeToday
+}
+
+
+const ORDINAL = (n: number): string => {
+  // 11th–13th are the exceptions the naive rule gets wrong.
+  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`
+}
+
+/**
+ * The date line under the Daily / Weekly / Monthly tabs.
+ *
+ * `title` is the period, `remaining` is how long is left in it — counted
+ * inclusive of today, so on the 8th of a 30-day month it reads "23 days to
+ * go" rather than 22. That is how people count the days they still have.
+ *
+ * The weekly range runs Monday to Saturday: the ISO week used for the period
+ * key ends on Sunday, but the work is expected done by close of Saturday, and
+ * the heading should say what is expected rather than what the key does.
+ */
+export function periodHeading(
+  frequency: ChecklistFrequency,
+  at: Date = new Date(),
+): { title: string; remaining: string | null } {
+  const p = parts(at)
+  const month = (m: number) =>
+    new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', month: 'long' }).format(
+      new Date(Date.UTC(p.y, m - 1, 1)),
+    )
+
+  if (frequency === 'DAILY') {
+    const weekday = new Intl.DateTimeFormat('en-AU', {
+      timeZone: 'UTC',
+      weekday: 'long',
+    }).format(new Date(Date.UTC(p.y, p.m - 1, p.d)))
+    return { title: `${weekday} ${ORDINAL(p.d)} ${month(p.m)}`, remaining: null }
+  }
+
+  if (frequency === 'WEEKLY') {
+    // p.weekday: 1 = Monday … 7 = Sunday.
+    const monday = new Date(Date.UTC(p.y, p.m - 1, p.d - (p.weekday - 1)))
+    const saturday = new Date(monday.getTime() + 5 * 86_400_000)
+    const sameMonth = monday.getUTCMonth() === saturday.getUTCMonth()
+    const title = sameMonth
+      ? `Mon ${ORDINAL(monday.getUTCDate())} – Sat ${ORDINAL(saturday.getUTCDate())} ${month(saturday.getUTCMonth() + 1)}`
+      : `Mon ${ORDINAL(monday.getUTCDate())} ${month(monday.getUTCMonth() + 1)} – Sat ${ORDINAL(saturday.getUTCDate())} ${month(saturday.getUTCMonth() + 1)}`
+    // Sunday sits after the Saturday deadline but inside the same ISO week.
+    const left = 6 - p.weekday + 1
+    const remaining =
+      p.weekday === 7
+        ? 'week has ended'
+        : left === 1
+          ? 'last day'
+          : `${left} days to go`
+    return { title, remaining }
+  }
+
+  const daysInMonth = new Date(Date.UTC(p.y, p.m, 0)).getUTCDate()
+  const left = daysInMonth - p.d + 1
+  return {
+    title: month(p.m),
+    remaining: left === 1 ? 'last day' : `${left} days to go`,
+  }
 }

@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { periodKey, periodLabel, isOverdue } from '@/lib/checklists'
+import { periodKey, periodLabel, isOverdue, periodHeading } from '@/lib/checklists'
 import { TaskList, type TaskRow, type ChecklistRow } from './TaskList'
 import { CreateTask } from './CreateTask'
 import { commentsForTasks } from '@/lib/story-comments'
@@ -133,6 +133,14 @@ export default async function StaffTasksPage() {
     }
   })
 
+  // Worked out server-side: the heading must be Brisbane's date, not whatever
+  // the device thinks it is.
+  const headings = {
+    DAILY: periodHeading('DAILY'),
+    WEEKLY: periodHeading('WEEKLY'),
+    MONTHLY: periodHeading('MONTHLY'),
+  }
+
   const month = await getChecklistMonth()
 
   const commentsByTask = await commentsForTasks(
@@ -176,7 +184,12 @@ export default async function StaffTasksPage() {
         )}
 
         <div className="mt-8">
-          <TaskList tasks={taskRows} checklist={checklistRows} commentsByTask={commentsByTask} />
+          <TaskList
+            tasks={taskRows}
+            checklist={checklistRows}
+            headings={headings}
+            commentsByTask={commentsByTask}
+          />
         </div>
       </div>
     </div>
