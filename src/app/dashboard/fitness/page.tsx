@@ -6,7 +6,9 @@ import prisma from '@/lib/prisma'
 import { LogStepsForm } from './LogStepsForm'
 import { StepsChart } from './StepsChart'
 import { TotalSteps, TipOfTheDay, TodaysTarget } from './ChallengePanels'
+import { getChallengeWeeks } from '@/lib/fitness-weeks'
 import { TopFive } from './TopFive'
+import { WeekWinners } from './WeekWinners'
 import { WeekSchedule } from './WeekSchedule'
 import { PaceNudge } from './PaceNudge'
 import { CheerWall } from './CheerWall'
@@ -56,7 +58,7 @@ export default async function StaffFitnessPage() {
     )
   }
 
-  const [board, tip, schedule, mine, eligible, cheers, fitnessLink] = await Promise.all([
+  const [board, tip, schedule, mine, eligible, cheers, weeks, fitnessLink] = await Promise.all([
     getChallengeBoard(challenge),
     getTipOfTheDay(),
     getWellbeingSchedule(challenge),
@@ -67,6 +69,7 @@ export default async function StaffFitnessPage() {
     }),
     prisma.user.count({ where: { OR: [{ isStaff: true }, { isTrainee: true }], isActive: true } }),
     getTodaysCheers(challenge.id, session.userId),
+    getChallengeWeeks(challenge),
     prisma.fitnessLink.findFirst({
       where: { userId: me.id, revokedAt: null },
       select: { lastUsedAt: true, lastAmount: true },
@@ -232,6 +235,12 @@ export default async function StaffFitnessPage() {
         <div className="mt-5">
           <TopFive top={board.top} />
         </div>
+
+        {weeks.length > 0 && (
+          <div className="mt-8">
+            <WeekWinners weeks={weeks} />
+          </div>
+        )}
 
         {started && (
           <div className="mt-5">

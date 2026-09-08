@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { brisbaneToday, calendarDay, calendarDayString } from '@/lib/fitness-days'
+import { currentWeekRange } from '@/lib/fitness-weeks'
 
 /**
  * Everything the challenge page shows, worked out in one pass.
@@ -102,11 +103,12 @@ export async function getChallengeBoard(challenge: {
   })
 
   const today = brisbaneToday()
-  // Monday of the current week, as a calendar day string, so entries can be
-  // bucketed by comparing strings rather than juggling timezones.
-  const todayDate = calendarDay(today)!
-  const weekday = ((todayDate.getUTCDay() + 6) % 7) + 1 // 1 = Mon
-  const weekStart = calendarDayString(new Date(todayDate.getTime() - (weekday - 1) * 86_400_000))
+  // The challenge week, not the calendar week. September 2026 started on a
+  // Tuesday, so a Monday-based week would cut week one in half and the "this
+  // week" leaderboard would disagree with the week-winner badge.
+  const week = currentWeekRange(challenge.startsAt)
+  const weekStart = week?.from ?? today
+  const weekEnd = week?.to ?? today
 
   const byDay = new Map<string, { total: number; walkers: number; leader: { name: string; amount: number } | null }>()
   const byPerson: Record<LeaderWindow, Map<string, Standing>> = {
@@ -134,7 +136,7 @@ export async function getChallengeBoard(challenge: {
     byDay.set(key, d)
 
     addTo('month', e.userId, name, e.amount)
-    if (key >= weekStart) addTo('week', e.userId, name, e.amount)
+    if (key >= weekStart && key <= weekEnd) addTo('week', e.userId, name, e.amount)
     if (key === today) addTo('today', e.userId, name, e.amount)
   }
 
