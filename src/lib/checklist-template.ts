@@ -13,8 +13,16 @@
  * toilets to keep clean.
  */
 
-export type Scope = 'both' | 'loganholme'
+/**
+ * 'shops' produces one copy per shop, each in that shop's own area.
+ * The others are single areas, all physically at Loganholme.
+ */
+export type Scope = 'shops' | 'warehouse' | 'office'
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY'
+
+/** Top-level tab on the checklist page. */
+export const AREAS = ['Loganholme', 'Hillcrest', 'Warehouse', 'Office'] as const
+export type Area = (typeof AREAS)[number]
 
 export type TemplateSection = {
   frequency: Frequency
@@ -28,7 +36,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'DAILY',
     section: 'Shop Floor & Customer Areas',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Sweep all shop floors',
       'Mop shop floors and clean spills immediately',
@@ -46,7 +54,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'DAILY',
     section: 'Fridges & Freezers',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Restock fridges and freezers',
       'Rotate stock using FIFO — oldest stock to the front',
@@ -61,7 +69,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'DAILY',
     section: 'Warehouse',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: [
       'Sweep warehouse floors and loading areas',
       'Remove loose cardboard, plastic wrap and rubbish',
@@ -78,7 +86,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'DAILY',
     section: 'Stock',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Rotate stock while replenishing shelves',
       'Check short-dated stock',
@@ -92,7 +100,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'DAILY',
     section: 'Staff Areas',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Empty kitchen bins',
       'Clean kitchen benches and sink',
@@ -107,13 +115,13 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'DAILY',
     section: 'Office',
-    scope: 'loganholme',
+    scope: 'office',
     items: ['Empty office bins', 'Keep desks and shared spaces tidy'],
   },
   {
     frequency: 'DAILY',
     section: 'Closing Check',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'All rubbish removed',
       'Floors clear',
@@ -125,7 +133,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'DAILY',
     section: 'Closing Check — Warehouse & Vehicles',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: ['Warehouse secure', 'Loading doors closed/locked', 'Vehicles secured'],
   },
 
@@ -133,7 +141,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Shop',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Thoroughly mop/scrub shop floors',
       'Clean underneath movable displays',
@@ -150,7 +158,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Fridges, Freezers & Cool Rooms',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Thoroughly clean fridge/freezer doors and handles',
       'Clean seals/gaskets',
@@ -164,7 +172,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Warehouse',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: [
       'Thoroughly sweep warehouse',
       'Sweep loading dock/loading bay',
@@ -181,7 +189,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Stock Management',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Complete a dedicated short-date/best-before review',
       'Review products already past best-before date',
@@ -197,7 +205,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Delivery Vehicles',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: [
       'Sweep/vacuum Lighthouse delivery vehicles',
       'Clean cargo areas',
@@ -215,7 +223,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Large Trucks',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: [
       'Sweep and clean truck cargo areas',
       'Remove pallets, rubbish and loose packaging',
@@ -231,7 +239,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Amenities',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Mop hard floors',
       'Thoroughly clean staff kitchen',
@@ -245,7 +253,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'WEEKLY',
     section: 'Office',
-    scope: 'loganholme',
+    scope: 'office',
     items: ['Vacuum office floors', 'Dust desks, shelves and equipment'],
   },
 
@@ -253,7 +261,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Deep Cleaning',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Deep clean shop floors',
       'Clean underneath shelving/display units where accessible',
@@ -267,7 +275,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Deep Cleaning — Warehouse',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: [
       'Clean warehouse corners and difficult-to-reach areas',
       'Clean loading dock/loading bay thoroughly',
@@ -276,7 +284,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Full Stock Review',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Complete full warehouse stock rotation check',
       'Review all short-dated stock',
@@ -293,7 +301,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Warehouse & Safety',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: [
       'Inspect racking for damage',
       'Inspect shelving',
@@ -314,7 +322,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Vehicles',
-    scope: 'loganholme',
+    scope: 'warehouse',
     items: [
       'Thoroughly wash and clean all delivery vehicles',
       'Thoroughly clean large trucks',
@@ -331,7 +339,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Refrigeration & Equipment',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Inspect fridge/freezer seals',
       'Check refrigeration temperatures/trends',
@@ -344,7 +352,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Building & Grounds',
-    scope: 'both',
+    scope: 'shops',
     items: [
       'Check external rubbish areas',
       'Clean around bins',
@@ -361,7 +369,7 @@ export const CHECKLIST_TEMPLATE: TemplateSection[] = [
   {
     frequency: 'MONTHLY',
     section: 'Office',
-    scope: 'loganholme',
+    scope: 'office',
     items: [
       'Declutter shared storage areas',
       'Dispose of unnecessary paperwork appropriately',
@@ -378,7 +386,7 @@ export function templateCounts(): { total: number; byFrequency: Record<Frequency
   const byFrequency: Record<Frequency, number> = { DAILY: 0, WEEKLY: 0, MONTHLY: 0 }
   let total = 0
   for (const s of CHECKLIST_TEMPLATE) {
-    const copies = s.scope === 'both' ? 2 : 1
+    const copies = s.scope === 'shops' ? 2 : 1
     const n = s.items.length * copies
     byFrequency[s.frequency] += n
     total += n

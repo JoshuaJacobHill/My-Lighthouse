@@ -77,6 +77,7 @@ export default async function StaffTasksPage() {
       orderBy: [{ frequency: 'asc' }, { sortOrder: 'asc' }, { title: 'asc' }],
       select: {
         id: true,
+        area: true,
         section: true,
         title: true,
         description: true,
@@ -118,6 +119,7 @@ export default async function StaffTasksPage() {
     const done = doneMap.has(mapKey)
     return {
       id: i.id,
+      area: i.area,
       section: i.section,
       title: i.title,
       description: i.description,

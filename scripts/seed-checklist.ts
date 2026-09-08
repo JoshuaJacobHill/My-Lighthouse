@@ -35,10 +35,23 @@ async function main() {
   let unchanged = 0
 
   for (const section of CHECKLIST_TEMPLATE) {
-    const targets =
-      section.scope === 'both' ? [loganholme, hillcrest] : [loganholme]
+    // Shop sections are copied per shop, each into that shop's own area.
+    // Warehouse and office are single areas, both physically at Loganholme —
+    // locationId stays Loganholme because shifts and attendance rely on it.
+    const targets: { location: { id: string; name: string }; area: string }[] =
+      section.scope === 'shops'
+        ? [
+            { location: loganholme, area: 'Loganholme' },
+            { location: hillcrest, area: 'Hillcrest' },
+          ]
+        : [
+            {
+              location: loganholme,
+              area: section.scope === 'warehouse' ? 'Warehouse' : 'Office',
+            },
+          ]
 
-    for (const location of targets) {
+    for (const { location, area } of targets) {
       for (const [i, title] of section.items.entries()) {
         // Sort keeps sections together and preserves the order they were
         // written in, which is the order someone works through them.
@@ -56,7 +69,7 @@ async function main() {
             locationId: location.id,
             section: section.section,
           },
-          select: { id: true, section: true, sortOrder: true, isActive: true },
+          select: { id: true, section: true, area: true, sortOrder: true, isActive: true },
         })
 
         if (!existing) {
@@ -66,6 +79,7 @@ async function main() {
                 title,
                 frequency: section.frequency,
                 section: section.section,
+                area,
                 locationId: location.id,
                 sortOrder,
                 isActive: true,
@@ -77,12 +91,14 @@ async function main() {
         }
 
         const needsUpdate =
-          existing.section !== section.section || existing.sortOrder !== sortOrder
+          existing.section !== section.section ||
+          existing.area !== area ||
+          existing.sortOrder !== sortOrder
         if (needsUpdate) {
           if (!DRY) {
             await prisma.checklistItem.update({
               where: { id: existing.id },
-              data: { section: section.section, sortOrder },
+              data: { section: section.section, area, sortOrder },
             })
           }
           updated++
@@ -98,20 +114,19 @@ async function main() {
   console.log(`unchanged: ${unchanged}`)
 
   const total = await prisma.checklistItem.count()
-  const byFreq = await prisma.checklistItem.groupBy({
-    by: ['frequency', 'locationId'],
+  const byArea = await prisma.checklistItem.groupBy({
+    by: ['area', 'frequency'],
     _count: true,
   })
   console.log(`\nitems in the database now: ${total}`)
-  for (const g of byFreq) {
-    const name = locations.find((l) => l.id === g.locationId)?.name ?? 'everywhere'
-    console.log(`  ${g.frequency.padEnd(8)} ${name.padEnd(20)} ${g._count}`)
+  for (const g of byArea.sort((a, b) => (a.area ?? '').localeCompare(b.area ?? ''))) {
+    console.log(`  ${(g.area ?? 'unset').padEnd(12)} ${g.frequency.padEnd(8)} ${g._count}`)
   }
 }
 
 main()
   .then(() => process.exit(0))
   .catch((e) => {
-    console.error(e.message?.slice(0, 400))
+    console.error(e.message ?? e)
     process.exit(1)
   })

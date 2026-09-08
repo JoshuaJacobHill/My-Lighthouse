@@ -20,6 +20,7 @@ export interface TaskRow {
 
 export interface ChecklistRow {
   id: string
+  area: string | null
   section: string | null
   title: string
   description: string | null
@@ -69,66 +70,66 @@ export function TaskList({
   const doneTasks = tasks.filter((t) => t.done)
   const shownTasks = tab === 'OPEN' ? openTasks : doneTasks
 
-  // Which store's list to show. Staff records carry no location, so this is a
-  // choice rather than something derived — remembered per device, since most
-  // people work at one shop and shouldn't have to pick every visit.
-  const stores = React.useMemo(
-    () => [...new Set(checklist.map((c) => c.location).filter((x): x is string => Boolean(x)))].sort(),
+  // Two levels of tabs. 289 items will not be worked through as one page, and
+  // stacking three frequencies meant scrolling past 54 daily items to reach
+  // anything weekly.
+  const areas = React.useMemo(
+    () => [...new Set(checklist.map((c) => c.area).filter((a): a is string => Boolean(a)))],
     [checklist],
   )
-  // Resolved as the initial state: localStorage is synchronous, so there is
-  // nothing to wait for, and reading it here avoids both a wasted render and
-  // the wrong store's list flashing up first.
-  const [store, setStore] = React.useState<string | null>(() => {
+
+  // Remembered per device: most people work in one area and should not have to
+  // choose on every visit. Read as initial state, so the wrong list never
+  // flashes up first.
+  const [pickedArea, setPickedArea] = React.useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     try {
-      const saved = window.localStorage.getItem('lh.checklist.store')
-      return saved || null
+      return window.localStorage.getItem('lh.checklist.area') || null
     } catch {
       return null
     }
   })
+  const area = pickedArea && areas.includes(pickedArea) ? pickedArea : areas[0] ?? null
 
-  // Fall back to the first store when nothing is saved, or the saved one has
-  // gone away. Derived rather than stored, so no effect is needed.
-  const activeStore = store && stores.includes(store) ? store : stores[0] ?? null
+  const [freq, setFreq] = React.useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('DAILY')
 
-  function pickStore(next: string) {
-    setStore(next)
+  function pickArea(next: string) {
+    setPickedArea(next)
     try {
-      window.localStorage.setItem('lh.checklist.store', next)
+      window.localStorage.setItem('lh.checklist.area', next)
     } catch {
-      // storage blocked; the choice just won't persist
+      // storage blocked; the choice just will not persist
     }
   }
 
-  const forStore = React.useMemo(
-    () =>
-      activeStore
-        ? checklist.filter((c) => c.location === activeStore || !c.location)
-        : checklist,
-    [checklist, activeStore],
+  const inArea = React.useMemo(
+    () => (area ? checklist.filter((c) => c.area === area) : checklist),
+    [checklist, area],
   )
 
-  const groups = [
-    { key: 'DAILY', label: 'Daily' },
-    { key: 'WEEKLY', label: 'Weekly' },
-    { key: 'MONTHLY', label: 'Monthly' },
-  ]
-    .map((g) => {
-      const items = forStore.filter((c) => c.frequency === g.key)
-      // Sections in the order the seed laid them out, which is the order
-      // someone actually works through them.
-      const sections: { name: string; items: ChecklistRow[] }[] = []
-      for (const item of items) {
-        const name = item.section ?? 'Other'
-        const last = sections[sections.length - 1]
-        if (last && last.name === name) last.items.push(item)
-        else sections.push({ name, items: [item] })
-      }
-      return { ...g, items, sections }
-    })
-    .filter((g) => g.items.length > 0)
+  const FREQS = [
+    { key: 'DAILY' as const, label: 'Daily' },
+    { key: 'WEEKLY' as const, label: 'Weekly' },
+    { key: 'MONTHLY' as const, label: 'Monthly' },
+  ].map((f) => {
+    const items = inArea.filter((c) => c.frequency === f.key)
+    return { ...f, items, done: items.filter((c) => c.done).length }
+  })
+
+  const shown = FREQS.find((f) => f.key === freq) ?? FREQS[0]
+
+  // Sections in the order the seed laid them out, which is the order someone
+  // actually works through them.
+  const sections = React.useMemo(() => {
+    const out: { name: string; items: ChecklistRow[] }[] = []
+    for (const item of shown?.items ?? []) {
+      const name = item.section ?? 'Other'
+      const last = out[out.length - 1]
+      if (last && last.name === name) last.items.push(item)
+      else out.push({ name, items: [item] })
+    }
+    return out
+  }, [shown])
 
   return (
     <div className="space-y-8">
@@ -226,50 +227,72 @@ export function TaskList({
       </section>
 
       {/* Recurring checklists */}
-      {stores.length > 1 && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-neutral-500">Showing</span>
-          <div className="flex rounded-full border border-neutral-200 p-0.5">
-            {stores.map((s) => (
+      <section>
+        <h2 className="text-xl font-bold tracking-tight">Checklists</h2>
+        <p className="mt-0.5 text-sm text-neutral-500">
+          Shared by the whole team — whoever does it, ticks it.
+        </p>
+
+        {areas.length > 1 && (
+          <div className="mt-3 flex flex-wrap gap-1">
+            {areas.map((a) => (
               <button
-                key={s}
+                key={a}
                 type="button"
-                onClick={() => pickStore(s)}
+                onClick={() => pickArea(a)}
                 className={
                   'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ' +
-                  (activeStore === s ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:text-neutral-800')
+                  (area === a
+                    ? 'bg-neutral-900 text-white'
+                    : 'border border-neutral-200 text-neutral-500 hover:text-neutral-800')
                 }
               >
-                {s.replace(/ Store$/, '')}
+                {a}
               </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {groups.map((g) => (
-        <section key={g.key}>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-xl font-bold tracking-tight">{g.label} checklist</h2>
-            <p className="text-sm font-semibold text-neutral-500">
-              {g.items.filter((c) => c.done).length} of {g.items.length} done
-            </p>
-          </div>
-          <p className="mt-0.5 text-sm text-neutral-500">
-            Shared by the whole team — whoever does it, ticks it.
+        <div className="mt-3 flex rounded-full border border-neutral-200 p-0.5">
+          {FREQS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFreq(f.key)}
+              disabled={f.items.length === 0}
+              className={
+                'flex-1 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-40 ' +
+                (freq === f.key ? 'bg-orange-600 text-white' : 'text-neutral-500 hover:text-neutral-800')
+              }
+            >
+              {f.label}
+              {f.items.length > 0 && (
+                <span className={freq === f.key ? 'text-white/70' : 'text-neutral-400'}>
+                  {' '}
+                  {f.done}/{f.items.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {sections.length === 0 ? (
+          <p className="mt-4 rounded-[28px] border border-dashed border-neutral-300 px-5 py-8 text-center text-sm text-neutral-500">
+            Nothing on this list.
           </p>
-          {g.sections.map((sec) => (
-          <div key={sec.name} className="mt-4">
-          <div className="flex items-baseline justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-400">
-              {sec.name}
-            </h3>
-            <span className="text-xs text-neutral-400">
-              {sec.items.filter((c) => c.done).length}/{sec.items.length}
-            </span>
-          </div>
-          <ul className="mt-2 divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
-            {sec.items.map((c) => (
+        ) : (
+          sections.map((sec) => (
+            <div key={sec.name} className="mt-4">
+              <div className="flex items-baseline justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-400">
+                  {sec.name}
+                </h3>
+                <span className="text-xs text-neutral-400">
+                  {sec.items.filter((c) => c.done).length}/{sec.items.length}
+                </span>
+              </div>
+              <ul className="mt-2 divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
+                {sec.items.map((c) => (
               <li key={c.id} className="flex items-start gap-4 p-4">
                 <Tick
                   done={c.done}
@@ -309,12 +332,12 @@ export function TaskList({
                   </div>
                 </div>
               </li>
-            ))}
-          </ul>
-          </div>
-          ))}
-        </section>
-      ))}
+                ))}
+              </ul>
+            </div>
+          ))
+        )}
+      </section>
     </div>
   )
 }

@@ -1287,6 +1287,12 @@ model ChecklistItem {
   /// Without it the daily list is fifty-odd undifferentiated checkboxes, which
   /// nobody works through twice.
   section     String?
+  /// Which part of the operation this belongs to: Loganholme, Hillcrest,
+  /// Warehouse, Office. Separate from locationId on purpose — the warehouse
+  /// and the office are both physically at Loganholme, but nobody works
+  /// through them as part of the shop list, and locationId is relied on by
+  /// shifts and attendance.
+  area        String?
   locationId  String? // null = applies everywhere
   // Hard deadline inside the period — "HH:MM" Brisbane. Past this, it's overdue.
   dueTime     String?
