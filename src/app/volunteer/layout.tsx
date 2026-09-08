@@ -16,6 +16,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
     <PortalShell
       unreadCount={unreadCount}
       userName={user.name ?? 'Volunteer'}
+      avatarUrl={user.imageUrl}
       isVolunteer={user.hasVolunteerProfile}
       hasGiven={user.donationCount > 0}
       isAdmin={isAdminRole(user.role)}

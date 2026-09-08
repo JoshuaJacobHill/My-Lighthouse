@@ -52,6 +52,7 @@ export interface PortalCapabilities {
 export function PortalShell({
   children,
   userName,
+  avatarUrl,
   isVolunteer,
   hasGiven,
   isStaff,
@@ -61,6 +62,7 @@ export function PortalShell({
 }: {
   children: React.ReactNode
   userName: string
+  avatarUrl?: string | null
   /** Drives the dot on the bell. Opening the feed clears it. */
   unreadCount?: number
 } & PortalCapabilities) {
@@ -210,7 +212,7 @@ export function PortalShell({
       <aside className="hidden w-64 flex-col border-r border-gray-200 bg-white lg:flex">
         <div className="border-b border-gray-200 p-4">
           <div className="flex items-center gap-3">
-            <Avatar name={displayName} size="md" />
+            <Avatar src={avatarUrl ?? undefined} name={displayName} size="md" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-gray-900">{displayName}</p>
               <p className="text-xs text-gray-500">{roleLabel}</p>
@@ -237,7 +239,7 @@ export function PortalShell({
         {/* Mobile top bar */}
         <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm lg:hidden">
           <div className="flex items-center gap-3">
-            <Avatar name={displayName} size="sm" />
+            <Avatar src={avatarUrl ?? undefined} name={displayName} size="sm" />
             <span className="text-sm font-semibold text-gray-900">{displayName}</span>
           </div>
           <div className="flex items-center gap-1">

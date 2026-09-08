@@ -33,6 +33,7 @@ export default async function DonorLayout({ children }: { children: React.ReactN
       unreadCount={unreadCount}
       canSeeReports={canSeeReports}
       userName={user.name ?? 'Friend'}
+      avatarUrl={user.imageUrl}
       isVolunteer={user.hasVolunteerProfile}
       hasGiven={user.donationCount > 0}
       isStaff={user.isStaff || user.isTrainee}

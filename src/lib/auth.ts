@@ -70,6 +70,7 @@ export const getSession = cache(async function getSession(): Promise<{
     /** Status of the volunteer profile, when there is one. */
     volunteerStatus: string | null
     donationCount: number
+    imageUrl: string | null
   }
 } | null> {
   try {
@@ -127,6 +128,7 @@ export const getSession = cache(async function getSession(): Promise<{
         hasVolunteerProfile: Boolean(session.user.volunteerProfile),
         volunteerStatus: session.user.volunteerProfile?.status ?? null,
         donationCount: session.user._count.donations,
+        imageUrl: session.user.imageUrl,
       },
     }
   } catch {
