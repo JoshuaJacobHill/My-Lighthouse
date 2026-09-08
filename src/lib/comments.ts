@@ -196,6 +196,7 @@ export async function notifyOnComment(input: {
     await notify({
       audience: { kind: 'users', ids: [...tagged] },
       category: storyId ? 'STORY' : 'TASK',
+      optional: 'mentions',
       title: input.subject,
       body: `${input.authorName} tagged you in a comment`,
       href: input.href,
@@ -208,6 +209,7 @@ export async function notifyOnComment(input: {
     await notify({
       audience: { kind: 'users', ids: others },
       category: storyId ? 'STORY' : 'TASK',
+      optional: 'comments',
       title: input.subject,
       body: `${input.authorName} commented`,
       href: input.href,

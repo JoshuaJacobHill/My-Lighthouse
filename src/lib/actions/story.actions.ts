@@ -100,6 +100,7 @@ async function announceStory(
   await notify({
     audience,
     category: 'STORY',
+    optional: 'stories',
     title: story.title,
     body: 'Lighthouse shared a good news story',
     href: `/dashboard/news?story=${encodeURIComponent(story.slug)}`,

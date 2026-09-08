@@ -133,21 +133,33 @@ model User {
   /// direction.
   fairPlayNoticeAt       DateTime?
   fairPlayNoticeAckAt    DateTime?
+
+  /// Notification preferences. Booleans on the user rather than a separate
+  /// table: there are a handful of them, they are read on every send, and a
+  /// join for four flags earns nothing.
+  ///
+  /// Deliberately no switch for tasks or shift requests. Those are work
+  /// somebody is waiting on, not news — being able to silence them means an
+  /// assignment disappears with nobody realising.
+  notifyEmail    Boolean   @default(true)
+  notifyComments Boolean   @default(true)
+  notifyMentions Boolean   @default(true)
+  notifyStories  Boolean   @default(true)
   // Display picture / avatar (may be a data URL, e.g. an uploaded sponsor logo).
-  imageUrl               String?   @db.Text
+  imageUrl       String?   @db.Text
   // Church member — sees church-only news, events & serving teams (in addition
   // to all Lighthouse Care content). Auto-set when they tithe; admin-toggleable.
-  isChurchMember         Boolean   @default(false)
+  isChurchMember Boolean   @default(false)
   // Staff member — an employee. Sees staff-only news, tasks, checklists and the
   // staff wellbeing/fitness challenges. A flag rather than a role, because staff
   // are usually volunteers and/or donors too and must keep those capabilities.
-  isStaff                Boolean   @default(false)
+  isStaff        Boolean   @default(false)
   // Trainee — supported employment/traineeship. Sees their hours, achievements,
   // required tasks and training modules, and can be assigned tasks with staff.
-  isTrainee              Boolean   @default(false)
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-  lastLoginAt            DateTime?
+  isTrainee      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lastLoginAt    DateTime?
 
   accounts            Account[]
   sessions            UserSession[]

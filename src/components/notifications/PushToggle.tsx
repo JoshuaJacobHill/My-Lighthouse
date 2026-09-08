@@ -22,6 +22,50 @@ import { useToast } from '@/components/ui/use-toast'
  * again — so it is never triggered on page load.
  */
 
+/**
+ * Nothing here is allowed to hang.
+ *
+ * The original version awaited each browser call directly, and on iOS one of
+ * them never settled — so the button span forever, no error was thrown, and
+ * there was nothing to report. A rejected promise is recoverable; a pending
+ * one is not.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, step: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`STEP:${step}`)), ms),
+    ),
+  ])
+}
+
+/**
+ * Permission, whichever form this browser supports.
+ *
+ * Safari shipped the callback signature years before the promise one, and on
+ * an older iOS the promise simply never resolves. Asking for both means the
+ * callback settles it even where the promise will not.
+ */
+function requestPermission(): Promise<NotificationPermission> {
+  return new Promise((resolve, reject) => {
+    try {
+      let settled = false
+      const done = (p: NotificationPermission) => {
+        if (!settled) {
+          settled = true
+          resolve(p)
+        }
+      }
+      // Callback form — harmless where it is ignored.
+      const maybe = Notification.requestPermission(done)
+      // Promise form, where it exists.
+      if (maybe && typeof maybe.then === 'function') void maybe.then(done, reject)
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
+
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4)
   const normalised = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -81,6 +125,8 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
   const [busy, setBusy] = React.useState(false)
   const [devices, setDevices] = React.useState(0)
   const [endpoint, setEndpoint] = React.useState<string | null>(null)
+  /** Which step failed, shown so a phone problem can be reported precisely. */
+  const [stuckAt, setStuckAt] = React.useState<string | null>(null)
 
   // Only the part that needs the service worker registry and the database.
   const check = React.useCallback(async () => {
@@ -106,20 +152,31 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
   async function turnOn() {
     if (!publicKey) return
     setBusy(true)
+    setStuckAt(null)
     try {
-      const permission = await Notification.requestPermission()
+      const permission = await withTimeout(requestPermission(), 60_000, 'permission')
       if (permission !== 'granted') {
         setState(permission === 'denied' ? 'blocked' : 'off')
         return
       }
 
-      const reg = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
+      const reg = await withTimeout(
+        navigator.serviceWorker.register('/sw.js'),
+        20_000,
+        'service worker',
+      )
+      // Not fatal on its own: a registration can be usable before anything
+      // controls the page, so a slow claim should not stop us subscribing.
+      await withTimeout(navigator.serviceWorker.ready, 15_000, 'worker ready').catch(() => {})
 
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
-      })
+      const sub = await withTimeout(
+        reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+        }),
+        20_000,
+        'subscribe',
+      )
 
       const json = sub.toJSON() as { keys?: { p256dh?: string; auth?: string } }
       const res = await subscribePushAction({
@@ -138,9 +195,18 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       await check()
       toast.success('Notifications on', `${deviceLabel()} will get a nudge for new things.`)
     } catch (err) {
+      const message = (err as Error).message ?? ''
+      const step = message.startsWith('STEP:') ? message.slice(5) : null
       console.error('push subscribe failed', err)
-      toast.error('Could not turn on', 'Something went wrong setting this up.')
+      setStuckAt(step ?? 'unknown')
+      toast.error(
+        'Could not turn on',
+        step
+          ? `It stopped at: ${step}. Nothing is broken — tell Josh which step and he can fix it.`
+          : 'Something went wrong setting this up.',
+      )
     } finally {
+      // Always, whatever happened. A stuck spinner tells nobody anything.
       setBusy(false)
     }
   }
@@ -274,6 +340,13 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
           </button>
         </div>
       </div>
+
+      {stuckAt && (
+        <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
+          Setting up stopped at <strong>{stuckAt}</strong>. Nothing is broken — telling Josh which
+          step it named is enough to fix it.
+        </p>
+      )}
     </Wrap>
   )
 }

@@ -149,9 +149,20 @@ const DEFAULT_ACTION: Record<NotificationCategory, string> = {
   GENERAL: 'View now',
 }
 
+/**
+ * Which preference, if any, governs a notification.
+ *
+ * Tasks and shift requests are absent on purpose: they are work someone is
+ * waiting on, and letting them be silenced means an assignment vanishes with
+ * nobody realising. News is optional; being asked to do something is not.
+ */
+export type Governedby = 'comments' | 'mentions' | 'stories' | null
+
 export type NotifyInput = {
   audience: Audience
   category: NotificationCategory
+  /** Preference that can switch this off. Omit for anything unmissable. */
+  optional?: Governedby
   /** The thing itself, shown in bold: "Pack shelves", "Cindy's Story". */
   title: string
   /** One line about what happened. */
@@ -179,6 +190,23 @@ export async function notify(input: NotifyInput): Promise<number> {
     let userIds = await resolveAudience(input.audience)
     if (input.exceptUserId) userIds = userIds.filter((id) => id !== input.exceptUserId)
     if (userIds.length === 0) return 0
+
+    // Drop anyone who has switched this kind off. Only applies to the optional
+    // kinds — see Governedby.
+    if (input.optional) {
+      const field =
+        input.optional === 'comments'
+          ? 'notifyComments'
+          : input.optional === 'mentions'
+            ? 'notifyMentions'
+            : 'notifyStories'
+      const willing = await prisma.user.findMany({
+        where: { id: { in: userIds }, [field]: true },
+        select: { id: true },
+      })
+      userIds = willing.map((u) => u.id)
+      if (userIds.length === 0) return 0
+    }
 
     await prisma.notification.create({
       data: {

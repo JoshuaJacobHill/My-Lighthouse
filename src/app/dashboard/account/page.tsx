@@ -1,17 +1,67 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, KeyRound, HandHeart, ArrowRight, Church } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  KeyRound,
+  HandHeart,
+  Church,
+  User as UserIcon,
+} from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { AccountSettingsForm } from '@/components/donor/AccountSettingsForm'
-import { PushToggle } from '@/components/notifications/PushToggle'
-import { LinkedEmails } from '@/components/donor/LinkedEmails'
+import { SignOutRow } from './SignOutRow'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Account' }
 
-export const metadata = { title: 'Account settings' }
+/**
+ * The account screen.
+ *
+ * A list of destinations rather than one long scroll of forms. Everything that
+ * used to be stacked here now has its own page, which suits a phone and means
+ * the common case — changing a notification setting — is two taps instead of
+ * scrolling past an address form.
+ */
+function Row({
+  href,
+  icon: Icon,
+  title,
+  hint,
+  tone = 'plain',
+}: {
+  href: string
+  icon: React.ElementType
+  title: string
+  hint?: string
+  tone?: 'plain' | 'accent'
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-neutral-50"
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className={
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ' +
+            (tone === 'accent' ? 'bg-orange-50 text-orange-600' : 'bg-neutral-100 text-neutral-500')
+          }
+        >
+          <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0">
+          <span className="block font-semibold text-neutral-900">{title}</span>
+          {hint && <span className="block truncate text-sm text-neutral-500">{hint}</span>}
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-neutral-300" aria-hidden="true" />
+    </Link>
+  )
+}
 
-export default async function DonorAccountPage() {
+export default async function AccountPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
@@ -20,13 +70,8 @@ export default async function DonorAccountPage() {
     select: {
       name: true,
       email: true,
-      company: true,
-      donorProfile: { select: { phone: true, address: true, consentEmailUpdates: true } },
+      imageUrl: true,
       volunteerProfile: { select: { id: true } },
-      extraEmails: {
-        select: { id: true, email: true, verifiedAt: true },
-        orderBy: { createdAt: 'asc' },
-      },
     },
   })
   if (!user) redirect('/login')
@@ -36,101 +81,93 @@ export default async function DonorAccountPage() {
     await prisma.donation.findFirst({
       where: { userId: session.userId, isTithe: true },
       select: { id: true },
-    })
+    }),
   )
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
-      <Link
-        href="/dashboard"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to dashboard
-      </Link>
-
-      <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-900">Account settings</h1>
-      <p className="mt-1.5 text-gray-500">Update your details and preferences.</p>
-
-      <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <AccountSettingsForm
-          initial={{
-            name: user.name ?? '',
-            email: user.email,
-            company: user.company ?? '',
-            phone: user.donorProfile?.phone ?? '',
-            address: user.donorProfile?.address ?? '',
-            consentEmailUpdates: user.donorProfile?.consentEmailUpdates ?? false,
-          }}
-        />
-      </div>
-
-      <div className="mt-6">
-        <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
-      </div>
-
-      <LinkedEmails
-        primary={user.email}
-        emails={user.extraEmails.map((e) => ({ id: e.id, email: e.email, verified: e.verifiedAt !== null }))}
-      />
-
-      {/* My tithes (church givers only) */}
-      {hasTithe && (
+    <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
+      <div className="mx-auto max-w-2xl px-5 py-8 sm:px-8">
         <Link
-          href="/dashboard/tithes"
-          className="mt-5 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-500 hover:text-neutral-800"
         >
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
-              <Church className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-semibold text-gray-900">My tithes</p>
-              <p className="text-sm text-gray-500">Manage your regular tithe to Lighthouse Family Church.</p>
-            </div>
-          </div>
-          <ArrowRight className="h-4 w-4 text-gray-400" />
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Dashboard
         </Link>
-      )}
 
-      {/* Password */}
-      <div className="mt-5 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
-            <KeyRound className="h-5 w-5" />
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Account</h1>
+
+        {/* Who you are, and the way into your details. */}
+        <Link
+          href="/dashboard/account/details"
+          className="mt-6 flex items-center justify-between gap-3 rounded-[28px] border border-neutral-200 p-4 transition-colors hover:bg-neutral-50"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-100 text-neutral-400">
+              {user.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <UserIcon className="h-6 w-6" aria-hidden="true" />
+              )}
+            </span>
+            <span className="min-w-0">
+              <span className="block font-bold text-neutral-900">{user.name ?? user.email}</span>
+              <span className="block text-sm text-neutral-500">Personal info</span>
+            </span>
           </span>
-          <div>
-            <p className="font-semibold text-gray-900">Password</p>
-            <p className="text-sm text-gray-500">We&rsquo;ll email you a secure link to change it.</p>
-          </div>
-        </div>
-        <Link
-          href="/forgot-password"
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Change password
+          <ArrowRight className="h-4 w-4 shrink-0 text-neutral-300" aria-hidden="true" />
         </Link>
-      </div>
 
-      {/* Volunteer sign-up */}
-      {!isVolunteer && (
-        <div className="mt-5 flex flex-col items-start justify-between gap-4 rounded-2xl border border-orange-200 bg-orange-50/60 p-6 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-orange-500 shadow-sm">
-              <HandHeart className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-semibold text-gray-900">Want to volunteer with us?</p>
-              <p className="text-sm text-gray-600">Give your time alongside your generosity.</p>
-            </div>
-          </div>
+        <h2 className="mt-8 text-xs font-bold uppercase tracking-wide text-neutral-400">
+          Settings
+        </h2>
+        <div className="mt-2 divide-y divide-neutral-100 overflow-hidden rounded-[28px] border border-neutral-200">
+          <Row
+            href="/dashboard/account/notifications"
+            icon={Bell}
+            title="Notifications"
+            hint="What reaches you, and on which devices"
+          />
+          <Row
+            href="/forgot-password"
+            icon={KeyRound}
+            title="Password"
+            hint="We’ll email a secure link to change it"
+          />
+          {hasTithe && (
+            <Row
+              href="/dashboard/tithes"
+              icon={Church}
+              title="My tithes"
+              hint="Manage your regular tithe"
+              tone="accent"
+            />
+          )}
+          <SignOutRow />
+        </div>
+
+        {!isVolunteer && (
           <Link
             href="/volunteer/apply"
-            className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+            className="mt-6 flex items-center justify-between gap-4 rounded-[28px] border border-orange-200 bg-orange-50/60 p-5 transition-colors hover:bg-orange-50"
           >
-            Sign up to volunteer <ArrowRight className="h-4 w-4" />
+            <span className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-orange-500 shadow-sm">
+                <HandHeart className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span>
+                <span className="block font-semibold text-neutral-900">
+                  Want to volunteer with us?
+                </span>
+                <span className="block text-sm text-neutral-600">
+                  Give your time alongside your generosity.
+                </span>
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-orange-400" aria-hidden="true" />
           </Link>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
