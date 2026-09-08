@@ -128,6 +128,12 @@ export default async function StaffFitnessPage() {
         )}
 
 
+        {started && weeks.length > 0 && (
+          <div className="mt-7">
+            <WeekWinners weeks={weeks} />
+          </div>
+        )}
+
         {started ? (
           <div className="mt-7">
             <TodaysTarget pace={pace} />
@@ -236,11 +242,6 @@ export default async function StaffFitnessPage() {
           <TopFive top={board.top} />
         </div>
 
-        {weeks.length > 0 && (
-          <div className="mt-8">
-            <WeekWinners weeks={weeks} />
-          </div>
-        )}
 
         {started && (
           <div className="mt-5">
