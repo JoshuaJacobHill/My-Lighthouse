@@ -22,7 +22,6 @@ import { SendInviteButton } from '@/components/admin/SendInviteButton'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
 import { listRecurringForEmail } from '@/lib/admin-recurring'
 import { StaffToggles } from '@/components/admin/StaffToggles'
-import { FairPlayControl } from '@/components/admin/FairPlayControl'
 import { ChurchMemberToggle } from '@/components/admin/ChurchMemberToggle'
 import { USER_ROLES } from '@/lib/constants'
 
@@ -50,8 +49,6 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
       isActive: true,
       isChurchMember: true,
       isStaff: true,
-      fairPlayNoticeAt: true,
-      fairPlayNoticeAckAt: true,
       passwordHash: true,
       isTrainee: true,
       createdAt: true,
@@ -160,18 +157,6 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
           <div className="mt-3 flex flex-wrap gap-2">
             <ChurchMemberToggle userId={user.id} initial={user.isChurchMember} />
             <StaffToggles userId={user.id} isStaff={user.isStaff} isTrainee={user.isTrainee} />
-
-            {/* Only where it is relevant — the challenge is staff-only. */}
-            {(user.isStaff || user.isTrainee) && me.role === 'SUPER_ADMIN' && (
-              <div className="mt-4">
-                <FairPlayControl
-                  userId={user.id}
-                  name={user.name ?? user.email}
-                  sentAt={user.fairPlayNoticeAt}
-                  ackAt={user.fairPlayNoticeAckAt}
-                />
-              </div>
-            )}
             <div className="mt-4">
               <SendInviteButton userId={user.id} hasPassword={Boolean(user.passwordHash)} />
             </div>

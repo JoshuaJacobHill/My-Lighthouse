@@ -9,8 +9,6 @@ import { TotalSteps, TipOfTheDay, TodaysTarget } from './ChallengePanels'
 import { getChallengeWeeks } from '@/lib/fitness-weeks'
 import { TopFive } from './TopFive'
 import { WeekWinners } from './WeekWinners'
-import { FairPlayNotice, FairPlayReminder } from './FairPlay'
-import { FAIR_PLAY_NOTICE, FAIR_PLAY_REMINDER, reminderIsLive } from '@/lib/fair-play'
 import { WeekSchedule } from './WeekSchedule'
 import { PaceNudge } from './PaceNudge'
 import { CheerWall } from './CheerWall'
@@ -60,7 +58,7 @@ export default async function StaffFitnessPage() {
     )
   }
 
-  const [board, tip, schedule, mine, eligible, cheers, weeks, fairPlay, fitnessLink] = await Promise.all([
+  const [board, tip, schedule, mine, eligible, cheers, weeks, fitnessLink] = await Promise.all([
     getChallengeBoard(challenge),
     getTipOfTheDay(),
     getWellbeingSchedule(challenge),
@@ -72,24 +70,11 @@ export default async function StaffFitnessPage() {
     prisma.user.count({ where: { OR: [{ isStaff: true }, { isTrainee: true }], isActive: true } }),
     getTodaysCheers(challenge.id, session.userId),
     getChallengeWeeks(challenge),
-    prisma.user.findUnique({
-      where: { id: me.id },
-      select: { fairPlayNoticeAt: true, fairPlayNoticeAckAt: true },
-    }),
     prisma.fitnessLink.findFirst({
       where: { userId: me.id, revokedAt: null },
       select: { lastUsedAt: true, lastAmount: true },
     }),
   ])
-
-  // Shown until they say they have read it; a fresh send clears the ack.
-  // The personal notice stays until an admin withdraws it — acknowledging
-  // records that it was read without taking it down.
-  const notice = fairPlay?.fairPlayNoticeAt != null
-
-  // Everyone else, until it expires on the 10th. Never both: being told the
-  // general version as well would only muddy a message addressed to you.
-  const reminder = !notice && reminderIsLive()
 
   const today = brisbaneToday()
   const myTotal = mine.reduce((sum, e) => sum + e.amount, 0)
@@ -140,25 +125,6 @@ export default async function StaffFitnessPage() {
             <span className="h-1.5 w-1.5 rounded-full bg-orange-500" aria-hidden="true" />
             Starts {startLabel}
           </p>
-        )}
-
-
-        {notice && (
-          <div className="mt-6">
-            <FairPlayNotice
-              heading={FAIR_PLAY_NOTICE.heading}
-              paragraphs={FAIR_PLAY_NOTICE.paragraphs}
-            />
-          </div>
-        )}
-
-        {reminder && (
-          <div className="mt-6">
-            <FairPlayReminder
-              heading={FAIR_PLAY_REMINDER.heading}
-              paragraphs={FAIR_PLAY_REMINDER.paragraphs}
-            />
-          </div>
         )}
 
         {started && weeks.length > 0 && (

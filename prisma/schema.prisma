@@ -127,10 +127,10 @@ model User {
   /// canViewDonations, because store revenue and ad spend are not something
   /// every admin needs to see.
   canViewBusinessReports Boolean   @default(false)
-  /// When an admin sent this person the fair-play notice, and when they said
-  /// they had read it. Two fields rather than one so sending it stays on the
-  /// record — a message of this kind should not be deniable in either
-  /// direction.
+  /// Retired. Held when and whether someone was sent the September 2026
+  /// fair-play notice; nothing reads them now the warnings have come down.
+  /// Kept because the production schema is additive-only, and because the
+  /// record of a message of that kind should not quietly disappear.
   fairPlayNoticeAt       DateTime?
   fairPlayNoticeAckAt    DateTime?
 
