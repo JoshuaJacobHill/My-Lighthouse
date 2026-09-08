@@ -9,6 +9,8 @@ import { TotalSteps, TipOfTheDay, TodaysTarget } from './ChallengePanels'
 import { getChallengeWeeks } from '@/lib/fitness-weeks'
 import { TopFive } from './TopFive'
 import { WeekWinners } from './WeekWinners'
+import { FairPlayNote, FairPlayNotice } from './FairPlay'
+import { FAIR_PLAY_NOTICE } from '@/lib/fair-play'
 import { WeekSchedule } from './WeekSchedule'
 import { PaceNudge } from './PaceNudge'
 import { CheerWall } from './CheerWall'
@@ -58,7 +60,7 @@ export default async function StaffFitnessPage() {
     )
   }
 
-  const [board, tip, schedule, mine, eligible, cheers, weeks, fitnessLink] = await Promise.all([
+  const [board, tip, schedule, mine, eligible, cheers, weeks, fairPlay, fitnessLink] = await Promise.all([
     getChallengeBoard(challenge),
     getTipOfTheDay(),
     getWellbeingSchedule(challenge),
@@ -70,11 +72,21 @@ export default async function StaffFitnessPage() {
     prisma.user.count({ where: { OR: [{ isStaff: true }, { isTrainee: true }], isActive: true } }),
     getTodaysCheers(challenge.id, session.userId),
     getChallengeWeeks(challenge),
+    prisma.user.findUnique({
+      where: { id: me.id },
+      select: { fairPlayNoticeAt: true, fairPlayNoticeAckAt: true },
+    }),
     prisma.fitnessLink.findFirst({
       where: { userId: me.id, revokedAt: null },
       select: { lastUsedAt: true, lastAmount: true },
     }),
   ])
+
+  // Shown until they say they have read it; a fresh send clears the ack.
+  const notice =
+    fairPlay?.fairPlayNoticeAt != null &&
+    (fairPlay.fairPlayNoticeAckAt == null ||
+      fairPlay.fairPlayNoticeAckAt < fairPlay.fairPlayNoticeAt)
 
   const today = brisbaneToday()
   const myTotal = mine.reduce((sum, e) => sum + e.amount, 0)
@@ -127,6 +139,15 @@ export default async function StaffFitnessPage() {
           </p>
         )}
 
+
+        {notice && (
+          <div className="mt-6">
+            <FairPlayNotice
+              heading={FAIR_PLAY_NOTICE.heading}
+              paragraphs={FAIR_PLAY_NOTICE.paragraphs}
+            />
+          </div>
+        )}
 
         {started && weeks.length > 0 && (
           <div className="mt-7">
@@ -231,6 +252,12 @@ export default async function StaffFitnessPage() {
               behind={onTrack - board.total}
               startLabel={startLabel}
             />
+          </div>
+        )}
+
+        {started && (
+          <div className="mt-5">
+            <FairPlayNote />
           </div>
         )}
 

@@ -127,6 +127,12 @@ model User {
   /// canViewDonations, because store revenue and ad spend are not something
   /// every admin needs to see.
   canViewBusinessReports Boolean   @default(false)
+  /// When an admin sent this person the fair-play notice, and when they said
+  /// they had read it. Two fields rather than one so sending it stays on the
+  /// record — a message of this kind should not be deniable in either
+  /// direction.
+  fairPlayNoticeAt       DateTime?
+  fairPlayNoticeAckAt    DateTime?
   // Display picture / avatar (may be a data URL, e.g. an uploaded sponsor logo).
   imageUrl               String?   @db.Text
   // Church member — sees church-only news, events & serving teams (in addition
