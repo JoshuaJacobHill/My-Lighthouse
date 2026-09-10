@@ -366,6 +366,33 @@ async function ingestInstagram(cfg: Cfg, pt: string, limit = POST_LIMIT): Promis
     }
 
     /**
+     * `total_views` in its own request.
+     *
+     * Instagram's `views` is one surface. These reels are crossposted to
+     * Facebook, and the API exposes `facebook_views` and `crossposted_views`
+     * separately — so `views` is a slice, and `total_views` is the figure that
+     * accounts for all of them, which is what Instagram shows on the profile.
+     *
+     * Asked separately rather than added to the metric list above, because
+     * availability varies by media product type: a metric a reel answers, a
+     * carousel refuses, and one refusal fails the entire request. That is why
+     * the whole insight block sits in a try/catch to begin with.
+     *
+     * Only ever allowed to raise the figure. A media type that does not
+     * support it returns nothing, and a total is never less than a part.
+     */
+    try {
+      const totals = await graph<{
+        data: { values?: { value: number }[]; total_value?: { value: number } }[]
+      }>(`${m.id}/insights`, { metric: 'total_views' }, pt)
+      const row = totals.data?.[0]
+      const n = int(row?.total_value?.value ?? row?.values?.[0]?.value)
+      if (n > views) views = n
+    } catch {
+      // Not available for this media product type; `views` stands.
+    }
+
+    /**
      * There is no plays metric. Asked and answered:
      *
      *   ig_reels_aggregated_all_plays_count  →  rejected
@@ -514,10 +541,20 @@ export async function probeInstagramMetrics(mediaId?: string): Promise<
    * against our 7,999.
    */
   const CANDIDATES = [
+    // Meta's own rejection message named every metric it accepts, so these
+    // are its list rather than a guess. Kept in full because availability
+    // varies by media product type: what a reel answers, a carousel refuses.
     'views',
-    'video_views',
-    'clips_replays_count',
-    'ig_reels_aggregated_all_plays_count',
+    'total_views',
+    'facebook_views',
+    'crossposted_views',
+    'reach',
+    'total_interactions',
+    'total_likes',
+    'total_comments',
+    'link_clicks',
+    'reposts',
+    'reels_skip_rate',
     'reach',
     'impressions',
     'plays',
