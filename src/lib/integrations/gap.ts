@@ -323,10 +323,40 @@ export function saleInstant(header: Pick<GapSaleHeader, 'created' | 'createdLoca
 // ─── The three endpoints ──────────────────────────────────────────────────────
 
 /**
+ * Find the array in an EMC response.
+ *
+ * EMC returns `{ list: [...] }`, which cost a day: the first version of this
+ * checked for a bare array, `items` and `data`, missed `list`, and so read a
+ * busy trading hour as zero sales — a 200 with an empty list is
+ * indistinguishable from no sales having happened. So rather than keep adding
+ * names to a guess-list, take whichever top-level key holds an array. A
+ * response with one list in it is unambiguous, and a future rename cannot
+ * silently empty the feed again.
+ */
+export function findRows(body: unknown): { rows: unknown[]; shape: string } {
+  if (Array.isArray(body)) return { rows: body, shape: 'array' }
+
+  if (body && typeof body === 'object') {
+    const keys = Object.keys(body as Record<string, unknown>)
+    for (const k of keys) {
+      const v = (body as Record<string, unknown>)[k]
+      if (Array.isArray(v)) return { rows: v, shape: `object.${k}[]` }
+    }
+    return { rows: [], shape: `object{${keys.join(',')}}` }
+  }
+
+  return { rows: [], shape: typeof body }
+}
+
+/**
  * Sale headers for a window.
  *
  * `ExcludeVoids` is asked for at the source rather than filtered here, so a
  * voided sale never even reaches the deduplication ledger.
+ *
+ * Note the header also carries tender, card, authorisation and operator
+ * fields. `GapSaleHeader` deliberately does not describe them and nothing
+ * reads them, so they are dropped where they arrive.
  */
 export async function getStoreSales(
   cfg: GapConfig,
@@ -340,16 +370,7 @@ export async function getStoreSales(
     Take: String(opts.take ?? 500),
   })
 
-  // Observed as a bare array; tolerate a wrapper without depending on one.
-  const rows = Array.isArray(body)
-    ? body
-    : Array.isArray((body as { items?: unknown[] })?.items)
-      ? (body as { items: unknown[] }).items
-      : Array.isArray((body as { data?: unknown[] })?.data)
-        ? (body as { data: unknown[] }).data
-        : []
-
-  return rows as GapSaleHeader[]
+  return findRows(body).rows as GapSaleHeader[]
 }
 
 /**
@@ -423,27 +444,9 @@ export async function probeSales(
       }
 
       const body: unknown = await res.json()
-      let rows: unknown[] = []
-      let shape: string
-
-      if (Array.isArray(body)) {
-        rows = body
-        shape = 'array'
-      } else if (body && typeof body === 'object') {
-        const keys = Object.keys(body as Record<string, unknown>)
-        shape = `object{${keys.join(',')}}`
-        // Whichever key holds the list, find it rather than guessing a name.
-        for (const k of keys) {
-          const v = (body as Record<string, unknown>)[k]
-          if (Array.isArray(v)) {
-            rows = v
-            shape = `object.${k}[]`
-            break
-          }
-        }
-      } else {
-        shape = typeof body
-      }
+      // The same extraction the real client uses, so the probe can never again
+      // see rows the client cannot.
+      const { rows, shape } = findRows(body)
 
       const first = rows[0] as Record<string, unknown> | undefined
       out.push({

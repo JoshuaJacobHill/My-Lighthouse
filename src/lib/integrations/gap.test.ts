@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EMPTY_GUID,
+  findRows,
   gapStores,
   createToken,
   getSaleDetail,
@@ -181,15 +182,18 @@ describe('request retry rules', () => {
     expect(salesUrl).toContain('Take=10')
   })
 
-  it('reads a wrapped list as well as a bare array', async () => {
+  it('reads the { list: [...] } wrapper EMC actually returns', async () => {
+    // This is the bug that read a busy trading hour as zero sales: the client
+    // checked for a bare array, `items` and `data`, and missed `list`.
     const f = vi.fn(async (input: string | URL) =>
       String(input).includes('CreateToken')
         ? json({ token: 'x' })
-        : json({ items: [{ saleHeaderID: 7 }] }),
+        : json({ list: [{ saleHeaderID: 396613, saleIdentifier: '0010425360034' }], total: 1 }),
     )
     vi.stubGlobal('fetch', f)
     const rows = await getStoreSales(cfg, loganholme, { start: new Date(), end: new Date() })
-    expect(rows[0].saleHeaderID).toBe(7)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].saleHeaderID).toBe(396613)
   })
 })
 
@@ -222,5 +226,27 @@ describe('store discovery', () => {
     expect(gapStores({ EMC_HILLCREST_STORE_ID: '' })).toEqual([])
     expect(gapStores({ EMC_HILLCREST_STORE_ID: 'two' })).toEqual([])
     expect(gapStores({})).toEqual([])
+  })
+})
+
+describe('finding the rows in a response', () => {
+  it('takes whichever key holds an array', () => {
+    expect(findRows({ list: [1, 2] })).toEqual({ rows: [1, 2], shape: 'object.list[]' })
+    expect(findRows({ items: [1] })).toEqual({ rows: [1], shape: 'object.items[]' })
+    expect(findRows({ data: [1] })).toEqual({ rows: [1], shape: 'object.data[]' })
+  })
+
+  it('still reads a bare array', () => {
+    expect(findRows([1, 2])).toEqual({ rows: [1, 2], shape: 'array' })
+  })
+
+  it('is not fooled by keys that come before the list', () => {
+    const r = findRows({ total: 1, page: 1, list: [{ saleHeaderID: 1 }] })
+    expect(r.rows).toHaveLength(1)
+  })
+
+  it('names the keys it found when there is no array, so the shape is visible', () => {
+    // The whole point: an empty result must say why, not just be empty.
+    expect(findRows({ total: 0, message: 'none' }).shape).toBe('object{total,message}')
   })
 })
