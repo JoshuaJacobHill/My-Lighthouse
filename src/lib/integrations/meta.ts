@@ -332,11 +332,13 @@ async function ingestInstagram(cfg: Cfg, pt: string, limit = POST_LIMIT): Promis
       permalink?: string
       media_url?: string
       thumbnail_url?: string
+      /** REELS, FEED, STORY or AD — decides which view metric is the right one. */
+      media_product_type?: string
     }[]
   }>(
     `${cfg.igUserId}/media`,
     {
-      fields: 'id,caption,timestamp,permalink,media_url,thumbnail_url',
+      fields: 'id,caption,timestamp,permalink,media_url,thumbnail_url,media_product_type',
       limit: String(limit),
     },
     pt,
@@ -361,6 +363,39 @@ async function ingestInstagram(cfg: Cfg, pt: string, limit = POST_LIMIT): Promis
       }
     } catch {
       // Stories and some media types expose a different metric set.
+    }
+
+    /**
+     * Reels are counted in plays, because that is the number Instagram itself
+     * prints on the profile grid.
+     *
+     * A reel showing 84.7K in the app was reported here as 7,999 — the
+     * `views` metric, which came out at roughly one per person reached while
+     * the app's figure was fourteen. The difference is replays and very short
+     * views, and `ig_reels_aggregated_all_plays_count` is what the grid shows.
+     *
+     * Matching the app matters more than metric purity: a report nobody
+     * believes is worse than one that counts a loop twice, and `reach` is
+     * still stored as the honest number of people.
+     *
+     * In its own try/catch because Meta retires metric names without warning
+     * and a dead one fails the whole request — this must never cost us the
+     * figures we already have.
+     */
+    if (m.media_product_type === 'REELS') {
+      try {
+        const plays = await graph<{ data: { values: { value: number }[] }[] }>(
+          `${m.id}/insights`,
+          { metric: 'ig_reels_aggregated_all_plays_count' },
+          pt,
+        )
+        const n = int(plays.data?.[0]?.values?.[0]?.value)
+        // Only ever upwards: if the metric is unavailable it reads 0, and a
+        // reel is never played fewer times than it was viewed.
+        if (n > views) views = n
+      } catch {
+        // Not available; `views` stands.
+      }
     }
 
     await prisma.socialPost.upsert({
