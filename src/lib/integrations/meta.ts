@@ -587,7 +587,11 @@ export async function probeInstagramMetrics(mediaId?: string): Promise<
         // Newer Instagram metrics are only served with metric_type=total_value
         // and error without it, so each name is asked both ways. Whichever
         // answers is the one the tenant supports.
-        for (const params of [{ metric: name }, { metric: name, metric_type: 'total_value' }]) {
+        const variants: Record<string, string>[] = [
+          { metric: name },
+          { metric: name, metric_type: 'total_value' },
+        ]
+        for (const params of variants) {
           const key = params.metric_type ? `${name} (total_value)` : name
           try {
             const ins = await graph<{
