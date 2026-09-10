@@ -43,16 +43,93 @@ const VIDEO_FIELDS = [
 export type TikTokConfig = {
   clientKey: string
   clientSecret: string
-  /** Only the starting value; the live one lives in AppSetting. */
-  seedRefreshToken: string
+  /**
+   * Optional, and only ever a starting value.
+   *
+   * The real refresh token normally arrives from the one-time authorisation
+   * at /api/admin/tiktok-connect and lives in AppSetting from then on. This
+   * exists so a token obtained some other way can be seeded without a
+   * database write.
+   */
+  seedRefreshToken?: string
 }
 
 export function tiktokConfig(): TikTokConfig | null {
   const clientKey = process.env.TIKTOK_CLIENT_KEY
   const clientSecret = process.env.TIKTOK_CLIENT_SECRET
-  const seedRefreshToken = process.env.TIKTOK_REFRESH_TOKEN
-  if (!clientKey || !clientSecret || !seedRefreshToken) return null
-  return { clientKey, clientSecret, seedRefreshToken }
+  if (!clientKey || !clientSecret) return null
+  return {
+    clientKey,
+    clientSecret,
+    seedRefreshToken: process.env.TIKTOK_REFRESH_TOKEN || undefined,
+  }
+}
+
+/** Read scopes. Nothing here posts, deletes or changes anything on TikTok. */
+export const TIKTOK_SCOPES = 'user.info.basic,user.info.stats,video.list'
+
+export const TIKTOK_AUTHORIZE_URL = 'https://www.tiktok.com/v2/auth/authorize/'
+
+/**
+ * Turn the one-time authorisation code into tokens, and keep the refresh one.
+ *
+ * The only moment a refresh token is created. Everything afterwards rotates
+ * the stored one, so if this write is lost the whole flow has to be repeated
+ * by hand — which is why it is saved before anything else is attempted.
+ */
+export async function exchangeAuthorizationCode(
+  cfg: TikTokConfig,
+  code: string,
+  redirectUri: string,
+): Promise<{ refreshTokenSaved: boolean; expiresIn: number; scope?: string }> {
+  const res = await fetch(OAUTH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_key: cfg.clientKey,
+      client_secret: cfg.clientSecret,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+    }),
+    cache: 'no-store',
+  })
+
+  const json = (await res.json().catch(() => ({}))) as {
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+    scope?: string
+    error?: string
+    error_description?: string
+  }
+
+  if (!res.ok || !json.refresh_token) {
+    // The description can echo the secret we just sent; the code cannot.
+    throw new Error(
+      `TikTok code exchange failed (${res.status})${json.error ? `: ${json.error}` : ''}`,
+    )
+  }
+
+  await prisma.appSetting.upsert({
+    where: { key: REFRESH_KEY },
+    create: {
+      key: REFRESH_KEY,
+      value: json.refresh_token,
+      label: 'TikTok refresh token (rotates on every use)',
+      group: 'integrations',
+    },
+    update: { value: json.refresh_token },
+  })
+
+  if (json.access_token) {
+    accessToken = {
+      value: json.access_token,
+      expiresAt: Date.now() + (json.expires_in ?? 86_400) * 1000,
+    }
+  }
+
+  return { refreshTokenSaved: true, expiresIn: json.expires_in ?? 0, scope: json.scope }
 }
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
@@ -74,7 +151,16 @@ export function tokenIsFresh(
 
 async function storedRefreshToken(cfg: TikTokConfig): Promise<string> {
   const row = await prisma.appSetting.findUnique({ where: { key: REFRESH_KEY } })
-  return row?.value?.trim() || cfg.seedRefreshToken
+  const token = row?.value?.trim() || cfg.seedRefreshToken
+  if (!token) {
+    // Says what to do rather than just failing: a refresh token can only be
+    // created by a person authorising in a browser, so no amount of retrying
+    // will produce one.
+    throw new Error(
+      'No TikTok refresh token yet — authorise once at /api/admin/tiktok-connect',
+    )
+  }
+  return token
 }
 
 /**
