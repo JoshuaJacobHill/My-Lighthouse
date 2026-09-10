@@ -13,6 +13,8 @@ const settings: BridgeSettings = {
   sendIdentifiers: false,
   lookbackMinutes: 60,
   maxAttempts: 6,
+  maxEventAgeDays: 7,
+  detailBudget: 150,
 }
 
 describe('deduplication', () => {
@@ -50,6 +52,14 @@ describe('deduplication', () => {
   })
 
   it('finishes a sale left pending', () => {
+    // Including one deferred because a run ran out of detail requests.
     expect(shouldReprocess({ status: GapSaleStatus.PENDING, attemptCount: 0 }, settings)).toBe(true)
+  })
+
+  it('never reconsiders a sale too old for Meta', () => {
+    // It counts in the sales report and is of no use to Meta, so looking at
+    // it again every night would be pure cost.
+    expect(shouldReprocess({ status: GapSaleStatus.SKIPPED_TOO_OLD, attemptCount: 0 }, settings))
+      .toBe(false)
   })
 })

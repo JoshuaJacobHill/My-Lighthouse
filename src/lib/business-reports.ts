@@ -294,16 +294,26 @@ export async function getTopSocial(
     .sort((a, b) => b.spendCents - a.spendCents)
     .slice(0, take)
 
+  // Ranked by views, not engagement rate.
+  //
+  // Rate put a post seen by thirty people above one seen by twenty thousand,
+  // because ten of the thirty liked it. That is a real signal but it is not
+  // what "top posts" means to anyone reading the page — and since views is
+  // the first figure on each row, a list ordered by something else simply
+  // looks broken. Rate stays visible as the tiebreak and as a column.
+  const byViews = (a: TopPost, b: TopPost) =>
+    b.views - a.views || b.engagements - a.engagements || b.engagementRate - a.engagementRate
+
   const organic = posts
     .filter((p) => p.kind === 'ORGANIC' && p.platform !== 'MAILCHIMP')
     .map((p) => shape(p))
-    .sort((a, b) => b.engagementRate - a.engagementRate || b.engagements - a.engagements)
+    .sort(byViews)
     .slice(0, take)
 
   const email = posts
     .filter((p) => p.platform === 'MAILCHIMP')
     .map((p) => shape(p))
-    .sort((a, b) => b.engagementRate - a.engagementRate || b.engagements - a.engagements)
+    .sort(byViews)
     .slice(0, take)
 
   return {

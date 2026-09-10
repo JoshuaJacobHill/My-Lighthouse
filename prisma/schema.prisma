@@ -1549,6 +1549,9 @@ enum GapSaleStatus {
   SKIPPED_TRAN_TYPE
   /// Customer identifiers are switched off, so it was recorded but not sent.
   SKIPPED_IDENTIFIERS_OFF
+  /// Older than Meta will accept an event for. Counted in the sales report,
+  /// never offered to Meta — which is what makes backfilling history cheap.
+  SKIPPED_TOO_OLD
   /// Meta rejected it, or we could not reach them. Retried on later runs.
   FAILED
 }

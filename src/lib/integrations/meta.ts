@@ -48,7 +48,17 @@ export function metaConfig(): Cfg | null {
   const pageId = process.env.META_PAGE_ID
   const igUserId = process.env.META_IG_USER_ID
   if (!token || !adAccountId || !pageId || !igUserId) return null
-  return { token, adAccountId, pageId, igUserId }
+  return {
+    token,
+    // Graph resolves an ad account only as `act_<id>`. A bare number is a
+    // different node entirely, and the error it gives — "(#100) Tried
+    // accessing nonexisting field (insights)" — names neither the prefix nor
+    // the account, so it reads like a permissions problem and is not. It cost
+    // five days of ad figures; normalise it rather than trust the variable.
+    adAccountId: adAccountId.startsWith('act_') ? adAccountId : `act_${adAccountId}`,
+    pageId,
+    igUserId,
+  }
 }
 
 async function graph<T>(path: string, params: Record<string, string>, token: string): Promise<T> {

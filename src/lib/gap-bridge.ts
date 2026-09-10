@@ -102,6 +102,25 @@ export type BridgeSettings = {
   lookbackMinutes: number
   /** Give up retrying a sale after this many failed attempts. */
   maxAttempts: number
+  /**
+   * How old an event can be and still be worth offering to Meta.
+   *
+   * Meta rejects events much older than a week, so fetching the customer for
+   * a sale from last month buys nothing — and it is the detail request, one
+   * per sale, that makes a run slow. Skipping it is what turns a month-long
+   * backfill from hours into a couple of minutes: history lands in the sales
+   * report at full speed and is never offered to Meta at all.
+   */
+  maxEventAgeDays: number
+  /**
+   * Detail requests allowed in one run.
+   *
+   * A bound, not a target. Whatever is left stays PENDING and is picked up by
+   * the next run, so a busy day cannot make a single run take longer than the
+   * function is allowed to live. The sales report does not wait for any of
+   * this — it is built from headers, which are already recorded.
+   */
+  detailBudget: number
 }
 
 export function bridgeSettings(): BridgeSettings {
@@ -110,6 +129,8 @@ export function bridgeSettings(): BridgeSettings {
     sendIdentifiers: flag('SEND_CUSTOMER_IDENTIFIERS', false),
     lookbackMinutes: Number(process.env.POLL_LOOKBACK_MINUTES) || DEFAULT_LOOKBACK_MINUTES,
     maxAttempts: Number(process.env.GAP_MAX_ATTEMPTS ?? 6),
+    maxEventAgeDays: Number(process.env.META_MAX_EVENT_AGE_DAYS) || 7,
+    detailBudget: Number(process.env.GAP_DETAIL_BUDGET) || 150,
   }
 }
 
@@ -192,6 +213,7 @@ export function shouldReprocess(
       return false
     case GapSaleStatus.SKIPPED_NO_CUSTOMER:
     case GapSaleStatus.SKIPPED_TRAN_TYPE:
+    case GapSaleStatus.SKIPPED_TOO_OLD:
       // An anonymous sale stays anonymous; do not reconsider it every ten
       // minutes for the rest of the month.
       return false
@@ -226,7 +248,16 @@ export async function processSale(
    * It forces inspection, never a re-send: a sale already sent is still not
    * sent again.
    */
-  opts?: { force?: boolean },
+  opts?: {
+    force?: boolean
+    /**
+     * Record the sale but do not fetch its customer.
+     *
+     * Used once a run has spent its detail budget. The row still counts
+     * towards the sales report; it stays PENDING and the next run finishes it.
+     */
+    skipDetail?: boolean
+  },
 ): Promise<SaleOutcome> {
   const valueAud = centsToAmount(header.totalAmount)
   const instant = saleInstant(header)
@@ -274,6 +305,31 @@ export async function processSale(
     const reason = header.storeID !== store.id ? 'other_store' : `tran_type_${header.tranType}`
     log({ event: 'skipped', ...ids(header), reason, status: 'SKIPPED_TRAN_TYPE' })
     return { saleIdentifier: header.saleIdentifier, status: GapSaleStatus.SKIPPED_TRAN_TYPE, reason, valueAud }
+  }
+
+  // Too old for Meta to accept, so the customer is not worth fetching. The
+  // sale still counts towards the report — this is exactly what makes a
+  // backfill of months of history cheap rather than an afternoon of requests.
+  const ageDays = (Date.now() - at.getTime()) / 86_400_000
+  if (ageDays > settings.maxEventAgeDays) {
+    await upsert(base, GapSaleStatus.SKIPPED_TOO_OLD, { hasCustomer: false })
+    return {
+      saleIdentifier: header.saleIdentifier,
+      status: GapSaleStatus.SKIPPED_TOO_OLD,
+      reason: `${Math.floor(ageDays)} days old`,
+      valueAud,
+    }
+  }
+
+  // Out of detail requests for this run. Record it and let the next one finish.
+  if (opts?.skipDetail) {
+    await upsert(base, GapSaleStatus.PENDING, { hasCustomer: false })
+    return {
+      saleIdentifier: header.saleIdentifier,
+      status: GapSaleStatus.PENDING,
+      reason: 'detail_budget_spent',
+      valueAud,
+    }
   }
 
   // Only now is the detail worth fetching — it is a request per sale, and it is
@@ -587,6 +643,8 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
   let skipped = 0
   let failed = 0
   let daysRolledUp = 0
+  let detailBudget = settings.detailBudget
+  let deferred = 0
   const notes: string[] = []
 
   try {
@@ -607,7 +665,18 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
       for (const header of headers) {
         inspected++
         try {
-          const outcome = await processSale(header, cfg, store, capi, settings)
+          const outcome = await processSale(header, cfg, store, capi, settings, {
+            skipDetail: detailBudget <= 0,
+          })
+          // Only a fetched detail costs anything; everything else is free.
+          if (outcome.reason === 'detail_budget_spent') deferred++
+          else if (
+            outcome.status !== GapSaleStatus.SKIPPED_TRAN_TYPE &&
+            outcome.status !== GapSaleStatus.SKIPPED_TOO_OLD &&
+            outcome.reason !== 'already_settled'
+          ) {
+            detailBudget--
+          }
           if (outcome.status === GapSaleStatus.SENT) sent++
           else if (outcome.status === GapSaleStatus.FAILED) failed++
           else if (outcome.status !== GapSaleStatus.PENDING) skipped++
@@ -649,7 +718,16 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
       skipped,
       failed,
       daysRolledUp,
-      ...(notes.length > 0 ? { notes } : {}),
+      ...(deferred > 0
+        ? {
+            notes: [
+              ...notes,
+              `${deferred} sales recorded but not yet offered to Meta — the next run will finish them`,
+            ],
+          }
+        : notes.length > 0
+          ? { notes }
+          : {}),
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error'

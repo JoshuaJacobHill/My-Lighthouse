@@ -16,6 +16,7 @@ const STATUS_LABEL: Record<string, string> = {
   SKIPPED_NO_CUSTOMER: 'No customer attached',
   SKIPPED_TRAN_TYPE: 'Not a normal sale',
   SKIPPED_IDENTIFIERS_OFF: 'Held — matching switched off',
+  SKIPPED_TOO_OLD: 'Too old for Meta (counted in the report)',
   FAILED: 'Failed',
 }
 
