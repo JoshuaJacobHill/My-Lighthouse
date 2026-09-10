@@ -451,3 +451,127 @@ export async function ingestMeta(
 }
 
 export const META_PLATFORMS: SocialPlatform[] = ['FACEBOOK', 'INSTAGRAM']
+
+// ─── Diagnosing one Instagram post ────────────────────────────────────────────
+
+/**
+ * Every insight Instagram will give for a post, asked for one metric at a time.
+ *
+ * One at a time on purpose: Meta fails the whole request if any single metric
+ * name is unavailable for that media type, so a combined call tells you only
+ * that *something* was wrong. Asking individually says exactly which metrics
+ * exist and what each is worth.
+ *
+ * Written because a post reading 7,999 views was reported as 80,000 in the
+ * app. That gap has two possible explanations — a metric we are not asking
+ * for, or the organic post being confused with the ad built from it — and
+ * neither can be settled by re-reading our own code.
+ */
+export async function probeInstagramMetrics(mediaId?: string): Promise<
+  | { ok: false; error: string }
+  | {
+      ok: true
+      posts: {
+        id: string
+        mediaType?: string
+        productType?: string
+        permalink?: string
+        timestamp?: string
+        caption?: string
+        metrics: Record<string, number | string>
+      }[]
+    }
+> {
+  const cfg = metaConfig()
+  if (!cfg) return { ok: false, error: 'META_ACCESS_TOKEN / IDs not configured' }
+
+  /**
+   * Everything Instagram has been known to expose, current and retired.
+   *
+   * `views` is the current headline metric; `impressions` and `plays` were
+   * retired but are asked for anyway, because a tenant sometimes answers a
+   * retired name. `ig_reels_aggregated_all_plays_count` counts replays and is
+   * routinely many times `views` — the most likely explanation of an 80,000
+   * against our 7,999.
+   */
+  const CANDIDATES = [
+    'views',
+    'reach',
+    'impressions',
+    'plays',
+    'ig_reels_aggregated_all_plays_count',
+    'ig_reels_avg_watch_time',
+    'ig_reels_video_view_total_time',
+    'total_interactions',
+    'likes',
+    'comments',
+    'saved',
+    'shares',
+    'profile_visits',
+    'profile_activity',
+    'follows',
+    'navigation',
+  ]
+
+  try {
+    const pt = await pageToken(cfg)
+
+    let ids: {
+      id: string
+      media_type?: string
+      media_product_type?: string
+      permalink?: string
+      timestamp?: string
+      caption?: string
+    }[]
+
+    if (mediaId) {
+      ids = [
+        await graph(
+          mediaId,
+          { fields: 'id,media_type,media_product_type,permalink,timestamp,caption' },
+          pt,
+        ),
+      ]
+    } else {
+      const media = await graph<{ data: typeof ids }>(
+        `${cfg.igUserId}/media`,
+        { fields: 'id,media_type,media_product_type,permalink,timestamp,caption', limit: '3' },
+        pt,
+      )
+      ids = media.data ?? []
+    }
+
+    const posts = []
+    for (const m of ids) {
+      const metrics: Record<string, number | string> = {}
+      for (const name of CANDIDATES) {
+        try {
+          const ins = await graph<{ data: { name: string; values: { value: number }[] }[] }>(
+            `${m.id}/insights`,
+            { metric: name },
+            pt,
+          )
+          const row = ins.data?.[0]
+          metrics[name] = int(row?.values?.[0]?.value)
+        } catch (err) {
+          // Not available for this media type, which is itself the answer.
+          metrics[name] = err instanceof Error ? err.message.slice(0, 90) : 'unavailable'
+        }
+      }
+      posts.push({
+        id: m.id,
+        mediaType: m.media_type,
+        productType: m.media_product_type,
+        permalink: m.permalink,
+        timestamp: m.timestamp,
+        caption: m.caption?.slice(0, 60),
+        metrics,
+      })
+    }
+
+    return { ok: true, posts }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'unknown error' }
+  }
+}
