@@ -34,8 +34,8 @@ import {
   type GapSaleHeader,
   type GapStore,
   gapConfig,
+  getAllStoreSales,
   getSaleDetail,
-  getStoreSales,
   hasRealCustomer,
   saleInstant,
   probeSales,
@@ -494,6 +494,8 @@ export type RunSummary = {
   skipped: number
   failed: number
   daysRolledUp: number
+  /** Set when EMC's row cap could not be worked around — sales may be missing. */
+  notes?: string[]
   dryRun: boolean
   sendIdentifiers: boolean
   testEventCode: boolean
@@ -556,13 +558,21 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
   let skipped = 0
   let failed = 0
   let daysRolledUp = 0
+  const notes: string[] = []
 
   try {
     // Every configured store, in one run. They share the token and the window;
     // the rollup is per store because SalesFact is keyed by store name.
     for (const store of cfg.stores) {
       const days = new Set<string>()
-      const headers = await getStoreSales(cfg, store, { start, end })
+      const headers = await getAllStoreSales(cfg, store, {
+        start,
+        end,
+        onNote: (note) => {
+          notes.push(`${store.name}: ${note}`)
+          log({ event: 'possible_truncation', storeID: store.id, reason: note })
+        },
+      })
       log({ event: 'fetched', count: headers.length, storeID: store.id })
 
       for (const header of headers) {
@@ -610,6 +620,7 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
       skipped,
       failed,
       daysRolledUp,
+      ...(notes.length > 0 ? { notes } : {}),
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error'

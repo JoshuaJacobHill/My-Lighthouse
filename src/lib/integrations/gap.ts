@@ -487,6 +487,61 @@ export async function probeSales(
   return out
 }
 
+/** What one request asks for. EMC may cap it lower; the splitter copes. */
+export const TAKE = 500
+
+/**
+ * Every sale in a window, however many there are.
+ *
+ * `Take` is a limit, not a promise of completeness, and EMC offers no
+ * documented paging — the published help is an endpoint list with no schemas.
+ * So when a request comes back full, assume it was cut off, halve the window
+ * and ask again. Recursion bottoms out at two minutes.
+ *
+ * This matters more than it looks. Loganholme runs 50-60 sales an hour, the
+ * nightly job uses a 25-hour window, and a trading day is 400-600 sales — so
+ * a flat `Take=500` would quietly drop the tail of a busy day and report a
+ * smaller number with no sign anything was missing. A silent undercount is
+ * worse than an error, because nothing prompts anyone to look.
+ *
+ * Windows are inclusive at both ends, so halves overlap by an instant; results
+ * are deduplicated on saleHeaderID.
+ */
+export async function getAllStoreSales(
+  cfg: GapConfig,
+  store: GapStore,
+  opts: { start: Date; end: Date; onNote?: (note: string) => void },
+): Promise<GapSaleHeader[]> {
+  const MIN_WINDOW_MS = 2 * 60_000
+  const MAX_DEPTH = 8
+
+  const seen = new Map<number, GapSaleHeader>()
+
+  async function walk(start: Date, end: Date, depth: number): Promise<void> {
+    const rows = await getStoreSales(cfg, store, { start, end, take: TAKE })
+    for (const r of rows) seen.set(r.saleHeaderID, r)
+
+    if (rows.length < TAKE) return
+
+    const span = end.getTime() - start.getTime()
+    if (span <= MIN_WINDOW_MS || depth >= MAX_DEPTH) {
+      // Two minutes of trade cannot really hold 500 sales, so this is a cap
+      // we cannot see past rather than a genuinely busy window. Say so.
+      opts.onNote?.(
+        `still full at ${Math.round(span / 1000)}s from ${start.toISOString()} — sales may be missing`,
+      )
+      return
+    }
+
+    const mid = new Date(start.getTime() + Math.floor(span / 2))
+    await walk(start, mid, depth + 1)
+    await walk(mid, end, depth + 1)
+  }
+
+  await walk(opts.start, opts.end, 0)
+  return [...seen.values()]
+}
+
 export async function getSaleDetail(cfg: GapConfig, saleHeaderID: number): Promise<GapSaleDetail> {
   return emcGet<GapSaleDetail>(cfg, `/api/storesale/${saleHeaderID}`)
 }

@@ -3,6 +3,8 @@ import {
   EMPTY_GUID,
   findRows,
   gapStores,
+  getAllStoreSales,
+  TAKE,
   createToken,
   getSaleDetail,
   getStoreSales,
@@ -248,5 +250,78 @@ describe('finding the rows in a response', () => {
   it('names the keys it found when there is no array, so the shape is visible', () => {
     // The whole point: an empty result must say why, not just be empty.
     expect(findRows({ total: 0, message: 'none' }).shape).toBe('object{total,message}')
+  })
+})
+
+describe('windows bigger than one request', () => {
+  /** A tenant holding `total` sales spread evenly across the day. */
+  function tenant(total: number) {
+    const day = new Date('2026-09-10T00:00:00+10:00').getTime()
+    const dayMs = 24 * 60 * 60_000
+    const sales = Array.from({ length: total }, (_, i) => ({
+      saleHeaderID: i + 1,
+      at: day + Math.floor((i * dayMs) / total),
+    }))
+    const requests: number[] = []
+
+    const f = vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname.includes('CreateToken')) return json({ token: 'x' })
+
+      // EMC's naive Brisbane wall-clock, back to an instant.
+      const from = new Date(`${url.searchParams.get('StartDate')}+10:00`).getTime()
+      const to = new Date(`${url.searchParams.get('EndDate')}+10:00`).getTime()
+      const take = Number(url.searchParams.get('Take'))
+      requests.push(to - from)
+
+      const inWindow = sales.filter((s) => s.at >= from && s.at <= to)
+      return json({ list: inWindow.slice(0, take).map((s) => ({ saleHeaderID: s.saleHeaderID })) })
+    })
+
+    return { f, requests }
+  }
+
+  const whole = {
+    start: new Date('2026-09-10T00:00:00+10:00'),
+    end: new Date('2026-09-11T00:00:00+10:00'),
+  }
+
+  it('takes one request when the day fits', async () => {
+    const { f, requests } = tenant(120)
+    vi.stubGlobal('fetch', f)
+    const rows = await getAllStoreSales(cfg, loganholme, whole)
+    expect(rows).toHaveLength(120)
+    expect(requests).toHaveLength(1)
+  })
+
+  it('splits the window rather than dropping the tail of a busy day', async () => {
+    // The bug this exists for: a flat Take would return 500 of 1400 and look
+    // like a quiet day. Nothing would prompt anyone to check.
+    const { f, requests } = tenant(1400)
+    vi.stubGlobal('fetch', f)
+    const rows = await getAllStoreSales(cfg, loganholme, whole)
+    expect(rows).toHaveLength(1400)
+    expect(requests.length).toBeGreaterThan(1)
+  })
+
+  it('deduplicates the sale sitting on a split boundary', async () => {
+    const { f } = tenant(1400)
+    vi.stubGlobal('fetch', f)
+    const rows = await getAllStoreSales(cfg, loganholme, whole)
+    expect(new Set(rows.map((r) => r.saleHeaderID)).size).toBe(rows.length)
+  })
+
+  it('says so when it cannot see past the cap', async () => {
+    // Every window full, however small: a server-side limit we cannot beat.
+    const f = vi.fn(async (input: string | URL) =>
+      String(input).includes('CreateToken')
+        ? json({ token: 'x' })
+        : json({ list: Array.from({ length: TAKE }, (_, i) => ({ saleHeaderID: i + 1 })) }),
+    )
+    vi.stubGlobal('fetch', f)
+    const notes: string[] = []
+    await getAllStoreSales(cfg, loganholme, { ...whole, onNote: (n) => notes.push(n) })
+    expect(notes.length).toBeGreaterThan(0)
+    expect(notes[0]).toMatch(/sales may be missing/)
   })
 })

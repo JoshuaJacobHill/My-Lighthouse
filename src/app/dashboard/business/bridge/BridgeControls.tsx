@@ -75,6 +75,7 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
         },
         { tone: 'ok', text: `${s.sent} sent · ${s.skipped} skipped · ${s.failed} failed` },
         { tone: 'ok', text: `${s.daysRolledUp} day(s) rolled into the sales report` },
+        ...(s.notes ?? []).map((n) => ({ tone: 'bad' as const, text: `Possible truncation — ${n}` })),
         ...(s.dryRun ? [{ tone: 'warn' as const, text: 'Dry run — nothing was sent to Meta.' }] : []),
       ])
     })
