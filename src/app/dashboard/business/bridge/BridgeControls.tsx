@@ -6,9 +6,10 @@ import {
   coverageAction,
   diagnoseGapAction,
   runBridgeNowAction,
+  salesShapeAction,
   testSaleAction,
 } from '@/lib/actions/gap.actions'
-import type { Coverage } from '@/lib/gap-bridge'
+import type { Coverage, ShapeField } from '@/lib/gap-bridge'
 import type { SalesProbe } from '@/lib/integrations/gap'
 
 /**
@@ -50,6 +51,8 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
   const [probeError, setProbeError] = React.useState('')
   const [coverage, setCoverage] = React.useState<Coverage | null>(null)
   const [coverageError, setCoverageError] = React.useState('')
+  const [shape, setShape] = React.useState<{ sampled: number; store: string; fields: ShapeField[] } | null>(null)
+  const [shapeError, setShapeError] = React.useState('')
 
   function run() {
     setRunLines([])
@@ -291,6 +294,63 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
                 match. That is a counter habit rather than a technical problem.
               </p>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Whether Gap can already tell online orders from counter trade. If it
+          can, the sales report needs no second integration. */}
+      <div className="rounded-[28px] border border-neutral-200 p-5">
+        <h2 className="text-lg font-bold">How does Gap label its sales?</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Shows the values Gap puts in its own structural fields — tills, departments, and the
+          external/imported flags. If click-and-collect and home-delivery orders arrive flagged
+          differently from counter sales, the sales report can split them without touching
+          MyFoodLink. Structural fields only; nothing about a customer is read.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setShape(null)
+            setShapeError('')
+            startTransition(async () => {
+              const res = await salesShapeAction(24)
+              if (!res.success || !res.fields) {
+                setShapeError(res.error ?? 'Something went wrong.')
+                return
+              }
+              setShape({ sampled: res.sampled!, store: res.store!, fields: res.fields })
+            })
+          }}
+          disabled={pending}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          Show sale labelling
+        </button>
+
+        {shapeError && <p className="mt-3 text-sm text-red-700">{shapeError}</p>}
+
+        {shape && (
+          <div className="mt-4">
+            <p className="text-xs text-neutral-500">
+              {shape.sampled} sales at {shape.store}, last 24 hours
+            </p>
+            <div className="mt-3 space-y-3">
+              {shape.fields.map((f) => (
+                <div key={f.name}>
+                  <p className="font-mono text-xs font-semibold text-neutral-700">{f.name}</p>
+                  <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-600">
+                    {f.values.map((v) => (
+                      <li key={v.value}>
+                        <span className="font-mono">{v.value}</span>{' '}
+                        <span className="tabular-nums text-neutral-400">×{v.count}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

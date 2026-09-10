@@ -5,6 +5,8 @@ import { hasCapability } from '@/lib/permissions'
 import {
   customerCoverage,
   diagnose,
+  salesShape,
+  type ShapeField,
   processOneSale,
   runOnce,
   type Coverage,
@@ -98,4 +100,19 @@ export async function coverageAction(
   const res = await customerCoverage(limit ?? 25)
   if (!res.ok) return { success: false, error: res.error }
   return { success: true, coverage: res.coverage }
+}
+
+/**
+ * How Gap labels its own sales — tills, departments, external flags.
+ *
+ * For working out whether online orders can be told apart from counter trade
+ * without a second integration. Structural fields only.
+ */
+export async function salesShapeAction(
+  hours?: number,
+): Promise<{ success: boolean; sampled?: number; store?: string; fields?: ShapeField[]; error?: string }> {
+  if (!(await guard())) return { success: false, error: 'Not allowed.' }
+  const res = await salesShape(hours ?? 24)
+  if (!res.ok) return { success: false, error: res.error }
+  return { success: true, sampled: res.sampled, store: res.store, fields: res.fields }
 }

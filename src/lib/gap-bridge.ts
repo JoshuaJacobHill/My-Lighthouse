@@ -875,6 +875,102 @@ export async function customerCoverage(limit = 25): Promise<
   }
 }
 
+// ─── What shape are the sales? ────────────────────────────────────────────────
+
+export type ShapeField = {
+  name: string
+  values: { value: string; count: number }[]
+}
+
+/**
+ * The distribution of the structural fields on a sale header.
+ *
+ * Asked because the sales report needs to separate in-store from click and
+ * collect and home delivery, and it is not yet known whether Gap can tell them
+ * apart. The header carries `externalSale`, `externalTransNo`, `imported`,
+ * `deptNo`, `zoneID` and `terminalNumber` — if online orders arrive flagged as
+ * external, the channel split comes free and MyFoodLink is not needed for it.
+ *
+ * Counts of values, not sales. Every field here is structural — terminal
+ * numbers and department codes — and nothing personal is read.
+ */
+export async function salesShape(hours = 24): Promise<
+  { ok: false; error: string } | { ok: true; sampled: number; store: string; fields: ShapeField[] }
+> {
+  const cfg = gapConfig()
+  if (!cfg) return { ok: false, error: 'EMC credentials or stores not configured' }
+
+  const store = cfg.stores[0]
+  const end = new Date()
+  const start = new Date(end.getTime() - hours * 60 * 60_000)
+
+  const rows = (await getAllStoreSales(cfg, store, { start, end })) as unknown as Record<
+    string,
+    unknown
+  >[]
+  if (rows.length === 0) return { ok: false, error: 'No sales in that window.' }
+
+  // Anything that might encode a channel, a till or a department.
+  const keys = [
+    'tranType',
+    'externalSale',
+    'externalTransNo',
+    'imported',
+    'direction',
+    'deptNo',
+    'zoneID',
+    'terminalNumber',
+    'machineName',
+    'storeName',
+    'requiredExports',
+    'processed',
+  ]
+
+  const fields: ShapeField[] = []
+
+  for (const key of keys) {
+    if (!(key in rows[0])) continue
+    const tally = new Map<string, number>()
+    for (const r of rows) {
+      const v = r[key]
+      // A free-text reference is only interesting as present/absent — printing
+      // every distinct value would be noise, and could carry an order number.
+      const label =
+        key === 'externalTransNo'
+          ? v === null || v === undefined || v === ''
+            ? '(empty)'
+            : '(has a value)'
+          : String(v ?? '(null)')
+      tally.set(label, (tally.get(label) ?? 0) + 1)
+    }
+    fields.push({
+      name: key,
+      values: [...tally.entries()]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8),
+    })
+  }
+
+  // The identifier prefix differs between sales and may encode the till.
+  const prefixes = new Map<string, number>()
+  for (const r of rows) {
+    const id = String(r.saleIdentifier ?? '')
+    if (id.length >= 8) prefixes.set(id.slice(0, 8), (prefixes.get(id.slice(0, 8)) ?? 0) + 1)
+  }
+  if (prefixes.size > 0) {
+    fields.push({
+      name: 'saleIdentifier (first 8)',
+      values: [...prefixes.entries()]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8),
+    })
+  }
+
+  return { ok: true, sampled: rows.length, store: store.name, fields }
+}
+
 // ─── Diagnosis ────────────────────────────────────────────────────────────────
 
 /**
