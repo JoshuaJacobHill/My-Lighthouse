@@ -167,6 +167,18 @@ export default async function BusinessReportPage({
           <PeriodTabs active={period} />
         </div>
 
+        {/* Did takings and reach move together? The question the two halves of
+            this page exist to answer, and which no single figure can — so it
+            leads rather than trailing the detail it summarises. */}
+        <div className="mt-8 rounded-[28px] border border-neutral-200 p-5">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
+            Sales and views by {trendGrain}
+          </h2>
+          <div className="mt-4">
+            <SalesVsViews points={trend} grain={trendGrain} />
+          </div>
+        </div>
+
         {/* Headline */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <div className="rounded-[28px] border border-neutral-200 p-5">
@@ -289,15 +301,6 @@ export default async function BusinessReportPage({
               </ul>
             </Card>
           )}
-        </div>
-
-        {/* Did takings and reach move together? The question the two halves of
-            this page exist to answer, which no single figure can. */}
-        <div className="mt-12">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
-            Sales and views by {trendGrain}
-          </h2>
-          <SalesVsViews points={trend} grain={trendGrain} />
         </div>
 
         {/* Where each number came from, and when. A figure with no age is a

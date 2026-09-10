@@ -333,7 +333,24 @@ export type TrendPoint = {
   label: string
   /** Full label for the tooltip. */
   title: string
-  revenueCents: number
+  /**
+   * Days in this bucket. Weeks are seven; months are not, and a per-day
+   * average that divides February by 30 is quietly wrong.
+   */
+  days: number
+  /**
+   * Broken down so the chart can be filtered in the browser without asking
+   * the server again — twelve buckets by two shops by two channels is a
+   * handful of numbers, and a filter that costs a round trip does not feel
+   * like a filter.
+   */
+  sales: { store: string; channel: string; revenueCents: number }[]
+  /**
+   * Views are organisation-wide. Meta and Mailchimp do not know which shop an
+   * impression belonged to, so this figure does not change when the store
+   * filter does — which the chart says out loud rather than implying a split
+   * that does not exist.
+   */
   views: number
 }
 
@@ -386,7 +403,7 @@ export async function getSalesVsViews(
 
   const [sales, ads, organic, email] = await Promise.all([
     prisma.salesFact.groupBy({
-      by: ['day'],
+      by: ['day', 'store', 'channel'],
       where: { day: { gte: from, lte: to } },
       _sum: { revenueCents: true },
     }),
@@ -412,25 +429,35 @@ export async function getSalesVsViews(
 
   const buckets = starts.map((start, i) => {
     const end = endOf(start, i)
-    return { start, end, revenueCents: 0, views: 0 }
+    return { start, end, sales: new Map<string, number>(), views: 0 }
   })
 
-  const put = (at: Date | null, revenue: number, views: number) => {
-    if (!at) return
+  const find = (at: Date | null) => {
+    if (!at) return null
     const t = at.getTime()
-    for (const b of buckets) {
-      if (t >= b.start.getTime() && t <= b.end.getTime() + 86_399_999) {
-        b.revenueCents += revenue
-        b.views += views
-        return
-      }
-    }
+    return (
+      buckets.find((b) => t >= b.start.getTime() && t <= b.end.getTime() + 86_399_999) ?? null
+    )
   }
 
-  for (const r of sales) put(r.day, r._sum.revenueCents ?? 0, 0)
-  for (const r of ads) put(r.day, 0, r._sum.views ?? 0)
-  for (const r of organic) put(r.publishedAt, 0, r.views)
-  for (const r of email) put(r.publishedAt, 0, r.engagements)
+  for (const r of sales) {
+    const b = find(r.day)
+    if (!b) continue
+    const key = `${r.store}\u0000${r.channel}`
+    b.sales.set(key, (b.sales.get(key) ?? 0) + (r._sum.revenueCents ?? 0))
+  }
+  for (const r of ads) {
+    const b = find(r.day)
+    if (b) b.views += r._sum.views ?? 0
+  }
+  for (const r of organic) {
+    const b = find(r.publishedAt)
+    if (b) b.views += r.views
+  }
+  for (const r of email) {
+    const b = find(r.publishedAt)
+    if (b) b.views += r.engagements
+  }
 
   const short = new Intl.DateTimeFormat('en-AU', {
     timeZone: 'UTC',
@@ -445,7 +472,11 @@ export async function getSalesVsViews(
       grain === 'week'
         ? `${short.format(b.start)} – ${short.format(b.end)}`
         : new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(b.start),
-    revenueCents: b.revenueCents,
+    days: Math.round((b.end.getTime() - b.start.getTime()) / 86_400_000) + 1,
+    sales: [...b.sales.entries()].map(([key, revenueCents]) => {
+      const [store, channel] = key.split('\u0000')
+      return { store, channel, revenueCents }
+    }),
     views: b.views,
   }))
 }

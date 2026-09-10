@@ -6,6 +6,7 @@ import {
   backfillAction,
   coverageAction,
   diagnoseGapAction,
+  probeHourlyAction,
   runBridgeNowAction,
   salesShapeAction,
   testSaleAction,
@@ -54,6 +55,8 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
   const [coverageError, setCoverageError] = React.useState('')
   const [shape, setShape] = React.useState<{ sampled: number; store: string; fields: ShapeField[] } | null>(null)
   const [shapeError, setShapeError] = React.useState('')
+  const [hourly, setHourly] = React.useState<SalesProbe[] | null>(null)
+  const [hourlyError, setHourlyError] = React.useState('')
   const [backfill, setBackfill] = React.useState<{
     running: boolean
     days: number
@@ -426,6 +429,74 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
         </button>
 
         {shapeError && <p className="mt-3 text-sm text-red-700">{shapeError}</p>}
+
+        <div className="mt-5 border-t border-neutral-100 pt-4">
+          <p className="text-sm font-semibold text-neutral-800">Hourly sales</p>
+          <p className="mt-1 text-sm text-neutral-500">
+            Tries <code className="font-mono text-xs">api/hourlysales</code> several ways to learn
+            what it answers. If it gives totals by hour it would show trade by time of day — a
+            rostering question nothing else here answers — and make backfills far cheaper. It
+            cannot replace the sales pull: Meta needs one event per sale.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setHourly(null)
+              setHourlyError('')
+              startTransition(async () => {
+                const res = await probeHourlyAction()
+                if (!res.success || !res.probes) {
+                  setHourlyError(res.error ?? 'Something went wrong.')
+                  return
+                }
+                setHourly(res.probes)
+              })
+            }}
+            disabled={pending}
+            className="mt-3 inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+          >
+            {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            Probe hourly sales
+          </button>
+
+          {hourlyError && <p className="mt-3 text-sm text-red-700">{hourlyError}</p>}
+
+          {hourly && (
+            <table className="mt-3 w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+                  <th className="py-2 pr-3">Parameters</th>
+                  <th className="py-2 pr-3">HTTP</th>
+                  <th className="py-2 pr-3">Rows</th>
+                  <th className="py-2">Shape</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hourly.map((p) => (
+                  <tr key={p.label} className="border-b border-neutral-100 align-top">
+                    <td className="py-2 pr-3">{p.label}</td>
+                    <td className="py-2 pr-3 tabular-nums">{p.status || '—'}</td>
+                    <td
+                      className={
+                        'py-2 pr-3 font-bold tabular-nums ' +
+                        (p.count > 0 ? 'text-lime-700' : 'text-neutral-400')
+                      }
+                    >
+                      {p.count}
+                    </td>
+                    <td className="py-2 font-mono text-xs text-neutral-500">{p.error ?? p.shape}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {hourly?.find((p) => p.firstRowKeys) && (
+            <p className="mt-3 rounded-2xl bg-neutral-50 p-3 font-mono text-xs text-neutral-600">
+              fields: {hourly.find((p) => p.firstRowKeys)!.firstRowKeys!.join(', ')}
+            </p>
+          )}
+        </div>
 
         {shape && (
           <div className="mt-4">

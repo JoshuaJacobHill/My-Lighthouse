@@ -440,10 +440,24 @@ export async function probeSales(
   store: GapStore,
   attempts: { label: string; params: Record<string, string> }[],
 ): Promise<SalesProbe[]> {
+  return probeEndpoint(cfg, `/api/store/${store.id}/sales`, attempts)
+}
+
+/**
+ * The same question of any endpoint: what does it answer, and in what shape?
+ *
+ * Undocumented APIs are learned by asking, and every guess this project has
+ * made about Gap has been wrong at least once. Cheaper to look.
+ */
+export async function probeEndpoint(
+  cfg: GapConfig,
+  path: string,
+  attempts: { label: string; params: Record<string, string> }[],
+): Promise<SalesProbe[]> {
   const out: SalesProbe[] = []
 
   for (const attempt of attempts) {
-    const url = new URL(`${cfg.baseUrl}/api/store/${store.id}/sales`)
+    const url = new URL(`${cfg.baseUrl}${path}`)
     for (const [k, v] of Object.entries(attempt.params)) url.searchParams.set(k, v)
 
     try {

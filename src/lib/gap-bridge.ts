@@ -40,6 +40,7 @@ import {
   isExternalSale,
   hasRealCustomer,
   saleInstant,
+  probeEndpoint,
   probeSales,
   toEmcDateParam,
   toUtcDateParam,
@@ -1091,6 +1092,57 @@ export async function customerCoverage(limit = 25): Promise<
         .sort((a, b) => b.filled - a.filled || a.name.localeCompare(b.name)),
     },
   }
+}
+
+// ─── Hourly sales ─────────────────────────────────────────────────────────────
+
+/**
+ * What `api/hourlysales` answers, and how.
+ *
+ * Two possible wins if it works: trade by hour of day, which is a rostering
+ * question nothing else here can answer, and a far cheaper backfill — one
+ * request a day instead of every sale header. Its parameters are undocumented,
+ * so several shapes are tried and the results compared.
+ *
+ * It will not replace the sales pull. Meta needs one event per sale with that
+ * customer attached, and no hourly total can produce that.
+ */
+export async function probeHourly(): Promise<
+  { ok: false; error: string } | { ok: true; store: GapStore; probes: SalesProbe[] }
+> {
+  const cfg = gapConfig()
+  if (!cfg) return { ok: false, error: 'EMC credentials or stores not configured' }
+
+  const store = cfg.stores[0]
+  const today = brisbaneToday()
+  const yesterday = brisbaneToday(new Date(Date.now() - 86_400_000))
+
+  const probes = await probeEndpoint(cfg, '/api/hourlysales', [
+    {
+      label: 'StoreID + a single Date',
+      params: { StoreID: String(store.id), Date: `${yesterday}T00:00:00` },
+    },
+    {
+      label: 'StoreID + StartDate/EndDate, one day',
+      params: {
+        StoreID: String(store.id),
+        StartDate: `${yesterday}T00:00:00`,
+        EndDate: `${yesterday}T23:59:59`,
+      },
+    },
+    {
+      label: 'StoreID + a week',
+      params: {
+        StoreID: String(store.id),
+        StartDate: `${brisbaneToday(new Date(Date.now() - 7 * 86_400_000))}T00:00:00`,
+        EndDate: `${today}T23:59:59`,
+      },
+    },
+    { label: 'StoreID only', params: { StoreID: String(store.id) } },
+    { label: 'No parameters', params: {} },
+  ])
+
+  return { ok: true, store, probes }
 }
 
 // ─── What shape are the sales? ────────────────────────────────────────────────

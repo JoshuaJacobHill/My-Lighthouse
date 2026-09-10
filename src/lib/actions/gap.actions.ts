@@ -6,6 +6,7 @@ import {
   backfillDays,
   customerCoverage,
   diagnose,
+  probeHourly,
   salesShape,
   type ShapeField,
   processOneSale,
@@ -134,4 +135,17 @@ export async function backfillAction(
   if (!res.ok) return { success: false, error: res.error }
   const { ok: _ok, ...result } = res
   return { success: true, result }
+}
+
+/** What `api/hourlysales` returns, and for which parameters. */
+export async function probeHourlyAction(): Promise<{
+  success: boolean
+  store?: GapStore
+  probes?: SalesProbe[]
+  error?: string
+}> {
+  if (!(await guard())) return { success: false, error: 'Not allowed.' }
+  const res = await probeHourly()
+  if (!res.ok) return { success: false, error: res.error }
+  return { success: true, store: res.store, probes: res.probes }
 }
