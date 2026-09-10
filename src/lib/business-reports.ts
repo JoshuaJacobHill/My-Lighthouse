@@ -328,88 +328,50 @@ export async function getTopSocial(
 /** Last successful pull per source, so each panel can show its own age. */
 // ─── Sales against exposure, over time ────────────────────────────────────────
 
-export type TrendPoint = {
-  /** Short label for the axis: "8 Sep" or "Sep". */
-  label: string
-  /** Full label for the tooltip. */
-  title: string
+export type TrendDay = {
+  /** yyyy-mm-dd, Brisbane. */
+  day: string
   /**
-   * Days in this bucket. Weeks are seven; months are not, and a per-day
-   * average that divides February by 30 is quietly wrong.
+   * Revenue by "Store|CHANNEL". Compact on purpose — this is a year of days
+   * crossing the wire, and zeros are omitted rather than sent.
    */
-  days: number
-  /**
-   * Broken down so the chart can be filtered in the browser without asking
-   * the server again — twelve buckets by two shops by two channels is a
-   * handful of numbers, and a filter that costs a round trip does not feel
-   * like a filter.
-   */
-  sales: { store: string; channel: string; revenueCents: number }[]
+  sales: Record<string, number>
   /**
    * Views are organisation-wide. Meta and Mailchimp do not know which shop an
-   * impression belonged to, so this figure does not change when the store
-   * filter does — which the chart says out loud rather than implying a split
-   * that does not exist.
+   * impression belonged to, so this figure cannot be split by store — which
+   * the chart says out loud rather than implying a split that does not exist.
    */
   views: number
 }
 
 /**
- * Takings and eyeballs, bucket by bucket.
+ * A year of days, sales and views together.
  *
- * Deliberately built from the same sources as the exposure panel — ad views,
- * organic post views and email opens — so the two can never disagree about
- * what a "view" is. One definition, read twice.
+ * Days rather than weeks or months because the grain belongs to the reader,
+ * not to this function. Sending the daily grain once lets the chart offer
+ * days, weeks and months and switch between them instantly — where fetching
+ * per grain meant the page had to guess which one you wanted, and guessed
+ * wrong often enough to be annoying.
  *
- * Weeks run Monday to Sunday, matching every other week in this app. Months
- * are calendar months in Brisbane.
+ * Views come from the same three sources as the exposure panel — ad views,
+ * organic post views, email opens — so the two can never disagree about what
+ * a view is.
  */
-export async function getSalesVsViews(
-  grain: 'week' | 'month',
-  points = 12,
-  now = new Date(),
-): Promise<TrendPoint[]> {
-  const { y, m, d, weekday } = brisbaneParts(now)
-
-  // Bucket starts, oldest first.
-  const starts: Date[] = []
-  if (grain === 'week') {
-    const today = bneDate(y, m, d)
-    const thisMonday = new Date(today.getTime() - ((weekday + 6) % 7) * 86_400_000)
-    for (let i = points - 1; i >= 0; i--) {
-      starts.push(new Date(thisMonday.getTime() - i * 7 * 86_400_000))
-    }
-  } else {
-    for (let i = points - 1; i >= 0; i--) {
-      const month = m - i
-      const year = y + Math.floor((month - 1) / 12)
-      const norm = ((month - 1) % 12 + 12) % 12 + 1
-      starts.push(bneDate(year, norm, 1))
-    }
-  }
-
-  const endOf = (start: Date, i: number): Date => {
-    if (grain === 'week') return new Date(start.getTime() + 6 * 86_400_000)
-    const next = starts[i + 1]
-    if (next) return new Date(next.getTime() - 86_400_000)
-    const sy = start.getUTCFullYear()
-    const sm = start.getUTCMonth() + 1
-    return new Date(Date.UTC(sm === 12 ? sy + 1 : sy, sm === 12 ? 0 : sm, 0))
-  }
-
-  const from = starts[0]
-  const to = endOf(starts[starts.length - 1], starts.length - 1)
-  const endInstant = new Date(to.getTime() + 86_399_999)
+export async function getDailyTrend(days = 365, now = new Date()): Promise<TrendDay[]> {
+  const { y, m, d } = brisbaneParts(now)
+  const today = bneDate(y, m, d)
+  const from = new Date(today.getTime() - (days - 1) * 86_400_000)
+  const endInstant = new Date(today.getTime() + 86_399_999)
 
   const [sales, ads, organic, email] = await Promise.all([
     prisma.salesFact.groupBy({
       by: ['day', 'store', 'channel'],
-      where: { day: { gte: from, lte: to } },
+      where: { day: { gte: from, lte: today } },
       _sum: { revenueCents: true },
     }),
     prisma.adDayStat.groupBy({
       by: ['day'],
-      where: { day: { gte: from, lte: to } },
+      where: { day: { gte: from, lte: today } },
       _sum: { views: true },
     }),
     prisma.socialPost.findMany({
@@ -427,58 +389,42 @@ export async function getSalesVsViews(
     }),
   ])
 
-  const buckets = starts.map((start, i) => {
-    const end = endOf(start, i)
-    return { start, end, sales: new Map<string, number>(), views: 0 }
-  })
-
-  const find = (at: Date | null) => {
-    if (!at) return null
-    const t = at.getTime()
-    return (
-      buckets.find((b) => t >= b.start.getTime() && t <= b.end.getTime() + 86_399_999) ?? null
-    )
+  const byDay = new Map<string, TrendDay>()
+  for (let i = 0; i < days; i++) {
+    const key = new Date(from.getTime() + i * 86_400_000).toISOString().slice(0, 10)
+    byDay.set(key, { day: key, sales: {}, views: 0 })
   }
 
   for (const r of sales) {
-    const b = find(r.day)
-    if (!b) continue
-    const key = `${r.store}\u0000${r.channel}`
-    b.sales.set(key, (b.sales.get(key) ?? 0) + (r._sum.revenueCents ?? 0))
+    const bucket = byDay.get(r.day.toISOString().slice(0, 10))
+    if (!bucket) continue
+    const cents = r._sum.revenueCents ?? 0
+    if (cents === 0) continue
+    const key = `${r.store}|${r.channel}`
+    bucket.sales[key] = (bucket.sales[key] ?? 0) + cents
   }
   for (const r of ads) {
-    const b = find(r.day)
-    if (b) b.views += r._sum.views ?? 0
+    const bucket = byDay.get(r.day.toISOString().slice(0, 10))
+    if (bucket) bucket.views += r._sum.views ?? 0
   }
+  // Published instants are UTC; the day they belong to is Brisbane's.
+  const bneDay = (at: Date) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Australia/Brisbane',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(at)
   for (const r of organic) {
-    const b = find(r.publishedAt)
-    if (b) b.views += r.views
+    const bucket = byDay.get(bneDay(r.publishedAt))
+    if (bucket) bucket.views += r.views
   }
   for (const r of email) {
-    const b = find(r.publishedAt)
-    if (b) b.views += r.engagements
+    const bucket = byDay.get(bneDay(r.publishedAt))
+    if (bucket) bucket.views += r.engagements
   }
 
-  const short = new Intl.DateTimeFormat('en-AU', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-  })
-  const monthOnly = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', month: 'short' })
-
-  return buckets.map((b) => ({
-    label: grain === 'week' ? short.format(b.start) : monthOnly.format(b.start),
-    title:
-      grain === 'week'
-        ? `${short.format(b.start)} – ${short.format(b.end)}`
-        : new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(b.start),
-    days: Math.round((b.end.getTime() - b.start.getTime()) / 86_400_000) + 1,
-    sales: [...b.sales.entries()].map(([key, revenueCents]) => {
-      const [store, channel] = key.split('\u0000')
-      return { store, channel, revenueCents }
-    }),
-    views: b.views,
-  }))
+  return [...byDay.values()]
 }
 
 export async function getIngestHealth(): Promise<

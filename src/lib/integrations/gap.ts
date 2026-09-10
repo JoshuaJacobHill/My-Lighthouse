@@ -413,6 +413,8 @@ export function toUtcDateParam(instant: Date): string {
 export type SalesProbe = {
   label: string
   params: Record<string, string>
+  /** GET unless the endpoint refuses it. */
+  method?: 'GET' | 'POST'
   /** HTTP status, or 0 if the request itself failed. */
   status: number
   /** How the body arrived: an array, or an object with these top-level keys. */
@@ -452,13 +454,17 @@ export async function probeSales(
 export async function probeEndpoint(
   cfg: GapConfig,
   path: string,
-  attempts: { label: string; params: Record<string, string> }[],
+  attempts: { label: string; params: Record<string, string>; method?: 'GET' | 'POST' }[],
 ): Promise<SalesProbe[]> {
   const out: SalesProbe[] = []
 
   for (const attempt of attempts) {
+    const method = attempt.method ?? 'GET'
     const url = new URL(`${cfg.baseUrl}${path}`)
-    for (const [k, v] of Object.entries(attempt.params)) url.searchParams.set(k, v)
+    // A POST carries its parameters in the body; a GET in the query string.
+    if (method === 'GET') {
+      for (const [k, v] of Object.entries(attempt.params)) url.searchParams.set(k, v)
+    }
 
     try {
       const token = await (async () => {
@@ -474,7 +480,13 @@ export async function probeEndpoint(
       }
 
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(method === 'POST' ? { body: JSON.stringify(attempt.params) } : {}),
         cache: 'no-store',
       })
 

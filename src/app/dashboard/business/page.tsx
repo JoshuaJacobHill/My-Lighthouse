@@ -6,11 +6,11 @@ import {
   getTopSocial,
   getIngestHealth,
   getExposure,
-  getSalesVsViews,
+  getDailyTrend,
   type Period,
   type TopPost,
 } from '@/lib/business-reports'
-import { SalesVsViews } from './SalesVsViews'
+import { SalesVsViews, type Grain } from './SalesVsViews'
 import { PeriodTabs } from './PeriodTabs'
 
 export const dynamic = 'force-dynamic'
@@ -136,16 +136,17 @@ export default async function BusinessReportPage({
   const { period: raw } = await searchParams
   const period: Period = PERIODS.includes(raw as Period) ? (raw as Period) : 'month'
 
-  // Weeks when looking at a day or a week, months for a month or a year —
-  // twelve bars of the grain you are already thinking in.
-  const trendGrain: 'week' | 'month' = period === 'day' || period === 'week' ? 'week' : 'month'
+  // Only where the chart *opens*. It carries its own Days/Weeks/Months control
+  // and states which it is showing, so choosing "Today" and being shown twelve
+  // weeks can no longer happen silently.
+  const openingGrain: Grain = period === 'day' ? 'day' : period === 'week' ? 'week' : 'month'
 
   const [sales, social, health, exposure, trend] = await Promise.all([
     getSalesReport(period),
     getTopSocial(period),
     getIngestHealth(),
     getExposure(period),
-    getSalesVsViews(trendGrain, 12),
+    getDailyTrend(365),
   ])
 
   const hasSales = sales.stores.length > 0
@@ -172,10 +173,10 @@ export default async function BusinessReportPage({
             leads rather than trailing the detail it summarises. */}
         <div className="mt-8 rounded-[28px] border border-neutral-200 p-5">
           <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
-            Sales and views by {trendGrain}
+            Sales and views
           </h2>
           <div className="mt-4">
-            <SalesVsViews points={trend} grain={trendGrain} />
+            <SalesVsViews daily={trend} defaultGrain={openingGrain} />
           </div>
         </div>
 

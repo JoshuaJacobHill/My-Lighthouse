@@ -31,18 +31,28 @@ export async function GET(request: NextRequest) {
     byHand = true
   }
 
-  const requested = Number(new URL(request.url).searchParams.get('days'))
+  const q = new URL(request.url).searchParams
+  const requested = Number(q.get('days'))
   const days = byHand && Number.isFinite(requested) && requested > 0
     ? Math.min(requested, 400)
     : undefined
 
+  // How far back to re-read organic post metrics. The nightly run keeps its
+  // small default: a year of post insights re-fetched every night would be
+  // thousands of requests to rediscover numbers that have not changed.
+  const requestedPosts = Number(q.get('posts'))
+  const posts = byHand && Number.isFinite(requestedPosts) && requestedPosts > 0
+    ? Math.min(requestedPosts, 600)
+    : undefined
+
   const started = Date.now()
-  const result = await ingestMeta(days ? { days } : {})
+  const result = await ingestMeta({ ...(days ? { days } : {}), ...(posts ? { posts } : {}) })
 
   return NextResponse.json(
     {
       ...result,
       days: days ?? 'default',
+      posts: posts ?? 'default',
       tookMs: Date.now() - started,
     },
     { status: result.ok ? 200 : 500 },

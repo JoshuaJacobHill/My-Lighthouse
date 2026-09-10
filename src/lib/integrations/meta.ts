@@ -32,7 +32,15 @@ const BASE = `https://graph.facebook.com/${V}`
  * bigger window explicitly for a first-time backfill.
  */
 const AD_DAYS_DEFAULT = 7
-/** How many recent posts to keep metrics fresh for. */
+/**
+ * How many recent posts to keep metrics fresh for.
+ *
+ * A default rather than a constant now: the chart looks back a year, and fifty
+ * posts is a couple of months of posting. A backfill passes a bigger number
+ * once; the nightly run stays small, because re-reading a year of post
+ * insights every night to rediscover figures that have not changed would be
+ * thousands of needless requests.
+ */
 const POST_LIMIT = 50
 
 type Cfg = {
@@ -236,7 +244,7 @@ async function pageToken(cfg: Cfg): Promise<string> {
   return match.access_token
 }
 
-async function ingestFacebookPosts(cfg: Cfg, pt: string): Promise<number> {
+async function ingestFacebookPosts(cfg: Cfg, pt: string, limit = POST_LIMIT): Promise<number> {
   const posts = await graphAll<{
     id: string
     message?: string
@@ -248,7 +256,7 @@ async function ingestFacebookPosts(cfg: Cfg, pt: string): Promise<number> {
     `${cfg.pageId}/posts`,
     { fields: 'id,message,story,created_time,permalink_url,full_picture', limit: '25' },
     pt,
-    Math.ceil(POST_LIMIT / 25),
+    Math.ceil(limit / 25),
     true, // we only ever want the most recent POST_LIMIT posts
   )
 
@@ -315,7 +323,7 @@ async function ingestFacebookPosts(cfg: Cfg, pt: string): Promise<number> {
 
 // ── Organic: Instagram ───────────────────────────────────────────────────────
 
-async function ingestInstagram(cfg: Cfg, pt: string): Promise<number> {
+async function ingestInstagram(cfg: Cfg, pt: string, limit = POST_LIMIT): Promise<number> {
   const media = await graph<{
     data: {
       id: string
@@ -329,7 +337,7 @@ async function ingestInstagram(cfg: Cfg, pt: string): Promise<number> {
     `${cfg.igUserId}/media`,
     {
       fields: 'id,caption,timestamp,permalink,media_url,thumbnail_url',
-      limit: String(POST_LIMIT),
+      limit: String(limit),
     },
     pt,
   )
@@ -390,7 +398,7 @@ async function ingestInstagram(cfg: Cfg, pt: string): Promise<number> {
  * and Instagram breaking should leave ads on the page, not blank the lot.
  */
 export async function ingestMeta(
-  { days = AD_DAYS_DEFAULT }: { days?: number } = {},
+  { days = AD_DAYS_DEFAULT, posts = POST_LIMIT }: { days?: number; posts?: number } = {},
 ): Promise<{ ok: boolean; rows: number; error?: string }> {
   const cfg = metaConfig()
   const run = await prisma.ingestRun.create({ data: { source: 'meta' }, select: { id: true } })
@@ -416,12 +424,12 @@ export async function ingestMeta(
   try {
     const pt = await pageToken(cfg)
     try {
-      rows += await ingestFacebookPosts(cfg, pt)
+      rows += await ingestFacebookPosts(cfg, pt, posts)
     } catch (e) {
       problems.push(`facebook: ${(e as Error).message}`)
     }
     try {
-      rows += await ingestInstagram(cfg, pt)
+      rows += await ingestInstagram(cfg, pt, posts)
     } catch (e) {
       problems.push(`instagram: ${(e as Error).message}`)
     }

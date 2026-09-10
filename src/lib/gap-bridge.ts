@@ -1117,13 +1117,13 @@ export async function probeHourly(): Promise<
   const today = brisbaneToday()
   const yesterday = brisbaneToday(new Date(Date.now() - 86_400_000))
 
+  // GET returned 405 Method Not Allowed on every shape, which is the endpoint
+  // saying "right address, wrong verb" — so POST is tried first now, with the
+  // same parameter shapes in a JSON body.
   const probes = await probeEndpoint(cfg, '/api/hourlysales', [
     {
-      label: 'StoreID + a single Date',
-      params: { StoreID: String(store.id), Date: `${yesterday}T00:00:00` },
-    },
-    {
-      label: 'StoreID + StartDate/EndDate, one day',
+      label: 'POST · StoreID + StartDate/EndDate',
+      method: 'POST',
       params: {
         StoreID: String(store.id),
         StartDate: `${yesterday}T00:00:00`,
@@ -1131,15 +1131,31 @@ export async function probeHourly(): Promise<
       },
     },
     {
-      label: 'StoreID + a week',
+      label: 'POST · storeID + startDate/endDate (camelCase)',
+      method: 'POST',
+      params: {
+        storeID: String(store.id),
+        startDate: `${yesterday}T00:00:00`,
+        endDate: `${yesterday}T23:59:59`,
+      },
+    },
+    {
+      label: 'POST · StoreID + a single Date',
+      method: 'POST',
+      params: { StoreID: String(store.id), Date: `${yesterday}T00:00:00` },
+    },
+    {
+      label: 'POST · StoreID + a week',
+      method: 'POST',
       params: {
         StoreID: String(store.id),
         StartDate: `${brisbaneToday(new Date(Date.now() - 7 * 86_400_000))}T00:00:00`,
         EndDate: `${today}T23:59:59`,
       },
     },
-    { label: 'StoreID only', params: { StoreID: String(store.id) } },
-    { label: 'No parameters', params: {} },
+    { label: 'POST · StoreID only', method: 'POST', params: { StoreID: String(store.id) } },
+    { label: 'POST · empty body', method: 'POST', params: {} },
+    { label: 'GET · for comparison', params: { StoreID: String(store.id) } },
   ])
 
   return { ok: true, store, probes }
