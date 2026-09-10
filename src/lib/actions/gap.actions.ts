@@ -3,12 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { hasCapability } from '@/lib/permissions'
 import {
+  backfillDays,
   customerCoverage,
   diagnose,
   salesShape,
   type ShapeField,
   processOneSale,
   runOnce,
+  type BackfillResult,
   type Coverage,
   type RunSummary,
   type SaleOutcome,
@@ -115,4 +117,21 @@ export async function salesShapeAction(
   const res = await salesShape(hours ?? 24)
   if (!res.ok) return { success: false, error: res.error }
   return { success: true, sampled: res.sampled, store: res.store, fields: res.fields }
+}
+
+/**
+ * One chunk of a historical backfill. The caller loops on `nextDay`.
+ *
+ * Chunked because a serverless function has about a minute, and a year of
+ * trade is more than that however cheap each day is.
+ */
+export async function backfillAction(
+  fromDay: string,
+  days = 14,
+): Promise<{ success: boolean; result?: BackfillResult; error?: string }> {
+  if (!(await guard())) return { success: false, error: 'Not allowed.' }
+  const res = await backfillDays({ fromDay, days: Math.min(Math.max(days, 1), 60) })
+  if (!res.ok) return { success: false, error: res.error }
+  const { ok: _ok, ...result } = res
+  return { success: true, result }
 }

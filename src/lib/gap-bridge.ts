@@ -28,12 +28,13 @@
 
 import prisma from '@/lib/prisma'
 import { GapSaleStatus, SalesChannel } from '@prisma/client'
-import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
+import { brisbaneToday, calendarDay, calendarDayString } from '@/lib/fitness-days'
 import {
   type GapConfig,
   type GapSaleHeader,
   type GapStore,
   gapConfig,
+  BRISBANE_OFFSET_MINUTES,
   getAllStoreSales,
   getSaleDetail,
   isExternalSale,
@@ -565,6 +566,116 @@ export async function rollUpSalesFacts(store: GapStore, days: Date[]): Promise<n
   }
 
   return new Set(grouped.map((g) => g.day.getTime())).size
+}
+
+// ─── Backfilling history ──────────────────────────────────────────────────────
+
+export type BackfillResult = {
+  /** yyyy-mm-dd of the next day to do, or null when finished. */
+  nextDay: string | null
+  daysDone: number
+  salesCounted: number
+  revenueCents: number
+  /** Days left to the ledger because it already holds them. */
+  skippedToLedger: number
+}
+
+/**
+ * Fill the sales report with history, without filling the ledger.
+ *
+ * A year of trade is roughly 300,000 sales. Writing a GapSale row for each
+ * would take hours and buy nothing: the ledger exists to stop Meta being sent
+ * the same event twice, and Meta will not accept an event from last March at
+ * all. What the report actually needs is four numbers a day per store — sales
+ * and revenue, in store and online — so that is all this writes.
+ *
+ * Which makes a year affordable: about two requests per store per day instead
+ * of a row per sale, and no customer detail fetched at any point.
+ *
+ * A day the ledger already covers is left alone. The two must never both own
+ * a day, or a full run and a partial one would take turns overwriting each
+ * other's total.
+ *
+ * Done in chunks because a serverless function has a minute to live. The
+ * caller loops on `nextDay`.
+ */
+export async function backfillDays(opts: {
+  /** Oldest day still to do, yyyy-mm-dd. */
+  fromDay: string
+  /** How many days this call should attempt. */
+  days: number
+}): Promise<{ ok: false; error: string } | ({ ok: true } & BackfillResult)> {
+  const cfg = gapConfig()
+  if (!cfg) return { ok: false, error: 'EMC credentials or stores not configured' }
+
+  const first = calendarDay(opts.fromDay)
+  if (!first) return { ok: false, error: `"${opts.fromDay}" is not a date.` }
+
+  const todayString = brisbaneToday()
+  const today = calendarDay(todayString)!
+
+  let daysDone = 0
+  let salesCounted = 0
+  let revenueCents = 0
+  let skippedToLedger = 0
+  let cursor = first
+
+  for (let i = 0; i < Math.max(1, opts.days); i++) {
+    if (cursor.getTime() >= today.getTime()) {
+      // Today belongs to the live run, which has the detail and the ledger.
+      return { ok: true, nextDay: null, daysDone, salesCounted, revenueCents, skippedToLedger }
+    }
+
+    // Brisbane midnight to midnight, as instants.
+    const start = new Date(cursor.getTime() - BRISBANE_OFFSET_MINUTES * 60_000)
+    const end = new Date(start.getTime() + 86_399_999)
+
+    for (const store of cfg.stores) {
+      const alreadyOurs = await prisma.gapSale.count({
+        where: { day: cursor, storeID: store.id },
+      })
+      if (alreadyOurs > 0) {
+        skippedToLedger++
+        continue
+      }
+
+      const headers = await getAllStoreSales(cfg, store, { start, end })
+      const counted = headers.filter((h) => h.tranType === 0 && h.storeID === store.id)
+
+      for (const channel of [SalesChannel.IN_STORE, SalesChannel.ONLINE]) {
+        const rows = counted.filter(
+          (h) => (isExternalSale(h) ? SalesChannel.ONLINE : SalesChannel.IN_STORE) === channel,
+        )
+        const revenue = rows.reduce((n, h) => n + h.totalAmount, 0)
+
+        // Written even when zero, so an empty day reads as "we looked and
+        // there was nothing" rather than as a gap in the data.
+        await prisma.salesFact.upsert({
+          where: {
+            day_store_channel_source: { day: cursor, store: store.name, channel, source: GAP_SOURCE },
+          },
+          create: {
+            day: cursor,
+            store: store.name,
+            channel,
+            source: GAP_SOURCE,
+            orders: rows.length,
+            revenueCents: revenue,
+          },
+          update: { orders: rows.length, revenueCents: revenue },
+        })
+
+        salesCounted += rows.length
+        revenueCents += revenue
+      }
+    }
+
+    daysDone++
+    cursor = new Date(cursor.getTime() + 86_400_000)
+  }
+
+  const nextDay = cursor.getTime() >= today.getTime() ? null : calendarDayString(cursor)
+  return { ok: true, nextDay, daysDone, salesCounted, revenueCents, skippedToLedger }
 }
 
 // ─── A run ────────────────────────────────────────────────────────────────────

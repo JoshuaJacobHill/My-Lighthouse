@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { Loader2 } from 'lucide-react'
 import {
+  backfillAction,
   coverageAction,
   diagnoseGapAction,
   runBridgeNowAction,
@@ -53,6 +54,15 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
   const [coverageError, setCoverageError] = React.useState('')
   const [shape, setShape] = React.useState<{ sampled: number; store: string; fields: ShapeField[] } | null>(null)
   const [shapeError, setShapeError] = React.useState('')
+  const [backfill, setBackfill] = React.useState<{
+    running: boolean
+    days: number
+    sales: number
+    revenueCents: number
+    at: string
+    done: boolean
+    error?: string
+  } | null>(null)
 
   function run() {
     setRunLines([])
@@ -292,6 +302,92 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
               <p className="mt-3 text-sm text-neutral-600">
                 None of the sales checked had a customer attached, so there is nothing for Meta to
                 match. That is a counter habit rather than a technical problem.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* History for the report, without a ledger row per sale. */}
+      <div className="rounded-[28px] border border-neutral-200 p-5">
+        <h2 className="text-lg font-bold">Backfill history</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Fills the sales report with past trade, a fortnight at a time. Writes daily totals only —
+          no customer detail is fetched and nothing goes to Meta, which is what makes a year
+          affordable. Days the bridge already covers are left alone.
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          {[
+            { label: 'Last 3 months', months: 3 },
+            { label: 'Last 12 months', months: 12 },
+          ].map((opt) => (
+            <button
+              key={opt.months}
+              type="button"
+              disabled={backfill?.running}
+              onClick={async () => {
+                const start = new Date()
+                start.setUTCMonth(start.getUTCMonth() - opt.months)
+                let cursor: string | null = start.toISOString().slice(0, 10)
+                let days = 0
+                let sales = 0
+                let revenueCents = 0
+
+                setBackfill({ running: true, days: 0, sales: 0, revenueCents: 0, at: cursor, done: false })
+
+                // Looped here rather than on the server: each call has to
+                // finish inside a function's lifetime, and the browser is
+                // the only thing that can hold the cursor between them.
+                while (cursor) {
+                  const res = await backfillAction(cursor, 14)
+                  if (!res.success || !res.result) {
+                    setBackfill({
+                      running: false, days, sales, revenueCents,
+                      at: cursor, done: false, error: res.error ?? 'Something went wrong.',
+                    })
+                    return
+                  }
+                  days += res.result.daysDone
+                  sales += res.result.salesCounted
+                  revenueCents += res.result.revenueCents
+                  cursor = res.result.nextDay
+                  setBackfill({
+                    running: Boolean(cursor), days, sales, revenueCents,
+                    at: cursor ?? 'finished', done: !cursor,
+                  })
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+            >
+              {backfill?.running && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {backfill && (
+          <div className="mt-4 rounded-2xl bg-neutral-50 p-4 text-sm">
+            <p className="font-semibold text-neutral-900">
+              {backfill.done
+                ? 'Finished.'
+                : backfill.error
+                  ? 'Stopped.'
+                  : `Working — up to ${backfill.at}`}
+            </p>
+            <p className="mt-1 text-neutral-600">
+              {backfill.days} days · {backfill.sales.toLocaleString('en-AU')} sales ·{' '}
+              {new Intl.NumberFormat('en-AU', {
+                style: 'currency',
+                currency: 'AUD',
+                maximumFractionDigits: 0,
+              }).format(backfill.revenueCents / 100)}
+            </p>
+            {backfill.error && <p className="mt-1 text-red-700">{backfill.error}</p>}
+            {backfill.running && (
+              <p className="mt-1 text-xs text-neutral-500">
+                Leave this page open until it finishes — the progress is held here, not on the
+                server.
               </p>
             )}
           </div>

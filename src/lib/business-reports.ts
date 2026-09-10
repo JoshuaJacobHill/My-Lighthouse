@@ -326,6 +326,130 @@ export async function getTopSocial(
 }
 
 /** Last successful pull per source, so each panel can show its own age. */
+// ─── Sales against exposure, over time ────────────────────────────────────────
+
+export type TrendPoint = {
+  /** Short label for the axis: "8 Sep" or "Sep". */
+  label: string
+  /** Full label for the tooltip. */
+  title: string
+  revenueCents: number
+  views: number
+}
+
+/**
+ * Takings and eyeballs, bucket by bucket.
+ *
+ * Deliberately built from the same sources as the exposure panel — ad views,
+ * organic post views and email opens — so the two can never disagree about
+ * what a "view" is. One definition, read twice.
+ *
+ * Weeks run Monday to Sunday, matching every other week in this app. Months
+ * are calendar months in Brisbane.
+ */
+export async function getSalesVsViews(
+  grain: 'week' | 'month',
+  points = 12,
+  now = new Date(),
+): Promise<TrendPoint[]> {
+  const { y, m, d, weekday } = brisbaneParts(now)
+
+  // Bucket starts, oldest first.
+  const starts: Date[] = []
+  if (grain === 'week') {
+    const today = bneDate(y, m, d)
+    const thisMonday = new Date(today.getTime() - ((weekday + 6) % 7) * 86_400_000)
+    for (let i = points - 1; i >= 0; i--) {
+      starts.push(new Date(thisMonday.getTime() - i * 7 * 86_400_000))
+    }
+  } else {
+    for (let i = points - 1; i >= 0; i--) {
+      const month = m - i
+      const year = y + Math.floor((month - 1) / 12)
+      const norm = ((month - 1) % 12 + 12) % 12 + 1
+      starts.push(bneDate(year, norm, 1))
+    }
+  }
+
+  const endOf = (start: Date, i: number): Date => {
+    if (grain === 'week') return new Date(start.getTime() + 6 * 86_400_000)
+    const next = starts[i + 1]
+    if (next) return new Date(next.getTime() - 86_400_000)
+    const sy = start.getUTCFullYear()
+    const sm = start.getUTCMonth() + 1
+    return new Date(Date.UTC(sm === 12 ? sy + 1 : sy, sm === 12 ? 0 : sm, 0))
+  }
+
+  const from = starts[0]
+  const to = endOf(starts[starts.length - 1], starts.length - 1)
+  const endInstant = new Date(to.getTime() + 86_399_999)
+
+  const [sales, ads, organic, email] = await Promise.all([
+    prisma.salesFact.groupBy({
+      by: ['day'],
+      where: { day: { gte: from, lte: to } },
+      _sum: { revenueCents: true },
+    }),
+    prisma.adDayStat.groupBy({
+      by: ['day'],
+      where: { day: { gte: from, lte: to } },
+      _sum: { views: true },
+    }),
+    prisma.socialPost.findMany({
+      where: {
+        kind: 'ORGANIC',
+        platform: { in: ['FACEBOOK', 'INSTAGRAM'] },
+        publishedAt: { gte: from, lte: endInstant },
+      },
+      select: { publishedAt: true, views: true },
+    }),
+    // Opens, not sends — the same choice the exposure panel makes.
+    prisma.socialPost.findMany({
+      where: { platform: 'MAILCHIMP', publishedAt: { gte: from, lte: endInstant } },
+      select: { publishedAt: true, engagements: true },
+    }),
+  ])
+
+  const buckets = starts.map((start, i) => {
+    const end = endOf(start, i)
+    return { start, end, revenueCents: 0, views: 0 }
+  })
+
+  const put = (at: Date | null, revenue: number, views: number) => {
+    if (!at) return
+    const t = at.getTime()
+    for (const b of buckets) {
+      if (t >= b.start.getTime() && t <= b.end.getTime() + 86_399_999) {
+        b.revenueCents += revenue
+        b.views += views
+        return
+      }
+    }
+  }
+
+  for (const r of sales) put(r.day, r._sum.revenueCents ?? 0, 0)
+  for (const r of ads) put(r.day, 0, r._sum.views ?? 0)
+  for (const r of organic) put(r.publishedAt, 0, r.views)
+  for (const r of email) put(r.publishedAt, 0, r.engagements)
+
+  const short = new Intl.DateTimeFormat('en-AU', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+  })
+  const monthOnly = new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', month: 'short' })
+
+  return buckets.map((b) => ({
+    label: grain === 'week' ? short.format(b.start) : monthOnly.format(b.start),
+    title:
+      grain === 'week'
+        ? `${short.format(b.start)} – ${short.format(b.end)}`
+        : new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(b.start),
+    revenueCents: b.revenueCents,
+    views: b.views,
+  }))
+}
+
 export async function getIngestHealth(): Promise<
   { source: string; at: Date | null; ok: boolean; error: string | null }[]
 > {

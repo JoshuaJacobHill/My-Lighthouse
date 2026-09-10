@@ -6,9 +6,11 @@ import {
   getTopSocial,
   getIngestHealth,
   getExposure,
+  getSalesVsViews,
   type Period,
   type TopPost,
 } from '@/lib/business-reports'
+import { SalesVsViews } from './SalesVsViews'
 import { PeriodTabs } from './PeriodTabs'
 
 export const dynamic = 'force-dynamic'
@@ -134,11 +136,16 @@ export default async function BusinessReportPage({
   const { period: raw } = await searchParams
   const period: Period = PERIODS.includes(raw as Period) ? (raw as Period) : 'month'
 
-  const [sales, social, health, exposure] = await Promise.all([
+  // Weeks when looking at a day or a week, months for a month or a year —
+  // twelve bars of the grain you are already thinking in.
+  const trendGrain: 'week' | 'month' = period === 'day' || period === 'week' ? 'week' : 'month'
+
+  const [sales, social, health, exposure, trend] = await Promise.all([
     getSalesReport(period),
     getTopSocial(period),
     getIngestHealth(),
     getExposure(period),
+    getSalesVsViews(trendGrain, 12),
   ])
 
   const hasSales = sales.stores.length > 0
@@ -282,6 +289,15 @@ export default async function BusinessReportPage({
               </ul>
             </Card>
           )}
+        </div>
+
+        {/* Did takings and reach move together? The question the two halves of
+            this page exist to answer, which no single figure can. */}
+        <div className="mt-12">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
+            Sales and views by {trendGrain}
+          </h2>
+          <SalesVsViews points={trend} grain={trendGrain} />
         </div>
 
         {/* Where each number came from, and when. A figure with no age is a
