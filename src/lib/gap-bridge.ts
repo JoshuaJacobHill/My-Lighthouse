@@ -695,6 +695,30 @@ export type FieldCoverage = {
   present: number
   /** And it survived normalisation, so Meta can match on it. */
   usable: number
+  /** Why the rest were rejected, so it can be fixed at the counter. */
+  reasons: { reason: string; count: number }[]
+}
+
+/**
+ * Why a value could not be used, without repeating the value.
+ *
+ * "Tidy it at the POS end" is useless advice if nobody can say what to tidy.
+ * A reason is the difference between that and "three numbers have a note typed
+ * after them". Deliberately describes the shape, never the content.
+ */
+function phoneRejection(raw: string): string {
+  if (/[a-z]/i.test(raw)) return 'has letters or a note typed in with it'
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 0) return 'no digits at all'
+  if (digits.length < 9) return `too short (${digits.length} digits)`
+  if (digits.length > 11) return `too long (${digits.length} digits)`
+  return 'not a recognisable Australian number'
+}
+
+function postcodeRejection(raw: string): string {
+  const v = raw.replace(/\s+/g, '')
+  if (/[a-z]/i.test(v)) return 'has letters in it'
+  return `not four digits (${v.length} characters)`
 }
 
 export type Coverage = {
@@ -742,6 +766,20 @@ export async function customerCoverage(limit = 25): Promise<
   }
   const seen = (raw: string | null | undefined) => Boolean(raw && raw.trim())
 
+  const why: Record<string, Map<string, number>> = {
+    em: new Map(),
+    ph: new Map(),
+    fn: new Map(),
+    ln: new Map(),
+    zp: new Map(),
+  }
+  const note = (key: string, reason: string) =>
+    why[key].set(reason, (why[key].get(reason) ?? 0) + 1)
+  const reasonsFor = (key: string) =>
+    [...why[key].entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+
   for (const row of recent) {
     let detail
     try {
@@ -760,10 +798,19 @@ export async function customerCoverage(limit = 25): Promise<
     if (seen(c?.postalCode)) f.zp.present++
 
     if (normaliseEmail(c?.email)) f.em.usable++
+    else if (seen(c?.email)) note('em', 'not a valid email address')
+
     if (normalisePhoneAu(c?.mobile)) f.ph.usable++
+    else if (seen(c?.mobile)) note('ph', phoneRejection(c!.mobile!))
+
     if (normaliseName(c?.givenName)) f.fn.usable++
+    else if (seen(c?.givenName)) note('fn', 'no letters in it')
+
     if (normaliseName(c?.familyName)) f.ln.usable++
+    else if (seen(c?.familyName)) note('ln', 'no letters in it')
+
     if (normalisePostcode(c?.postalCode)) f.zp.usable++
+    else if (seen(c?.postalCode)) note('zp', postcodeRejection(c!.postalCode!))
 
     if (isMatchable(buildUserData({
       email: c?.email,
@@ -784,11 +831,11 @@ export async function customerCoverage(limit = 25): Promise<
       withCustomer: count.withCustomer,
       matchable: count.matchable,
       fields: [
-        { key: 'em', label: 'Email', ...f.em },
-        { key: 'ph', label: 'Phone', ...f.ph },
-        { key: 'fn', label: 'First name', ...f.fn },
-        { key: 'ln', label: 'Last name', ...f.ln },
-        { key: 'zp', label: 'Postcode', ...f.zp },
+        { key: 'em', label: 'Email', ...f.em, reasons: reasonsFor('em') },
+        { key: 'ph', label: 'Phone', ...f.ph, reasons: reasonsFor('ph') },
+        { key: 'fn', label: 'First name', ...f.fn, reasons: reasonsFor('fn') },
+        { key: 'ln', label: 'Last name', ...f.ln, reasons: reasonsFor('ln') },
+        { key: 'zp', label: 'Postcode', ...f.zp, reasons: reasonsFor('zp') },
       ],
     },
   }

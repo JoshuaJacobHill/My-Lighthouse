@@ -244,13 +244,24 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
               </table>
             )}
 
-            {coverage.fields.some((f) => f.usable < f.present) && (
-              <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-                An amber figure means the POS holds something in that field but it is not in a shape
-                Meta can match — a phone number with a note after it, a postcode that is not four
-                digits. Those are dropped rather than sent wrong, because a hash that matches nobody
-                still looks like data. Worth tidying at the POS end.
-              </p>
+            {coverage.fields.some((f) => f.reasons.length > 0) && (
+              <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                <p className="font-semibold">What was dropped, and why</p>
+                <ul className="mt-1.5 space-y-1">
+                  {coverage.fields.flatMap((f) =>
+                    f.reasons.map((r) => (
+                      <li key={`${f.key}-${r.reason}`}>
+                        <span className="font-semibold">{f.label}</span> · {r.count} × {r.reason}
+                      </li>
+                    )),
+                  )}
+                </ul>
+                <p className="mt-2">
+                  These are dropped rather than sent wrong: a hash that matches nobody still looks
+                  like data to Meta, and drags the match quality down with it. All fixable at the
+                  counter.
+                </p>
+              </div>
             )}
 
             {coverage.withCustomer === 0 && (
