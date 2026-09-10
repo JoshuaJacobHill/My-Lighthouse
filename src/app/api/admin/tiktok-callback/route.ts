@@ -51,12 +51,37 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await exchangeAuthorizationCode(cfg, code, redirectUri(request))
+
+    /**
+     * What TikTok says was granted, from both places it says it.
+     *
+     * Scopes are individually deniable — "the user can deny access to one
+     * scope while granting access to others" — so a run can succeed having
+     * been refused `video.list`, which then looks exactly like an account
+     * with no videos. Reported plainly, and checked, rather than assumed.
+     */
+    const grantedOnRedirect = q.get('scopes')
+    const granted = (result.scope ?? grantedOnRedirect ?? '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean)
+    const missing = ['user.info.basic', 'user.info.stats', 'video.list'].filter(
+      (needed) => granted.length > 0 && !granted.includes(needed),
+    )
+
     const res = NextResponse.json({
       ok: true,
       refreshTokenSaved: result.refreshTokenSaved,
-      scopesGranted: result.scope,
+      scopesGranted: granted.length > 0 ? granted : 'not reported',
+      scopesMissing: missing.length > 0 ? missing : 'none',
+      ...(missing.includes('video.list')
+        ? {
+            warning:
+              'video.list was not granted, so no videos can be read. Authorise again and leave every permission switched on.',
+          }
+        : {}),
       accessTokenValidForSeconds: result.expiresIn,
-      next: 'Refresh the TikTok feed on /dashboard/business, or probe it at /api/admin/tiktok-probe',
+      next: 'Probe it at /api/admin/tiktok-probe before trusting any figure',
     })
     // Single use: a state left lying about is a state that can be replayed.
     res.cookies.delete(STATE_COOKIE)

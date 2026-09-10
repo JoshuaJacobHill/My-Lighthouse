@@ -47,6 +47,16 @@ export async function GET(request: NextRequest) {
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('redirect_uri', redirectUri(request))
   url.searchParams.set('state', state)
+  /**
+   * Always show the consent screen, never skip it for a live session.
+   *
+   * TikTok's default skips authorisation when the browser already has a valid
+   * session — which would silently authorise whichever TikTok account happens
+   * to be logged in. That is very likely a personal account rather than
+   * @lighthousecare, and the mistake would be invisible until the report
+   * filled up with the wrong videos. The extra click is the whole safeguard.
+   */
+  url.searchParams.set('disable_auto_auth', '1')
 
   const res = NextResponse.redirect(url)
   res.cookies.set(STATE_COOKIE, state, {
