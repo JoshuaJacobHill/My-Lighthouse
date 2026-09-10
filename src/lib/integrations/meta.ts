@@ -366,37 +366,21 @@ async function ingestInstagram(cfg: Cfg, pt: string, limit = POST_LIMIT): Promis
     }
 
     /**
-     * Reels are counted in plays, because that is the number Instagram itself
-     * prints on the profile grid.
+     * There is no plays metric. Asked and answered:
      *
-     * A reel showing 84.7K in the app was reported here as 7,999 — the
-     * `views` metric, which came out at roughly one per person reached while
-     * the app's figure was fourteen. The difference is replays and very short
-     * views, and `ig_reels_aggregated_all_plays_count` is what the grid shows.
+     *   ig_reels_aggregated_all_plays_count  →  rejected
+     *   plays                                →  rejected
+     *   video_views                          →  rejected
+     *   clips_replays_count                  →  rejected
+     *   impressions                          →  not supported here
      *
-     * Matching the app matters more than metric purity: a report nobody
-     * believes is worse than one that counts a loop twice, and `reach` is
-     * still stored as the honest number of people.
-     *
-     * In its own try/catch because Meta retires metric names without warning
-     * and a dead one fails the whole request — this must never cost us the
-     * figures we already have.
+     * `views` and `reach` are the only view figures the Media Insights API
+     * will give for a reel. An earlier version of this file asked for the
+     * plays count anyway, on the assumption that it was what Instagram shows
+     * on the profile grid — a wasted request per reel that could never
+     * succeed. Removed rather than left in a try/catch: dead code that fails
+     * silently is worse than no code, because it reads as a working fallback.
      */
-    if (m.media_product_type === 'REELS') {
-      try {
-        const plays = await graph<{ data: { values: { value: number }[] }[] }>(
-          `${m.id}/insights`,
-          { metric: 'ig_reels_aggregated_all_plays_count' },
-          pt,
-        )
-        const n = int(plays.data?.[0]?.values?.[0]?.value)
-        // Only ever upwards: if the metric is unavailable it reads 0, and a
-        // reel is never played fewer times than it was viewed.
-        if (n > views) views = n
-      } catch {
-        // Not available; `views` stands.
-      }
-    }
 
     await prisma.socialPost.upsert({
       where: { platform_externalId: { platform: 'INSTAGRAM', externalId: m.id } },
@@ -600,7 +584,12 @@ export async function probeInstagramMetrics(mediaId?: string): Promise<
             const row = ins.data?.[0]
             metrics[key] = int(row?.total_value?.value ?? row?.values?.[0]?.value)
           } catch (err) {
-            metrics[key] = err instanceof Error ? err.message.slice(0, 110) : 'unavailable'
+            // Not truncated. Meta's rejection lists every metric it *will*
+            // accept — "metric[0] must be one of the following values: ..." —
+            // which is the authoritative answer to what is available and is
+            // worth far more than the guess that prompted the question. An
+            // earlier 110-character cut threw exactly that list away.
+            metrics[key] = err instanceof Error ? err.message : 'unavailable'
           }
         }
       }
