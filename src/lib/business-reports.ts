@@ -442,22 +442,63 @@ export async function getDailyTrend(days = 365, now = new Date()): Promise<Trend
 }
 
 export async function getIngestHealth(): Promise<
-  { source: string; at: Date | null; ok: boolean; error: string | null }[]
+  {
+    source: string
+    at: Date | null
+    ok: boolean
+    error: string | null
+    /** A run that started and never recorded an end. */
+    interrupted: boolean
+  }[]
 > {
   const runs = await prisma.ingestRun.findMany({
     orderBy: { startedAt: 'desc' },
-    take: 50,
-    select: { source: true, startedAt: true, ok: true, error: true },
+    take: 100,
+    select: { source: true, startedAt: true, finishedAt: true, ok: true, error: true },
   })
-  const seen = new Map<string, { source: string; at: Date | null; ok: boolean; error: string | null }>()
-  for (const r of runs) {
-    if (!seen.has(r.source)) {
-      seen.set(r.source, { source: r.source, at: r.startedAt, ok: r.ok, error: r.error })
-    }
-  }
-  return [...seen.values()]
-}
 
+  /**
+   * Report the last run that *finished*, and flag separately if one did not.
+   *
+   * `ok` starts false and is set on completion, so a run killed by the
+   * function timeout leaves a row that reads exactly like a failure. That
+   * happened on a twelve-month ad backfill: the ads landed — five thousand
+   * rows of them — and the panel said the feed had failed, which is the
+   * opposite of the truth and the kind of thing that gets a working feed
+   * "fixed".
+   */
+  const out = new Map<
+    string,
+    { source: string; at: Date | null; ok: boolean; error: string | null; interrupted: boolean }
+  >()
+
+  for (const r of runs) {
+    const existing = out.get(r.source)
+    if (!r.finishedAt) {
+      // Newest row for this source, and it never ended.
+      if (!existing) {
+        out.set(r.source, {
+          source: r.source,
+          at: r.startedAt,
+          ok: false,
+          error: null,
+          interrupted: true,
+        })
+      }
+      continue
+    }
+    if (existing && !existing.interrupted) continue
+    out.set(r.source, {
+      source: r.source,
+      at: r.startedAt,
+      ok: r.ok,
+      error: r.error,
+      interrupted: existing?.interrupted ?? false,
+    })
+  }
+
+  return [...out.values()]
+}
 
 export type ExposureSource = {
   label: string

@@ -11,12 +11,21 @@ import {
   type TopPost,
 } from '@/lib/business-reports'
 import { SalesVsViews, type Grain } from './SalesVsViews'
+import { FeedRefresh } from './FeedRefresh'
+import type { FeedName } from '@/lib/actions/feeds.actions'
 import { PeriodTabs } from './PeriodTabs'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Sales & marketing' }
 
 const PERIODS: Period[] = ['day', 'week', 'month', 'year']
+
+/** IngestRun.source → what to call it, and which feed refreshes it. */
+const FEED_META: Record<string, { label: string; feed: FeedName }> = {
+  'gap-meta-bridge': { label: 'Till sales', feed: 'sales' },
+  meta: { label: 'Meta ads and posts', feed: 'meta' },
+  mailchimp: { label: 'Mailchimp', feed: 'mailchimp' },
+}
 
 const CHANNEL_LABEL: Record<string, string> = {
   IN_STORE: 'In store',
@@ -83,15 +92,35 @@ function PostRow({ post }: { post: TopPost }) {
         <p className="line-clamp-2 text-sm text-neutral-900">
           {post.caption?.trim() || <span className="text-neutral-400">No caption</span>}
         </p>
-        <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
-          <span>{num(post.views)} views</span>
-          <span>{num(post.engagements)} engaged</span>
-          <span className="font-semibold text-neutral-700">{post.engagementRate.toFixed(1)}%</span>
-          {post.spendCents > 0 && (
-            <span className="font-semibold text-neutral-700">{money(post.spendCents)} spent</span>
-          )}
-          {post.audience && <span className="text-neutral-400">{post.audience}</span>}
-        </p>
+        {/* An email is measured differently from a post.
+            SocialPost.views holds emails_sent for a campaign — the size of the
+            list, not a measure of anyone seeing it — so leading with it as
+            "views" overstated every campaign by a factor of fifteen. Opens are
+            what reached somebody; sent is kept because opens over sent is the
+            open rate. */}
+        {post.platform === 'MAILCHIMP' ? (
+          <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
+            <span className="font-semibold text-neutral-700">
+              {num(post.engagements)} opened
+            </span>
+            <span>{num(post.views)} sent</span>
+            <span className="font-semibold text-neutral-700">
+              {post.engagementRate.toFixed(1)}% open rate
+            </span>
+            {post.clicks > 0 && <span>{num(post.clicks)} clicked</span>}
+            {post.audience && <span className="text-neutral-400">{post.audience}</span>}
+          </p>
+        ) : (
+          <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
+            <span>{num(post.views)} views</span>
+            <span>{num(post.engagements)} engaged</span>
+            <span className="font-semibold text-neutral-700">{post.engagementRate.toFixed(1)}%</span>
+            {post.spendCents > 0 && (
+              <span className="font-semibold text-neutral-700">{money(post.spendCents)} spent</span>
+            )}
+            {post.audience && <span className="text-neutral-400">{post.audience}</span>}
+          </p>
+        )}
       </div>
       {post.permalink && (
         <a
@@ -308,6 +337,10 @@ export default async function BusinessReportPage({
             figure you cannot trust. */}
         <div className="mt-12 border-t border-neutral-100 pt-6">
           <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">Feeds</h2>
+          <p className="mt-1 text-xs text-neutral-400">
+            Each runs once a day on its own — till sales at 21:30, Meta and Mailchimp at 04:00.
+            Daily is all the hosting plan allows, so refresh a feed here if you need it sooner.
+          </p>
           {health.length === 0 ? (
             <p className="mt-2 text-sm text-neutral-500">
               No feed has run yet. Nothing on this page is live.
@@ -316,9 +349,19 @@ export default async function BusinessReportPage({
             <ul className="mt-2 space-y-1 text-sm">
               {health.map((h) => (
                 <li key={h.source} className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-semibold text-neutral-700">{h.source}</span>
-                  <span className={h.ok ? 'text-neutral-500' : 'font-semibold text-red-600'}>
-                    {h.ok ? 'ok' : 'failed'}
+                  <span className="font-semibold text-neutral-700">
+                    {FEED_META[h.source]?.label ?? h.source}
+                  </span>
+                  <span
+                    className={
+                      h.interrupted
+                        ? 'font-semibold text-amber-600'
+                        : h.ok
+                          ? 'text-neutral-500'
+                          : 'font-semibold text-red-600'
+                    }
+                  >
+                    {h.interrupted ? 'cut short' : h.ok ? 'ok' : 'failed'}
                   </span>
                   <span className="text-neutral-400">
                     {h.at
@@ -332,6 +375,9 @@ export default async function BusinessReportPage({
                       : 'never'}
                   </span>
                   {h.error && <span className="text-red-500">{h.error.slice(0, 120)}</span>}
+                  {FEED_META[h.source] && (
+                    <FeedRefresh feed={FEED_META[h.source].feed} label={FEED_META[h.source].label} />
+                  )}
                 </li>
               ))}
             </ul>
