@@ -1,7 +1,7 @@
 # The POS bridge — Gap Solutions → Meta
 
 Sales at the Loganholme counter go into Gap Solutions. This bridge reads them
-every ten minutes and does two things with each one:
+on a schedule and does two things with each one:
 
 1. **Feeds the sales report.** In-store revenue and order counts land in
    `SalesFact`, which is what `/dashboard/business` already reads. This is the
@@ -43,7 +43,7 @@ database as the report, one feed serves both.
 | EMC client (auth, retries, the three endpoints) | `src/lib/integrations/gap.ts` |
 | Meta CAPI (normalising, hashing, payload, sending) | `src/lib/integrations/meta-capi.ts` |
 | The bridge itself (`runOnce`, `processSale`, rollup) | `src/lib/gap-bridge.ts` |
-| Ten-minute cron | `src/app/api/cron/gap-sales/route.ts` |
+| Scheduled cron | `src/app/api/cron/gap-sales/route.ts` |
 | Admin console — status, manual run, single-sale test | `/dashboard/business/bridge` |
 | Tests | `src/lib/**/*.test.ts` |
 
@@ -84,6 +84,30 @@ Hillcrest's takings can never land in Loganholme's column.
 
 A sale belonging to a store that is *not* configured is recorded and skipped
 with the reason `other_store`, rather than being quietly counted somewhere.
+
+## How often it runs
+
+Once a day, at 21:30 Brisbane, looking back twenty-five hours.
+
+It was designed to poll every ten minutes, and the code still supports that —
+but **the Vercel plan is Hobby, which allows only daily cron jobs**. A
+`*/10 * * * *` schedule does not merely get ignored: it makes the whole
+deployment invalid and nothing ships at all.
+
+A daily run is still correct rather than a compromise. Deduplication makes the
+wide overlap free, and Meta accepts in-store events up to seven days old, so
+attribution is unaffected. It is only less timely — a purchase reaches Meta the
+evening it happened rather than within the hour.
+
+Two ways to get back to ten minutes:
+
+1. **Upgrade to Vercel Pro.** Then set the schedule in `vercel.json` to
+   `*/10 * * * *` and `POLL_LOOKBACK_MINUTES=60`. No code change.
+2. **Schedule it from outside Vercel** — GitHub Actions, or a free service like
+   cron-job.org — calling the endpoint with the `CRON_SECRET` bearer token.
+
+Either way, **Run now** on the bridge page works at any time, so nothing has to
+wait for a schedule.
 
 ## Turning it on, in order
 

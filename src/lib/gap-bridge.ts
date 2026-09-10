@@ -64,6 +64,20 @@ const flag = (name: string, fallback: boolean): boolean => {
   return v === 'true' || v === '1'
 }
 
+/**
+ * How far back a scheduled run looks.
+ *
+ * Twenty-five hours, not one, because the Vercel plan allows a single daily
+ * cron rather than the ten-minute poll this was designed for. One run a day
+ * with a day-wide window is still correct — deduplication means the overlap
+ * costs nothing, and Meta accepts in-store events up to seven days old, so
+ * attribution is unaffected. It is only less timely.
+ *
+ * On Vercel Pro, set the cron to `*​/10 * * * *` and POLL_LOOKBACK_MINUTES=60
+ * and it polls as intended, with no code change.
+ */
+const DEFAULT_LOOKBACK_MINUTES = 25 * 60
+
 export type BridgeSettings = {
   /** Fetch, inspect, build the payload — but post nothing to Meta. */
   dryRun: boolean
@@ -85,7 +99,7 @@ export function bridgeSettings(): BridgeSettings {
   return {
     dryRun: flag('DRY_RUN', true),
     sendIdentifiers: flag('SEND_CUSTOMER_IDENTIFIERS', false),
-    lookbackMinutes: Number(process.env.POLL_LOOKBACK_MINUTES ?? 60),
+    lookbackMinutes: Number(process.env.POLL_LOOKBACK_MINUTES) || DEFAULT_LOOKBACK_MINUTES,
     maxAttempts: Number(process.env.GAP_MAX_ATTEMPTS ?? 6),
   }
 }

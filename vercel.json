@@ -33,7 +33,7 @@
     },
     {
       "path": "/api/cron/gap-sales",
-      "schedule": "*/10 * * * *"
+      "schedule": "30 11 * * *"
     }
   ]
 }
