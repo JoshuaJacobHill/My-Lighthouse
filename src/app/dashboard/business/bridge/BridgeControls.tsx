@@ -264,6 +264,26 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
               </div>
             )}
 
+            {coverage.customerFields.length > 0 && (
+              <details className="mt-4 rounded-2xl bg-neutral-50 p-4">
+                <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  Every field on the customer record ({coverage.customerFields.length})
+                </summary>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Field names and how many held a value, out of {coverage.withCustomer}. Names only
+                  — no contents are read. Here so anything worth adding next, like city and state,
+                  can be read off rather than guessed at.
+                </p>
+                <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs text-neutral-700 sm:grid-cols-3">
+                  {coverage.customerFields.map((f) => (
+                    <li key={f.name} className={f.filled === 0 ? 'text-neutral-400' : undefined}>
+                      {f.name} <span className="tabular-nums">({f.filled})</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
             {coverage.withCustomer === 0 && (
               <p className="mt-3 text-sm text-neutral-600">
                 None of the sales checked had a customer attached, so there is nothing for Meta to

@@ -174,6 +174,7 @@ function hashCustomer(detail: Awaited<ReturnType<typeof getSaleDetail>>): {
     familyName: c?.familyName,
     postalCode: c?.postalCode,
     country: 'AU',
+    externalId: detail.customerGuid,
   })
   return { user, matchKeys: Object.keys(user).join(',') }
 }
@@ -727,6 +728,16 @@ export type Coverage = {
   /** Enough for Meta to match: an email, a phone, or name plus postcode. */
   matchable: number
   fields: FieldCoverage[]
+  /**
+   * Every field name EMC's customer record carries, and which of them held a
+   * value. Names only — never contents.
+   *
+   * Here so the next parameter worth adding (city and state would strengthen
+   * the name-plus-postcode match) can be read off rather than guessed at. The
+   * last thing we guessed at was the key holding the sales list, and that cost
+   * an afternoon.
+   */
+  customerFields: { name: string; filled: number }[]
 }
 
 /**
@@ -765,6 +776,7 @@ export async function customerCoverage(limit = 25): Promise<
     zp: { present: 0, usable: 0 },
   }
   const seen = (raw: string | null | undefined) => Boolean(raw && raw.trim())
+  const customerFields = new Map<string, number>()
 
   const why: Record<string, Map<string, number>> = {
     em: new Map(),
@@ -789,6 +801,14 @@ export async function customerCoverage(limit = 25): Promise<
     }
     if (!hasRealCustomer(detail)) continue
     count.withCustomer++
+
+    // Field names and whether they are populated. Values are not recorded, and
+    // anything that is not a scalar is counted as present without inspection.
+    for (const [k, v] of Object.entries((detail.customer ?? {}) as Record<string, unknown>)) {
+      const filled =
+        v !== null && v !== undefined && v !== '' && !(typeof v === 'string' && !v.trim())
+      customerFields.set(k, (customerFields.get(k) ?? 0) + (filled ? 1 : 0))
+    }
 
     const c = detail.customer
     if (seen(c?.email)) f.em.present++
@@ -837,6 +857,9 @@ export async function customerCoverage(limit = 25): Promise<
         { key: 'ln', label: 'Last name', ...f.ln, reasons: reasonsFor('ln') },
         { key: 'zp', label: 'Postcode', ...f.zp, reasons: reasonsFor('zp') },
       ],
+      customerFields: [...customerFields.entries()]
+        .map(([name, filled]) => ({ name, filled }))
+        .sort((a, b) => b.filled - a.filled || a.name.localeCompare(b.name)),
     },
   }
 }

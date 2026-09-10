@@ -9,6 +9,7 @@ import {
   normaliseEmail,
   normaliseName,
   normalisePhoneAu,
+  normaliseExternalId,
   normalisePostcode,
   sendEvents,
   sha256,
@@ -242,5 +243,38 @@ describe('sending', () => {
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://graph.facebook.com/v26.0/326811303390692/events')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-token')
+  })
+})
+
+describe('external id', () => {
+  it('hashes the customer GUID', () => {
+    const guid = '3F2504E0-4F89-11D3-9A0C-0305E82C3301'
+    expect(normaliseExternalId(guid)).toBe(guid.toLowerCase())
+    expect(buildUserData({ externalId: guid }).external_id).toEqual([digest(guid.toLowerCase())])
+  })
+
+  it('rejects the all-zero GUID', () => {
+    // Otherwise every anonymous sale would share one hash — a single fake
+    // customer who bought everything in the shop.
+    expect(normaliseExternalId('00000000-0000-0000-0000-000000000000')).toBeNull()
+    expect(buildUserData({ externalId: '00000000-0000-0000-0000-000000000000' }).external_id)
+      .toBeUndefined()
+  })
+
+  it('does not on its own make a sale matchable', () => {
+    // It lifts the match-quality score, but an id Meta has never seen in a
+    // browser identifies nobody.
+    expect(isMatchable(buildUserData({ externalId: '3f2504e0-4f89-11d3-9a0c-0305e82c3301' })))
+      .toBe(false)
+  })
+
+  it('rides along with the identifiers that do match', () => {
+    const user = buildUserData({
+      email: 'jane@example.com',
+      externalId: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
+    })
+    expect(user.em).toBeDefined()
+    expect(user.external_id).toBeDefined()
+    expect(isMatchable(user)).toBe(true)
   })
 })

@@ -151,6 +151,12 @@ export type GapSaleDetail = {
     postalCode?: string | null
     emailMarketing?: boolean | null
     smsMarketing?: boolean | null
+    /**
+     * EMC sends more than this. Nothing reads an undeclared field — the
+     * coverage check counts their names to show what is available, and even
+     * that never looks at a value.
+     */
+    [key: string]: unknown
   } | null
 }
 

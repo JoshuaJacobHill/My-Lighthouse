@@ -114,6 +114,27 @@ export function normalisePostcode(raw: string | null | undefined): string | null
   return /^\d{4}$/.test(v) ? v : null
 }
 
+/**
+ * A stable, opaque customer id — EMC's `customerGuid`.
+ *
+ * Meta weights `external_id` heavily in match quality, and it is the cheapest
+ * parameter we can possibly send: a GUID says nothing about the person, so
+ * there is no privacy cost at all. It also lets Meta recognise a returning
+ * customer across their visits.
+ *
+ * Worth being clear about what it does not do: an id Meta has never seen in a
+ * browser cannot by itself identify anyone. Real matching still comes from
+ * email and phone. This raises the score and links repeat purchases.
+ */
+export function normaliseExternalId(raw: string | null | undefined): string | null {
+  const v = raw?.trim().toLowerCase()
+  if (!v) return null
+  // EMC's "no customer" GUID would otherwise become a hash shared by every
+  // anonymous sale — a single fake customer who bought everything.
+  if (/^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(v)) return null
+  return v
+}
+
 /** Meta: two-letter ISO 3166-1 alpha-2, lowercase. */
 export function normaliseCountry(raw: string | null | undefined = 'AU'): string | null {
   const v = raw?.trim().toLowerCase()
@@ -131,6 +152,8 @@ export type RawIdentifiers = {
   familyName?: string | null
   postalCode?: string | null
   country?: string | null
+  /** EMC's customerGuid. Opaque, so it carries nothing personal. */
+  externalId?: string | null
 }
 
 export type HashedUserData = {
@@ -140,6 +163,7 @@ export type HashedUserData = {
   ln?: string[]
   zp?: string[]
   country?: string[]
+  external_id?: string[]
 }
 
 /**
@@ -156,6 +180,7 @@ export function buildUserData(raw: RawIdentifiers): HashedUserData {
     ln: hashed(normaliseName(raw.familyName)),
     zp: hashed(normalisePostcode(raw.postalCode)),
     country: hashed(normaliseCountry(raw.country ?? 'AU')),
+    external_id: hashed(normaliseExternalId(raw.externalId)),
   }
   // Drop the empty keys so a sparse customer doesn't send a payload of nulls.
   for (const k of Object.keys(out) as (keyof HashedUserData)[]) {
@@ -168,7 +193,9 @@ export function buildUserData(raw: RawIdentifiers): HashedUserData {
  * Whether there is anything Meta could actually match on.
  *
  * `country` alone is not a match — everyone shopping in Loganholme is in
- * Australia — so it is excluded from the test on purpose.
+ * Australia. Nor is `external_id` alone: an id Meta has never seen in a
+ * browser identifies nobody, however much it helps the score. Both are
+ * excluded from this test on purpose.
  */
 export function isMatchable(user: HashedUserData): boolean {
   return Boolean(user.em || user.ph || (user.fn && user.ln && user.zp))
