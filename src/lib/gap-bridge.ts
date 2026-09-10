@@ -38,6 +38,10 @@ import {
   getStoreSales,
   hasRealCustomer,
   saleInstant,
+  probeSales,
+  toEmcDateParam,
+  toUtcDateParam,
+  type SalesProbe,
   GapError,
 } from '@/lib/integrations/gap'
 import {
@@ -655,6 +659,80 @@ export async function processOneSale(saleHeaderID: number): Promise<
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'unknown error' }
   }
+}
+
+// ─── Diagnosis ────────────────────────────────────────────────────────────────
+
+/**
+ * Why did a run inspect nothing?
+ *
+ * A 200 with an empty list is indistinguishable from "no sales happened", so
+ * this asks EMC for the same period several ways and reports what each returns.
+ * The interesting comparison is the first two: the same sixty minutes, once
+ * formatted as Brisbane wall-clock and once as UTC. Whichever returns rows is
+ * how EMC reads an unzoned timestamp — which a whole-day window can never
+ * reveal, because it returns rows either way.
+ */
+export async function diagnose(lookbackMinutes = 60): Promise<
+  { ok: false; error: string } | { ok: true; store: GapStore; probes: SalesProbe[] }
+> {
+  const cfg = gapConfig()
+  if (!cfg) return { ok: false, error: 'EMC credentials or stores not configured' }
+
+  const store = cfg.stores[0]
+  const end = new Date()
+  const start = new Date(end.getTime() - lookbackMinutes * 60_000)
+  const today = brisbaneToday(end)
+  const yesterday = brisbaneToday(new Date(end.getTime() - 24 * 60 * 60_000))
+
+  const probes = await probeSales(cfg, store, [
+    {
+      label: `Last ${lookbackMinutes} min, as Brisbane wall-clock`,
+      params: {
+        StartDate: toEmcDateParam(start),
+        EndDate: toEmcDateParam(end),
+        ExcludeVoids: 'true',
+        Take: '10',
+      },
+    },
+    {
+      label: `Last ${lookbackMinutes} min, as UTC`,
+      params: {
+        StartDate: toUtcDateParam(start),
+        EndDate: toUtcDateParam(end),
+        ExcludeVoids: 'true',
+        Take: '10',
+      },
+    },
+    {
+      label: `All of today (${today}) — the shape proven in testing`,
+      params: {
+        StartDate: `${today}T00:00:00`,
+        EndDate: `${today}T23:59:59`,
+        ExcludeVoids: 'true',
+        Take: '10',
+      },
+    },
+    {
+      label: `All of yesterday (${yesterday})`,
+      params: {
+        StartDate: `${yesterday}T00:00:00`,
+        EndDate: `${yesterday}T23:59:59`,
+        ExcludeVoids: 'true',
+        Take: '10',
+      },
+    },
+    {
+      label: 'Today, without ExcludeVoids',
+      params: { StartDate: `${today}T00:00:00`, EndDate: `${today}T23:59:59`, Take: '10' },
+    },
+    {
+      label: 'No parameters at all',
+      params: { Take: '10' },
+    },
+  ])
+
+  return { ok: true, store, probes }
 }
 
 // ─── Status, for the admin console ────────────────────────────────────────────

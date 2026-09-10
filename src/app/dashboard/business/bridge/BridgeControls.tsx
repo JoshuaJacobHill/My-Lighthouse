@@ -2,7 +2,8 @@
 
 import * as React from 'react'
 import { Loader2 } from 'lucide-react'
-import { runBridgeNowAction, testSaleAction } from '@/lib/actions/gap.actions'
+import { diagnoseGapAction, runBridgeNowAction, testSaleAction } from '@/lib/actions/gap.actions'
+import type { SalesProbe } from '@/lib/integrations/gap'
 
 /**
  * Run the bridge by hand, and test one known sale.
@@ -39,6 +40,8 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
   const [saleId, setSaleId] = React.useState('')
   const [testLines, setTestLines] = React.useState<Line[]>([])
   const [lookback, setLookback] = React.useState('60')
+  const [probes, setProbes] = React.useState<SalesProbe[] | null>(null)
+  const [probeError, setProbeError] = React.useState('')
 
   function run() {
     setRunLines([])
@@ -97,8 +100,8 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
       <div className="rounded-[28px] border border-neutral-200 p-5">
         <h2 className="text-lg font-bold">Run a cycle now</h2>
         <p className="mt-1 text-sm text-neutral-500">
-          Normally every ten minutes with an hour&rsquo;s overlap. Widen the window to catch up after
-          an outage — already-handled sales are skipped, so it is safe to re-run.
+          Runs on its own once a day at 21:30, looking back twenty-five hours. Widen the window to
+          catch up after an outage — already-handled sales are skipped, so it is safe to re-run.
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="text-sm">
@@ -154,6 +157,91 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
           </button>
         </div>
         <Result lines={testLines} />
+      </div>
+
+      {/* For the case a run succeeds having inspected nothing. A 200 with an
+          empty list looks identical to "no sales happened", so ask several
+          ways and compare. */}
+      <div className="rounded-[28px] border border-neutral-200 p-5">
+        <h2 className="text-lg font-bold">Why did it find nothing?</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Asks Gap Solutions for the same period several different ways and shows what each returns.
+          If the sixty-minute window comes back empty but the same window sent as UTC has rows, their
+          dates are UTC and ours are wrong. Sale headers only — no customer detail is read.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setProbes(null)
+            setProbeError('')
+            startTransition(async () => {
+              const res = await diagnoseGapAction(Number(lookback) || 60)
+              if (!res.success || !res.probes) {
+                setProbeError(res.error ?? 'Something went wrong.')
+                return
+              }
+              setProbes(res.probes)
+            })
+          }}
+          disabled={pending}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          Diagnose
+        </button>
+
+        {probeError && <p className="mt-3 text-sm text-red-700">{probeError}</p>}
+
+        {probes && (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+                  <th className="py-2 pr-3">How we asked</th>
+                  <th className="py-2 pr-3">HTTP</th>
+                  <th className="py-2 pr-3">Rows</th>
+                  <th className="py-2">Shape</th>
+                </tr>
+              </thead>
+              <tbody>
+                {probes.map((p) => (
+                  <tr key={p.label} className="border-b border-neutral-100 align-top">
+                    <td className="py-2 pr-3">{p.label}</td>
+                    <td className="py-2 pr-3 tabular-nums">{p.status || '—'}</td>
+                    <td
+                      className={
+                        'py-2 pr-3 font-bold tabular-nums ' +
+                        (p.count > 0 ? 'text-lime-700' : 'text-neutral-400')
+                      }
+                    >
+                      {p.count}
+                    </td>
+                    <td className="py-2 font-mono text-xs text-neutral-500">
+                      {p.error ?? p.shape}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {probes.find((p) => p.firstRow) && (
+              <div className="mt-4 rounded-2xl bg-neutral-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  First row returned
+                </p>
+                <pre className="mt-2 overflow-x-auto text-xs text-neutral-700">
+                  {JSON.stringify(probes.find((p) => p.firstRow)!.firstRow, null, 2)}
+                </pre>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Fields available:{' '}
+                  <span className="font-mono">
+                    {probes.find((p) => p.firstRowKeys)?.firstRowKeys?.join(', ')}
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

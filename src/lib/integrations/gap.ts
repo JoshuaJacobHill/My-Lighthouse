@@ -352,6 +352,132 @@ export async function getStoreSales(
   return rows as GapSaleHeader[]
 }
 
+/**
+ * Format an instant as naive UTC wall-clock.
+ *
+ * The counterpart to `toEmcDateParam`. Which of the two EMC actually means is
+ * not documented, and a whole-day window returns rows under either reading —
+ * so only a narrow window can tell them apart. `probeSales` asks both.
+ */
+export function toUtcDateParam(instant: Date): string {
+  return instant.toISOString().slice(0, 19)
+}
+
+export type SalesProbe = {
+  label: string
+  params: Record<string, string>
+  /** HTTP status, or 0 if the request itself failed. */
+  status: number
+  /** How the body arrived: an array, or an object with these top-level keys. */
+  shape: string
+  count: number
+  /**
+   * Field names on the first row. Sale headers carry no personal information —
+   * ids, times, counts and totals — so this is safe to show.
+   */
+  firstRowKeys?: string[]
+  /** The first row's identifying and timing fields, for eyeballing. */
+  firstRow?: Record<string, unknown>
+  error?: string
+}
+
+/**
+ * Ask for the same sales several ways and report what came back.
+ *
+ * For when EMC answers 200 with an empty list: that is indistinguishable from
+ * "no sales happened" unless you can compare interpretations side by side.
+ * Deliberately does not throw, and reads only sale headers.
+ */
+export async function probeSales(
+  cfg: GapConfig,
+  store: GapStore,
+  attempts: { label: string; params: Record<string, string> }[],
+): Promise<SalesProbe[]> {
+  const out: SalesProbe[] = []
+
+  for (const attempt of attempts) {
+    const url = new URL(`${cfg.baseUrl}/api/store/${store.id}/sales`)
+    for (const [k, v] of Object.entries(attempt.params)) url.searchParams.set(k, v)
+
+    try {
+      const token = await (async () => {
+        try {
+          return await createToken(cfg)
+        } catch {
+          return null
+        }
+      })()
+      if (!token) {
+        out.push({ ...attempt, status: 0, shape: '-', count: 0, error: 'could not authenticate' })
+        continue
+      }
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        cache: 'no-store',
+      })
+
+      if (!res.ok) {
+        out.push({ ...attempt, status: res.status, shape: '-', count: 0, error: `HTTP ${res.status}` })
+        continue
+      }
+
+      const body: unknown = await res.json()
+      let rows: unknown[] = []
+      let shape: string
+
+      if (Array.isArray(body)) {
+        rows = body
+        shape = 'array'
+      } else if (body && typeof body === 'object') {
+        const keys = Object.keys(body as Record<string, unknown>)
+        shape = `object{${keys.join(',')}}`
+        // Whichever key holds the list, find it rather than guessing a name.
+        for (const k of keys) {
+          const v = (body as Record<string, unknown>)[k]
+          if (Array.isArray(v)) {
+            rows = v
+            shape = `object.${k}[]`
+            break
+          }
+        }
+      } else {
+        shape = typeof body
+      }
+
+      const first = rows[0] as Record<string, unknown> | undefined
+      out.push({
+        ...attempt,
+        status: res.status,
+        shape,
+        count: rows.length,
+        firstRowKeys: first ? Object.keys(first) : undefined,
+        firstRow: first
+          ? {
+              saleHeaderID: first.saleHeaderID,
+              saleIdentifier: first.saleIdentifier,
+              storeID: first.storeID,
+              tranType: first.tranType,
+              totalAmount: first.totalAmount,
+              created: first.created,
+              createdLocal: first.createdLocal,
+            }
+          : undefined,
+      })
+    } catch (err) {
+      out.push({
+        ...attempt,
+        status: 0,
+        shape: '-',
+        count: 0,
+        error: err instanceof Error ? err.message : 'unknown error',
+      })
+    }
+  }
+
+  return out
+}
+
 export async function getSaleDetail(cfg: GapConfig, saleHeaderID: number): Promise<GapSaleDetail> {
   return emcGet<GapSaleDetail>(cfg, `/api/storesale/${saleHeaderID}`)
 }

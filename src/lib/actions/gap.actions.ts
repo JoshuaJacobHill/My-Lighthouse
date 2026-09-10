@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { hasCapability } from '@/lib/permissions'
-import { processOneSale, runOnce, type RunSummary, type SaleOutcome } from '@/lib/gap-bridge'
+import { diagnose, processOneSale, runOnce, type RunSummary, type SaleOutcome } from '@/lib/gap-bridge'
+import type { GapStore, SalesProbe } from '@/lib/integrations/gap'
 import { resetGapToken } from '@/lib/integrations/gap'
 
 /**
@@ -57,4 +58,21 @@ export async function resetGapTokenAction(): Promise<{ success: boolean; error?:
   if (!(await guard())) return { success: false, error: 'Not allowed.' }
   resetGapToken()
   return { success: true }
+}
+
+/**
+ * Ask EMC for the same sales several ways and report what came back.
+ *
+ * For the case a run "succeeds" having inspected nothing. Reads sale headers
+ * only — ids, times, counts and totals, no customer detail.
+ */
+export async function diagnoseGapAction(
+  lookbackMinutes?: number,
+): Promise<{ success: boolean; store?: GapStore; probes?: SalesProbe[]; error?: string }> {
+  if (!(await guard())) return { success: false, error: 'Not allowed.' }
+  const res = await diagnose(
+    Number.isFinite(lookbackMinutes) && (lookbackMinutes ?? 0) > 0 ? lookbackMinutes : 60,
+  )
+  if (!res.ok) return { success: false, error: res.error }
+  return { success: true, store: res.store, probes: res.probes }
 }
