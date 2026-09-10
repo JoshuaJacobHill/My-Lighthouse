@@ -53,43 +53,27 @@ export async function GET(request: NextRequest) {
     const result = await exchangeAuthorizationCode(cfg, code, redirectUri(request))
 
     /**
-     * What TikTok says was granted, from both places it says it.
+     * Back to the page, not to a wall of JSON.
      *
-     * Scopes are individually deniable — "the user can deny access to one
-     * scope while granting access to others" — so a run can succeed having
-     * been refused `video.list`, which then looks exactly like an account
-     * with no videos. Reported plainly, and checked, rather than assumed.
+     * TikTok's own review asks for a demo video that "clearly shows the user
+     * interface and user interactions", and a redirect that ends on raw JSON
+     * is neither. It is also simply worse for whoever runs this: the page can
+     * say what was granted and show the videos it read.
      */
+    const back = new URL('/dashboard/business/tiktok', request.nextUrl.origin)
+    back.searchParams.set('connected', '1')
     const grantedOnRedirect = q.get('scopes')
-    const granted = (result.scope ?? grantedOnRedirect ?? '')
-      .split(',')
-      .map((x) => x.trim())
-      .filter(Boolean)
-    const missing = ['user.info.basic', 'video.list'].filter(
-      (needed) => granted.length > 0 && !granted.includes(needed),
-    )
+    if (result.scope || grantedOnRedirect) {
+      back.searchParams.set('scopes', result.scope ?? grantedOnRedirect ?? '')
+    }
 
-    const res = NextResponse.json({
-      ok: true,
-      refreshTokenSaved: result.refreshTokenSaved,
-      scopesGranted: granted.length > 0 ? granted : 'not reported',
-      scopesMissing: missing.length > 0 ? missing : 'none',
-      ...(missing.includes('video.list')
-        ? {
-            warning:
-              'video.list was not granted, so no videos can be read. Authorise again and leave every permission switched on.',
-          }
-        : {}),
-      accessTokenValidForSeconds: result.expiresIn,
-      next: 'Probe it at /api/admin/tiktok-probe before trusting any figure',
-    })
+    const res = NextResponse.redirect(back)
     // Single use: a state left lying about is a state that can be replayed.
     res.cookies.delete(STATE_COOKIE)
     return res
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : 'unknown error' },
-      { status: 500 },
-    )
+    const back = new URL('/dashboard/business/tiktok', request.nextUrl.origin)
+    back.searchParams.set('error', err instanceof Error ? err.message : 'unknown error')
+    return NextResponse.redirect(back)
   }
 }

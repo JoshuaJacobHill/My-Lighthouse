@@ -10,11 +10,24 @@
  * by hand. It is persisted in AppSetting instead, and the variable is only
  * ever the starting value.
  *
- * Endpoints are TikTok's Display API v2. Every field name below is taken from
- * their documentation rather than the live account, which — on the evidence of
- * this project's afternoon with Gap Solutions and Instagram — makes them
- * assumptions, not facts. `probeTikTok` exists so the first thing done with
- * real credentials is to look at what actually comes back.
+ * Endpoints are TikTok's Display API v2, reached with the `video.list` scope.
+ *
+ * A note for anyone retracing this: the developer portal's Add Products list
+ * does not offer "Display API" for this app — only Login Kit, Share Kit,
+ * Content Posting, Webhooks, Data Portability and Local Service. That looked
+ * like a dead end and is not one. The scope is what gates the endpoint, and
+ * `video.list` is offered under Login Kit, so /v2/video/list/ is reachable
+ * without the Display API tile ever appearing.
+ *
+ * The alternative, if this ever does prove closed, is TikTok API for Business
+ * (business-api.tiktok.com) and /open_api/v1.3/business/video/list/, which
+ * returns reach and watch time as well as views. It needs the Accounts API
+ * Access Application Form completed first — a gate since 20 March 2026 — and
+ * its post data stops updating a year after publishing.
+ *
+ * Every field name here came from documentation rather than the live account.
+ * `probeTikTok` exists because twice today taking the documentation over a
+ * look has been the difference between a working feed and a silent zero.
  */
 
 import prisma from '@/lib/prisma'
@@ -24,6 +37,8 @@ const VIDEO_LIST_URL = 'https://open.tiktokapis.com/v2/video/list/'
 
 /** Where the rotating refresh token is kept. */
 const REFRESH_KEY = 'tiktok.refresh_token'
+/** What TikTok said it granted, so the page can show it rather than assume. */
+const SCOPES_KEY = 'tiktok.scopes_granted'
 
 /** Fields asked of the video list. Verified by probeTikTok before trusting. */
 const VIDEO_FIELDS = [
@@ -131,6 +146,19 @@ export async function exchangeAuthorizationCode(
     },
     update: { value: json.refresh_token },
   })
+
+  if (json.scope) {
+    await prisma.appSetting.upsert({
+      where: { key: SCOPES_KEY },
+      create: {
+        key: SCOPES_KEY,
+        value: json.scope,
+        label: 'TikTok scopes granted at authorisation',
+        group: 'integrations',
+      },
+      update: { value: json.scope },
+    })
+  }
 
   if (json.access_token) {
     accessToken = {
@@ -317,16 +345,20 @@ export async function ingestTikTok(
   { limit = 50 }: { limit?: number } = {},
 ): Promise<{ ok: boolean; rows: number; error?: string }> {
   const cfg = tiktokConfig()
-  const run = await prisma.ingestRun.create({ data: { source: 'tiktok' }, select: { id: true } })
 
+  /**
+   * Nothing configured is not a failure, and must not be recorded as one.
+   *
+   * The nightly cron runs regardless. Writing an IngestRun here would put a
+   * red "TikTok failed" on the sales report every morning for an integration
+   * nobody has set up yet — teaching everyone to ignore that panel, which is
+   * the one place a genuinely broken feed announces itself.
+   */
   if (!cfg) {
-    const error = 'TIKTOK_CLIENT_KEY / SECRET / REFRESH_TOKEN not configured'
-    await prisma.ingestRun.update({
-      where: { id: run.id },
-      data: { ok: false, error, finishedAt: new Date() },
-    })
-    return { ok: false, rows: 0, error }
+    return { ok: false, rows: 0, error: 'TikTok is not configured yet.' }
   }
+
+  const run = await prisma.ingestRun.create({ data: { source: 'tiktok' }, select: { id: true } })
 
   try {
     const videos = await listVideos(cfg, limit)
@@ -402,5 +434,74 @@ export async function probeTikTok(): Promise<
     }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'unknown error' }
+  }
+}
+
+// ─── Status, for the admin page ───────────────────────────────────────────────
+
+export type TikTokStatus = {
+  /** Client key and secret are present in the environment. */
+  configured: boolean
+  /** A refresh token exists, so the account has been authorised. */
+  connected: boolean
+  scopesGranted: string[]
+  /** Whether video.list came through — without it there are no videos to read. */
+  canReadVideos: boolean
+  lastRun: { at: Date; ok: boolean; rows: number; error: string | null } | null
+  videos: {
+    externalId: string
+    caption: string | null
+    permalink: string | null
+    thumbnailUrl: string | null
+    publishedAt: Date
+    views: number
+    engagements: number
+  }[]
+  videoCount: number
+}
+
+export async function getTikTokStatus(): Promise<TikTokStatus> {
+  const cfg = tiktokConfig()
+
+  const [refresh, scopes, lastRun, videos, videoCount] = await Promise.all([
+    prisma.appSetting.findUnique({ where: { key: REFRESH_KEY }, select: { value: true } }),
+    prisma.appSetting.findUnique({ where: { key: SCOPES_KEY }, select: { value: true } }),
+    prisma.ingestRun.findFirst({
+      where: { source: 'tiktok' },
+      orderBy: { startedAt: 'desc' },
+      select: { startedAt: true, ok: true, rows: true, error: true },
+    }),
+    prisma.socialPost.findMany({
+      where: { platform: 'TIKTOK' },
+      orderBy: { publishedAt: 'desc' },
+      take: 8,
+      select: {
+        externalId: true,
+        caption: true,
+        permalink: true,
+        thumbnailUrl: true,
+        publishedAt: true,
+        views: true,
+        engagements: true,
+      },
+    }),
+    prisma.socialPost.count({ where: { platform: 'TIKTOK' } }),
+  ])
+
+  const granted = (scopes?.value ?? '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+
+  return {
+    configured: Boolean(cfg),
+    connected: Boolean(refresh?.value?.trim() || cfg?.seedRefreshToken),
+    scopesGranted: granted,
+    // Only claimed when TikTok actually said so. Assuming it would turn a
+    // refused scope into a mystery about an account with no videos.
+    canReadVideos: granted.length === 0 ? false : granted.includes('video.list'),
+    lastRun: lastRun ? { at: lastRun.startedAt, ...lastRun } : null,
+    videos,
+    videoCount,
   }
 }

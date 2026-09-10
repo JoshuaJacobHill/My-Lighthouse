@@ -383,13 +383,22 @@ export default async function BusinessReportPage({
               ))}
             </ul>
           )}
-          <Link
-            href="/dashboard/business/bridge"
-            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:underline"
-          >
-            POS bridge settings and manual runs
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+            <Link
+              href="/dashboard/business/bridge"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:underline"
+            >
+              POS bridge settings and manual runs
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/dashboard/business/tiktok"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:underline"
+            >
+              Connect TikTok
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </div>
     </div>
