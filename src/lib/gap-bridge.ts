@@ -52,6 +52,10 @@ import {
   capiConfig,
   centsToAmount,
   isMatchable,
+  normaliseEmail,
+  normaliseName,
+  normalisePhoneAu,
+  normalisePostcode,
   sendEvents,
 } from '@/lib/integrations/meta-capi'
 
@@ -211,6 +215,16 @@ export async function processSale(
   store: GapStore,
   capi: CapiConfig | null,
   settings: BridgeSettings,
+  /**
+   * Inspect a sale the ledger has already settled.
+   *
+   * For the manual test only. Without it, testing a recorded sale returns
+   * "already_settled" before the customer is ever read — so the one thing the
+   * test is for, showing which fields Meta could match on, never appears.
+   * It forces inspection, never a re-send: a sale already sent is still not
+   * sent again.
+   */
+  opts?: { force?: boolean },
 ): Promise<SaleOutcome> {
   const valueAud = centsToAmount(header.totalAmount)
   const instant = saleInstant(header)
@@ -235,7 +249,7 @@ export async function processSale(
     select: { status: true, attemptCount: true },
   })
 
-  if (!shouldReprocess(existing, settings)) {
+  if (!shouldReprocess(existing, settings) && !opts?.force) {
     return { saleIdentifier: header.saleIdentifier, status: existing!.status, reason: 'already_settled', valueAud }
   }
 
@@ -286,6 +300,17 @@ export async function processSale(
       saleIdentifier: header.saleIdentifier,
       status: GapSaleStatus.SKIPPED_IDENTIFIERS_OFF,
       reason: 'identifiers_disabled',
+      matchKeys,
+      valueAud,
+    }
+  }
+
+  // Reached only when forcing, and the one thing forcing must never do.
+  if (existing?.status === GapSaleStatus.SENT) {
+    return {
+      saleIdentifier: header.saleIdentifier,
+      status: GapSaleStatus.SENT,
+      reason: 'already_sent — not sent again',
       matchKeys,
       valueAud,
     }
@@ -654,10 +679,118 @@ export async function processOneSale(saleHeaderID: number): Promise<
       }
     }
 
-    const outcome = await processSale(header, cfg, store, capi, settings)
+    const outcome = await processSale(header, cfg, store, capi, settings, { force: true })
     return { ok: true, outcome, dryRun: settings.dryRun }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'unknown error' }
+  }
+}
+
+// ─── Match coverage ───────────────────────────────────────────────────────────
+
+export type FieldCoverage = {
+  key: string
+  label: string
+  /** The POS had something in this field. */
+  present: number
+  /** And it survived normalisation, so Meta can match on it. */
+  usable: number
+}
+
+export type Coverage = {
+  sampled: number
+  withCustomer: number
+  /** Enough for Meta to match: an email, a phone, or name plus postcode. */
+  matchable: number
+  fields: FieldCoverage[]
+}
+
+/**
+ * What customer data is actually in there, and how much of it Meta could use.
+ *
+ * The distinction that matters is **present** versus **usable**. A phone number
+ * the POS holds as "0412 345 678 (mob)" is present and unusable: normalisation
+ * rejects it, we send no `ph`, and nothing anywhere says so. Counting both
+ * turns that from an invisible shortfall into a number.
+ *
+ * Reads customer fields to test them and discards them — nothing is stored,
+ * nothing is logged, and the result is counts only. Capped, because it costs
+ * one EMC detail request per sale.
+ */
+export async function customerCoverage(limit = 25): Promise<
+  { ok: false; error: string } | { ok: true; coverage: Coverage }
+> {
+  const cfg = gapConfig()
+  if (!cfg) return { ok: false, error: 'EMC credentials or stores not configured' }
+
+  const recent = await prisma.gapSale.findMany({
+    orderBy: { occurredAt: 'desc' },
+    take: Math.min(Math.max(limit, 1), 100),
+    select: { saleHeaderID: true },
+  })
+  if (recent.length === 0) {
+    return { ok: false, error: 'No sales recorded yet — run a cycle first.' }
+  }
+
+  const count = { withCustomer: 0, matchable: 0 }
+  const f = {
+    em: { present: 0, usable: 0 },
+    ph: { present: 0, usable: 0 },
+    fn: { present: 0, usable: 0 },
+    ln: { present: 0, usable: 0 },
+    zp: { present: 0, usable: 0 },
+  }
+  const seen = (raw: string | null | undefined) => Boolean(raw && raw.trim())
+
+  for (const row of recent) {
+    let detail
+    try {
+      detail = await getSaleDetail(cfg, row.saleHeaderID)
+    } catch {
+      continue
+    }
+    if (!hasRealCustomer(detail)) continue
+    count.withCustomer++
+
+    const c = detail.customer
+    if (seen(c?.email)) f.em.present++
+    if (seen(c?.mobile)) f.ph.present++
+    if (seen(c?.givenName)) f.fn.present++
+    if (seen(c?.familyName)) f.ln.present++
+    if (seen(c?.postalCode)) f.zp.present++
+
+    if (normaliseEmail(c?.email)) f.em.usable++
+    if (normalisePhoneAu(c?.mobile)) f.ph.usable++
+    if (normaliseName(c?.givenName)) f.fn.usable++
+    if (normaliseName(c?.familyName)) f.ln.usable++
+    if (normalisePostcode(c?.postalCode)) f.zp.usable++
+
+    if (isMatchable(buildUserData({
+      email: c?.email,
+      mobile: c?.mobile,
+      givenName: c?.givenName,
+      familyName: c?.familyName,
+      postalCode: c?.postalCode,
+    }))) {
+      count.matchable++
+    }
+    // The raw values fall out of scope here and are never written anywhere.
+  }
+
+  return {
+    ok: true,
+    coverage: {
+      sampled: recent.length,
+      withCustomer: count.withCustomer,
+      matchable: count.matchable,
+      fields: [
+        { key: 'em', label: 'Email', ...f.em },
+        { key: 'ph', label: 'Phone', ...f.ph },
+        { key: 'fn', label: 'First name', ...f.fn },
+        { key: 'ln', label: 'Last name', ...f.ln },
+        { key: 'zp', label: 'Postcode', ...f.zp },
+      ],
+    },
   }
 }
 

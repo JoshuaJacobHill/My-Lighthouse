@@ -2,7 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { hasCapability } from '@/lib/permissions'
-import { diagnose, processOneSale, runOnce, type RunSummary, type SaleOutcome } from '@/lib/gap-bridge'
+import {
+  customerCoverage,
+  diagnose,
+  processOneSale,
+  runOnce,
+  type Coverage,
+  type RunSummary,
+  type SaleOutcome,
+} from '@/lib/gap-bridge'
 import type { GapStore, SalesProbe } from '@/lib/integrations/gap'
 import { resetGapToken } from '@/lib/integrations/gap'
 
@@ -75,4 +83,19 @@ export async function diagnoseGapAction(
   )
   if (!res.ok) return { success: false, error: res.error }
   return { success: true, store: res.store, probes: res.probes }
+}
+
+/**
+ * How much of the recent customer data Meta could actually match on.
+ *
+ * Counts only — which fields are filled in and which survive normalisation.
+ * The values themselves are read to test them and discarded.
+ */
+export async function coverageAction(
+  limit?: number,
+): Promise<{ success: boolean; coverage?: Coverage; error?: string }> {
+  if (!(await guard())) return { success: false, error: 'Not allowed.' }
+  const res = await customerCoverage(limit ?? 25)
+  if (!res.ok) return { success: false, error: res.error }
+  return { success: true, coverage: res.coverage }
 }

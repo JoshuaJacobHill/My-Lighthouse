@@ -2,7 +2,13 @@
 
 import * as React from 'react'
 import { Loader2 } from 'lucide-react'
-import { diagnoseGapAction, runBridgeNowAction, testSaleAction } from '@/lib/actions/gap.actions'
+import {
+  coverageAction,
+  diagnoseGapAction,
+  runBridgeNowAction,
+  testSaleAction,
+} from '@/lib/actions/gap.actions'
+import type { Coverage } from '@/lib/gap-bridge'
 import type { SalesProbe } from '@/lib/integrations/gap'
 
 /**
@@ -42,6 +48,8 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
   const [lookback, setLookback] = React.useState('60')
   const [probes, setProbes] = React.useState<SalesProbe[] | null>(null)
   const [probeError, setProbeError] = React.useState('')
+  const [coverage, setCoverage] = React.useState<Coverage | null>(null)
+  const [coverageError, setCoverageError] = React.useState('')
 
   function run() {
     setRunLines([])
@@ -131,7 +139,8 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
         <h2 className="text-lg font-bold">Test one sale</h2>
         <p className="mt-1 text-sm text-neutral-500">
           Give it a Gap Solutions sale header ID. It runs the real path and shows a redacted summary
-          — which fields were hashed, never what they were.
+          — which fields were hashed, never what they were. Works on sales already recorded, and
+          never sends one twice.
           {dryRun ? ' Dry run is on, so nothing will reach Meta.' : ''}
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -157,6 +166,101 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
           </button>
         </div>
         <Result lines={testLines} />
+      </div>
+
+      {/* The question that decides whether any of this is worth switching on:
+          is there enough customer data for Meta to match anybody? */}
+      <div className="rounded-[28px] border border-neutral-200 p-5">
+        <h2 className="text-lg font-bold">Can Meta match these customers?</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Checks the most recent sales for the details Meta matches on. Counts only — the values are
+          read to test them and thrown away, and nothing is stored or logged.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setCoverage(null)
+            setCoverageError('')
+            startTransition(async () => {
+              const res = await coverageAction(25)
+              if (!res.success || !res.coverage) {
+                setCoverageError(res.error ?? 'Something went wrong.')
+                return
+              }
+              setCoverage(res.coverage)
+            })
+          }}
+          disabled={pending}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          Check match coverage
+        </button>
+
+        {coverageError && <p className="mt-3 text-sm text-red-700">{coverageError}</p>}
+
+        {coverage && (
+          <div className="mt-4">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { n: coverage.sampled, label: 'sales checked' },
+                { n: coverage.withCustomer, label: 'have a customer' },
+                { n: coverage.matchable, label: 'Meta can match' },
+              ].map((s) => (
+                <div key={s.label} className="rounded-2xl bg-neutral-50 p-4 text-center">
+                  <p className="text-2xl font-extrabold tabular-nums">{s.n}</p>
+                  <p className="text-xs text-neutral-500">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {coverage.withCustomer > 0 && (
+              <table className="mt-4 w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+                    <th className="py-2">Field</th>
+                    <th className="py-2 text-right">Filled in</th>
+                    <th className="py-2 text-right">Meta can use</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coverage.fields.map((f) => (
+                    <tr key={f.key} className="border-b border-neutral-100">
+                      <td className="py-2">{f.label}</td>
+                      <td className="py-2 text-right tabular-nums">
+                        {f.present}/{coverage.withCustomer}
+                      </td>
+                      <td
+                        className={
+                          'py-2 text-right font-bold tabular-nums ' +
+                          (f.usable < f.present ? 'text-amber-700' : 'text-neutral-800')
+                        }
+                      >
+                        {f.usable}/{coverage.withCustomer}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {coverage.fields.some((f) => f.usable < f.present) && (
+              <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                An amber figure means the POS holds something in that field but it is not in a shape
+                Meta can match — a phone number with a note after it, a postcode that is not four
+                digits. Those are dropped rather than sent wrong, because a hash that matches nobody
+                still looks like data. Worth tidying at the POS end.
+              </p>
+            )}
+
+            {coverage.withCustomer === 0 && (
+              <p className="mt-3 text-sm text-neutral-600">
+                None of the sales checked had a customer attached, so there is nothing for Meta to
+                match. That is a counter habit rather than a technical problem.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* For the case a run succeeds having inspected nothing. A 200 with an
