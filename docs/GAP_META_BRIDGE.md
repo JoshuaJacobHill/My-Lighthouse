@@ -1,0 +1,207 @@
+# The POS bridge — Gap Solutions → Meta
+
+Sales at the Loganholme counter go into Gap Solutions. This bridge reads them
+every ten minutes and does two things with each one:
+
+1. **Feeds the sales report.** In-store revenue and order counts land in
+   `SalesFact`, which is what `/dashboard/business` already reads. This is the
+   half of that report that was blank until now.
+2. **Tells Meta about the purchase**, so money spent on ads can be measured
+   against money taken over the counter — as a `physical_store` Purchase event
+   in the existing Lighthouse Care dataset.
+
+    Gap Solutions EMC                     our database                Meta
+    ─────────────────                     ────────────                ────
+    GET /api/store/1/sales      ──▶  GapSale (one row per sale)
+       for the last hour                     │
+                                             │ only sales that qualify
+    GET /api/storesale/{id}     ──▶          │
+       customer, if attached                 │
+                                             ▼
+                                    hash email/phone/name in memory
+                                    raw values discarded immediately
+                                             │
+                                             ▼
+                                                            POST .../{dataset}/events
+                                                                     │
+                                    GapSale.status = SENT  ◀──────────┘
+                                    (only once Meta acknowledges it)
+                                             │
+                                             ▼
+                                    SalesFact → the sales report
+
+## Where it lives
+
+Inside this app, not as a separate service. It uses the Postgres database we
+already run, the Vercel cron scheduler we already use, and the same admin
+permissions as the sales report. There is no Docker container to deploy and no
+second set of secrets to keep in step — and because the ledger is in the same
+database as the report, one feed serves both.
+
+| Piece | File |
+| --- | --- |
+| EMC client (auth, retries, the three endpoints) | `src/lib/integrations/gap.ts` |
+| Meta CAPI (normalising, hashing, payload, sending) | `src/lib/integrations/meta-capi.ts` |
+| The bridge itself (`runOnce`, `processSale`, rollup) | `src/lib/gap-bridge.ts` |
+| Ten-minute cron | `src/app/api/cron/gap-sales/route.ts` |
+| Admin console — status, manual run, single-sale test | `/dashboard/business/bridge` |
+| Tests | `src/lib/**/*.test.ts` |
+
+## What you need in the environment
+
+Add these in **Vercel → Settings → Environment Variables** (Production). The
+full list with comments is in `.env.example`.
+
+| Variable | Value | Notes |
+| --- | --- | --- |
+| `EMC_BASE_URL` | `https://gap4.ezimanager.cloud` | |
+| `EMC_EMAIL` | the integration account's email | the restricted read-only account, never a person's login |
+| `EMC_PASSWORD` | its password | |
+| `EMC_LOGANHOLME_STORE_ID` | `1` | one variable per store — see below |
+| `META_DATASET_ID` | `326811303390692` | the existing dataset — do not make another |
+| `META_CAPI_ACCESS_TOKEN` | the Conversions API token | falls back to `META_ACCESS_TOKEN` if unset |
+| `META_TEST_EVENT_CODE` | `TEST94037` | **remove this to go live** |
+| `DRY_RUN` | `true` | `true` builds the payload and sends nothing |
+| `SEND_CUSTOMER_IDENTIFIERS` | `false` | see Privacy below |
+
+`META_GRAPH_VERSION` defaults to `v26.0` and is a variable on purpose — when
+Meta retires a version, that is a settings change, not a code change.
+
+### Adding another shop
+
+Stores are discovered from the environment, one variable each:
+
+```
+EMC_LOGANHOLME_STORE_ID=1
+EMC_HILLCREST_STORE_ID=2
+```
+
+The name in the middle becomes the store's label in the sales report, so it has
+to match how the report already spells it (`MOUNT_WARREN` → `Mount Warren`).
+Every configured store is polled in the same run, sharing one token and one
+window, and each is rolled up separately — `SalesFact` is keyed by store, so
+Hillcrest's takings can never land in Loganholme's column.
+
+A sale belonging to a store that is *not* configured is recorded and skipped
+with the reason `other_store`, rather than being quietly counted somewhere.
+
+## Turning it on, in order
+
+The two switches are separate deliberately, so you can prove each step without
+risking the next one.
+
+**Step 1 — prove the Gap Solutions side, sending nothing anywhere.**
+With `DRY_RUN=true`, open `/dashboard/business/bridge` and press **Run now**. It
+will authenticate, read the last hour of sales, fetch the detail for the ones
+that qualify, build the Meta payload and stop. You should see sales inspected
+and "Dry run — nothing was sent to Meta."
+
+From a terminal, the same thing:
+
+```bash
+curl -s "https://my.lighthousecare.org.au/api/cron/gap-sales?lookback=1440" -H "Authorization: Bearer $CRON_SECRET" | jq
+```
+
+**Step 2 — send events, without customer matching.** Set `DRY_RUN=false`,
+leave `SEND_CUSTOMER_IDENTIFIERS=false`. Sales are recorded and counted, and
+the sales report fills in, but nothing about a customer goes to Meta. Every
+customer-linked sale shows as "Held — matching switched off".
+
+**Step 3 — turn on customer matching.** Set `SEND_CUSTOMER_IDENTIFIERS=true`.
+Only do this once the privacy question below is settled. Sales held at step 2
+are picked back up automatically on the next run.
+
+**Step 4 — go live at Meta.** Delete `META_TEST_EVENT_CODE`. Until you do,
+events only appear under Test Events in Events Manager and do not count.
+
+## Privacy
+
+**Nothing personal is stored.** A customer's email, phone, name and postcode are
+read from the EMC detail response, normalised, SHA-256 hashed and dropped inside
+a single function. What survives in the database is the sale identifier, the
+time, the value, the store and a yes/no on whether a customer was attached.
+
+**Nothing personal is logged.** Logging is allow-listed rather than redacted —
+only named fields can reach a log line, so a new field appearing in EMC's
+response cannot leak by being forgotten.
+
+**Payment data never enters the application.** The EMC detail response can carry
+card, EFTPOS, terminal and operator information, along with basket contents and
+staff notes. None of it is read, stored, logged or sent.
+
+**On `SEND_CUSTOMER_IDENTIFIERS`.** Turning it on means hashed customer
+identifiers are shared with Meta for advertising measurement. That is a decision
+about our privacy notice and legal basis, not a technical setting — and a
+customer's marketing tick-box in the POS is *not* the same question. That box is
+about whether we may email them. Leave the switch off until the privacy notice
+covers this use.
+
+## Why it cannot double-count
+
+Three layers, because double-counted revenue would quietly corrupt ad
+optimisation rather than fail visibly:
+
+1. `GapSale.saleIdentifier` is **unique** in Postgres.
+2. A sale marked `SENT` is never offered again, and the ten-minute poll with a
+   sixty-minute lookback relies on exactly that.
+3. Meta's `event_id` **is** the sale identifier, so even a duplicate send is
+   deduplicated at their end.
+
+A sale is only marked `SENT` when Meta answers with success *and*
+`events_received >= 1`. Meta will answer HTTP 200 with `events_received: 0`
+when it has dropped everything, and treating that as sent would lose the sale
+for good.
+
+## Token handling
+
+EMC tokens go stale without warning. Any request that comes back 401 refreshes
+the token once, retries once, and stops. Nobody ever has to paste a token in.
+
+A 403 is different — that is the integration account missing a permission, and
+retrying only fills their logs and ours. It fails immediately and says so. If
+you see 403s, the account's permissions have changed at the Gap Solutions end.
+
+## Checking on it
+
+`/dashboard/business/bridge` shows how it is configured, when it last ran, how
+many sales are in each state, today's in-store total, and the last few failures
+with Meta's error text. It also has the two manual controls:
+
+- **Run now**, with an adjustable lookback for catching up after an outage.
+  Re-running is safe; already-handled sales are skipped.
+- **Test one sale**, given a sale header ID. It runs the real path — persistence
+  included, so a tested sale will not be sent again by the next cycle — and
+  shows which fields were hashed, never what they were.
+
+The **Feeds** list at the bottom of the sales report shows `gap-meta-bridge`
+alongside the Meta and Mailchimp feeds.
+
+## Troubleshooting
+
+| What you see | What it means |
+| --- | --- |
+| `EMC CreateToken failed (401)` | the integration account's email or password is wrong |
+| `EMC ... refused (403)` | the account has lost a permission at the Gap Solutions end |
+| Meta `400` | payload or token problem — the error text names the field |
+| Meta `401` / `403` | the CAPI token or dataset permissions |
+| `events_received: 1` | accepted |
+| Sales inspected but 0 sent | expected while `DRY_RUN=true` or matching is off |
+| "No customer attached" for most sales | normal — walk-in sales have no customer in the POS |
+
+## What is deliberately not built
+
+**Refunds and unusual transaction types.** Only `tranType = 0` is processed.
+Everything else is recorded as `SKIPPED_TRAN_TYPE` with a reason. Refunds need
+their own thinking — Meta has a separate treatment for them — and inventing
+rules here would be guessing.
+
+**`/api/customer/{guid}/sales`.** The integration account is refused it, and
+the bridge does not need it.
+
+**Post-purchase automations.** The idea of a Zapier-style layer — subscribing a
+customer to Mailchimp, or triggering an email when someone buys in store — plugs
+in at the `SaleOutcome` returned by `processSale`, which is the point where we
+know a real sale happened and who it belonged to. It is not wired up, on
+purpose: sending marketing email to customers off the back of a purchase is a
+consent decision, and the same privacy question as above applies with more force
+because it reaches the customer directly.

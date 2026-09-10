@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import { requireCapability } from '@/lib/permissions'
 import {
   getSalesReport,
@@ -314,6 +316,13 @@ export default async function BusinessReportPage({
               ))}
             </ul>
           )}
+          <Link
+            href="/dashboard/business/bridge"
+            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:underline"
+          >
+            POS bridge settings and manual runs
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </div>
       </div>
     </div>

@@ -1529,6 +1529,66 @@ model SalesFact {
   @@index([store, day])
 }
 
+/// How far a Gap Solutions sale has got on its way to Meta.
+enum GapSaleStatus {
+  /// Seen and recorded, not yet offered to Meta.
+  PENDING
+  /// Meta acknowledged it. Never send this sale again.
+  SENT
+  /// No customer attached, so there is nothing for Meta to match on.
+  SKIPPED_NO_CUSTOMER
+  /// A refund, void or other transaction type this bridge does not handle.
+  SKIPPED_TRAN_TYPE
+  /// Customer identifiers are switched off, so it was recorded but not sent.
+  SKIPPED_IDENTIFIERS_OFF
+  /// Meta rejected it, or we could not reach them. Retried on later runs.
+  FAILED
+}
+
+/// One completed sale from Gap Solutions EMC.
+///
+/// Two jobs: it is the deduplication ledger for Meta Conversions API — nothing
+/// is ever sent twice — and it is the raw grain the in-store half of the sales
+/// report rolls up from.
+///
+/// Deliberately holds NO personal information. The customer's email, phone and
+/// name are read from the EMC detail response, hashed in memory and discarded;
+/// only whether a customer was attached survives. Payment, card, EFTPOS,
+/// operator and basket contents are never read into this application at all.
+model GapSale {
+  id String @id @default(cuid())
+
+  /// EMC's own row id, used to fetch the detail.
+  saleHeaderID   Int    @unique
+  /// EMC's stable business identifier. This is the Meta event_id and order_id,
+  /// and the reason a retry can never create a second event.
+  saleIdentifier String @unique
+  storeID        Int
+  /// 0 is a normal completed sale; everything else is skipped for now.
+  tranType       Int
+  itemCount      Int?
+
+  /// Exactly as EMC reports it: cents. 7194 is $71.94.
+  totalCents Int
+  /// The real transaction time, not when we processed it.
+  occurredAt DateTime
+  /// Brisbane calendar day, for the report. Midnight UTC — see lib/fitness-days.ts.
+  day        DateTime @db.Date
+
+  /// Whether EMC had a customer attached. Not who they were.
+  hasCustomer Boolean @default(false)
+
+  status       GapSaleStatus @default(PENDING)
+  attemptCount Int           @default(0)
+  lastError    String?       @db.Text
+  inspectedAt  DateTime      @default(now())
+  sentAt       DateTime?
+
+  @@index([storeID, day])
+  @@index([status])
+  @@index([occurredAt])
+}
+
 enum SocialPlatform {
   FACEBOOK
   INSTAGRAM
