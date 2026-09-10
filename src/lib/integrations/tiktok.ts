@@ -65,8 +65,18 @@ export function tiktokConfig(): TikTokConfig | null {
   }
 }
 
-/** Read scopes. Nothing here posts, deletes or changes anything on TikTok. */
-export const TIKTOK_SCOPES = 'user.info.basic,user.info.stats,video.list'
+/**
+ * The two scopes this actually uses, and no more.
+ *
+ * `user.info.stats` was requested at first and is not needed: nothing here
+ * reads follower counts, only the video list. TikTok's Display API overview
+ * names just these two, and every extra scope is another permission to
+ * justify at review and another thing the account is handing over for no
+ * return.
+ *
+ * Nothing here posts, deletes or changes anything on TikTok.
+ */
+export const TIKTOK_SCOPES = 'user.info.basic,video.list'
 
 export const TIKTOK_AUTHORIZE_URL = 'https://www.tiktok.com/v2/auth/authorize/'
 

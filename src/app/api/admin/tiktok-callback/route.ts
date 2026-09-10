@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       .split(',')
       .map((x) => x.trim())
       .filter(Boolean)
-    const missing = ['user.info.basic', 'user.info.stats', 'video.list'].filter(
+    const missing = ['user.info.basic', 'video.list'].filter(
       (needed) => granted.length > 0 && !granted.includes(needed),
     )
 
