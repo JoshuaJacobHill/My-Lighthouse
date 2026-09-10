@@ -126,17 +126,60 @@ From a terminal, the same thing:
 curl -s "https://my.lighthousecare.org.au/api/cron/gap-sales?lookback=1440" -H "Authorization: Bearer $CRON_SECRET" | jq
 ```
 
-**Step 2 — send events, without customer matching.** Set `DRY_RUN=false`,
-leave `SEND_CUSTOMER_IDENTIFIERS=false`. Sales are recorded and counted, and
-the sales report fills in, but nothing about a customer goes to Meta. Every
-customer-linked sale shows as "Held — matching switched off".
+**Step 2 — record sales without sending anything to Meta.** Leave both
+switches as they are. Sales are recorded and the sales report fills in, but no
+customer detail goes anywhere. Every customer-linked sale shows as "Held —
+matching switched off". This is a perfectly good place to sit for a while.
 
-**Step 3 — turn on customer matching.** Set `SEND_CUSTOMER_IDENTIFIERS=true`.
-Only do this once the privacy question below is settled. Sales held at step 2
-are picked back up automatically on the next run.
+**Step 3 — send test events.** In Vercel → Settings → Environment Variables,
+change **both**:
 
-**Step 4 — go live at Meta.** Delete `META_TEST_EVENT_CODE`. Until you do,
-events only appear under Test Events in Events Manager and do not count.
+```
+DRY_RUN=false
+SEND_CUSTOMER_IDENTIFIERS=true
+```
+
+Both are needed. With identifiers off, `DRY_RUN=false` sends nothing, because a
+Purchase event with no identifier cannot match anyone and the bridge holds it
+rather than sending an empty one.
+
+**Environment variables only take effect on a new deployment.** After saving,
+go to **Deployments**, open the most recent one, and choose **Redeploy**. Until
+you do, the running app still has the old values — which looks exactly like the
+change not working.
+
+Then press **Run now** on the bridge page. Sales held at step 2 are picked up
+automatically, so the first run should send several at once.
+
+**Step 4 — check they arrived.** In [Events Manager](https://business.facebook.com/events_manager):
+
+1. Choose the Lighthouse Care dataset (`326811303390692`).
+2. Open the **Test Events** tab. With `META_TEST_EVENT_CODE` set, events appear
+   here within a few seconds of a run, and nowhere else.
+3. Each one should read: **Purchase**, Received from **Server**, Action source
+   **physical_store**, Currency **AUD**, with a value and an Order ID matching
+   the sale identifier on the bridge page.
+
+Test events deliberately do not count towards reporting or ad optimisation.
+They prove the payload is right and nothing else.
+
+**Step 5 — go live.** Delete `META_TEST_EVENT_CODE` (or clear its value) and
+redeploy. The bridge page's "Meta test events" row should then read "Live
+events".
+
+Two things to expect:
+
+- **The sales already sent as test events will not reappear.** They are marked
+  SENT and are never sent twice, so the first live events are new sales. That is
+  the deduplication working, not a fault.
+- **Event Match Quality takes a day or two.** It is calculated on real events,
+  so it does not appear for test events at all. Once live, open the **Overview**
+  tab, click the Purchase event, and it shows a score plus which parameters
+  Meta received. That score — not anything measurable from our side — is the
+  real verdict on how well the matching works.
+
+**To stop at any point**, set `DRY_RUN=true` and redeploy. Sales keep being
+recorded and the report keeps working; nothing further goes to Meta.
 
 ## Privacy
 
