@@ -531,6 +531,9 @@ export async function probeInstagramMetrics(mediaId?: string): Promise<
    */
   const CANDIDATES = [
     'views',
+    'video_views',
+    'clips_replays_count',
+    'ig_reels_aggregated_all_plays_count',
     'reach',
     'impressions',
     'plays',
@@ -581,17 +584,20 @@ export async function probeInstagramMetrics(mediaId?: string): Promise<
     for (const m of ids) {
       const metrics: Record<string, number | string> = {}
       for (const name of CANDIDATES) {
-        try {
-          const ins = await graph<{ data: { name: string; values: { value: number }[] }[] }>(
-            `${m.id}/insights`,
-            { metric: name },
-            pt,
-          )
-          const row = ins.data?.[0]
-          metrics[name] = int(row?.values?.[0]?.value)
-        } catch (err) {
-          // Not available for this media type, which is itself the answer.
-          metrics[name] = err instanceof Error ? err.message.slice(0, 90) : 'unavailable'
+        // Newer Instagram metrics are only served with metric_type=total_value
+        // and error without it, so each name is asked both ways. Whichever
+        // answers is the one the tenant supports.
+        for (const params of [{ metric: name }, { metric: name, metric_type: 'total_value' }]) {
+          const key = params.metric_type ? `${name} (total_value)` : name
+          try {
+            const ins = await graph<{
+              data: { name: string; values?: { value: number }[]; total_value?: { value: number } }[]
+            }>(`${m.id}/insights`, params, pt)
+            const row = ins.data?.[0]
+            metrics[key] = int(row?.total_value?.value ?? row?.values?.[0]?.value)
+          } catch (err) {
+            metrics[key] = err instanceof Error ? err.message.slice(0, 110) : 'unavailable'
+          }
         }
       }
       posts.push({
