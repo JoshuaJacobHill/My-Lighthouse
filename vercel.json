@@ -34,6 +34,10 @@
     {
       "path": "/api/cron/gap-sales",
       "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/cron/ingest-tiktok",
+      "schedule": "40 18 * * *"
     }
   ]
 }

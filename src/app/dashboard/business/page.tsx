@@ -25,6 +25,7 @@ const FEED_META: Record<string, { label: string; feed: FeedName }> = {
   'gap-meta-bridge': { label: 'Till sales', feed: 'sales' },
   meta: { label: 'Meta ads and posts', feed: 'meta' },
   mailchimp: { label: 'Mailchimp', feed: 'mailchimp' },
+  tiktok: { label: 'TikTok', feed: 'tiktok' },
 }
 
 const CHANNEL_LABEL: Record<string, string> = {

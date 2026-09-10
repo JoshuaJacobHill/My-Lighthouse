@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { hasCapability } from '@/lib/permissions'
 import { ingestMeta } from '@/lib/integrations/meta'
 import { ingestMailchimp } from '@/lib/integrations/mailchimp'
+import { ingestTikTok } from '@/lib/integrations/tiktok'
 import { runOnce } from '@/lib/gap-bridge'
 
 /**
@@ -19,7 +20,7 @@ import { runOnce } from '@/lib/gap-bridge'
  * halfway is worse than three buttons.
  */
 
-export type FeedName = 'sales' | 'meta' | 'mailchimp'
+export type FeedName = 'sales' | 'meta' | 'mailchimp' | 'tiktok'
 
 export async function refreshFeedAction(
   feed: FeedName,
@@ -54,6 +55,15 @@ export async function refreshFeedAction(
       return {
         success: r.ok,
         message: r.ok ? `${r.rows} rows from Meta.` : `Failed: ${r.error}`,
+      }
+    }
+
+    if (feed === 'tiktok') {
+      const r = await ingestTikTok()
+      revalidatePath('/dashboard/business')
+      return {
+        success: r.ok,
+        message: r.ok ? `${r.rows} videos from TikTok.` : `Failed: ${r.error}`,
       }
     }
 
