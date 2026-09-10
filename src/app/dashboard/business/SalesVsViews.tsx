@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import type { TrendDay } from '@/lib/business-reports'
+import { SOURCE_LABEL, VIEW_SOURCES, type ViewSource } from '@/lib/view-sources'
 
 /**
  * Takings against eyeballs, over days, weeks or months.
@@ -60,11 +61,8 @@ const GRID_LINES = 4
 
 export type Grain = 'day' | 'week' | 'month'
 
-const GRAIN_LABEL: Record<Grain, string> = {
-  day: 'Last 30 days',
-  week: 'Last 12 weeks',
-  month: 'Last 12 months',
-}
+/** Seven days at a time on the daily view: a trading week, readable at a glance. */
+const DAYS_SHOWN = 7
 
 const CHANNEL_LABEL: Record<string, string> = {
   IN_STORE: 'In store',
@@ -88,7 +86,17 @@ const fmtDay = (d: Date) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`
  * calendar months. Buckets are emitted oldest first and only for periods the
  * data covers, so a chart never shows an empty tail it has no figures for.
  */
-function bucket(daily: TrendDay[], grain: Grain, storeFilter: string, channelFilter: string): Bucket[] {
+function bucket(
+  daily: TrendDay[],
+  grain: Grain,
+  storeFilter: string,
+  channelFilter: string,
+  sources: Set<ViewSource>,
+  weeksBack = 0,
+): Bucket[] {
+  const viewsOf = (d: TrendDay) =>
+    VIEW_SOURCES.reduce((n, src) => (sources.has(src) ? n + (d.views[src] ?? 0) : n), 0)
+
   const revenueOf = (d: TrendDay) =>
     Object.entries(d.sales).reduce((n, [key, cents]) => {
       const [store, channel] = key.split('|')
@@ -98,7 +106,6 @@ function bucket(daily: TrendDay[], grain: Grain, storeFilter: string, channelFil
       return wanted ? n + cents : n
     }, 0)
 
-  const wanted = grain === 'day' ? 30 : 12
   const map = new Map<string, Bucket>()
 
   for (const d of daily) {
@@ -126,14 +133,22 @@ function bucket(daily: TrendDay[], grain: Grain, storeFilter: string, channelFil
     const existing = map.get(key)
     if (existing) {
       existing.revenueCents += revenueOf(d)
-      existing.views += d.views
+      existing.views += viewsOf(d)
       existing.days++
     } else {
-      map.set(key, { key, label, title, days: 1, revenueCents: revenueOf(d), views: d.views })
+      map.set(key, { key, label, title, days: 1, revenueCents: revenueOf(d), views: viewsOf(d) })
     }
   }
 
-  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key)).slice(-wanted)
+  const ordered = [...map.values()].sort((a, b) => a.key.localeCompare(b.key))
+
+  // The daily view is a window that can be walked back a week at a time; the
+  // others always show the most recent twelve.
+  if (grain === 'day') {
+    const end = ordered.length - weeksBack * DAYS_SHOWN
+    return ordered.slice(Math.max(0, end - DAYS_SHOWN), Math.max(0, end))
+  }
+  return ordered.slice(-12)
 }
 
 function Pills<T extends string>({
@@ -178,6 +193,15 @@ export function SalesVsViews({
   const [store, setStore] = React.useState('all')
   const [channel, setChannel] = React.useState('all')
   const [picked, setPicked] = React.useState<string | null>(null)
+  const [sources, setSources] = React.useState<Set<ViewSource>>(() => new Set(VIEW_SOURCES))
+  /** How many weeks back the daily window sits. 0 is the most recent week. */
+  const [weeksBack, setWeeksBack] = React.useState(0)
+
+  /** Only the sources that ever have a figure — an empty tick box is clutter. */
+  const available = React.useMemo(
+    () => VIEW_SOURCES.filter((src) => daily.some((d) => (d.views[src] ?? 0) > 0)),
+    [daily],
+  )
 
   const stores = React.useMemo(
     () =>
@@ -194,7 +218,25 @@ export function SalesVsViews({
     [daily],
   )
 
-  const buckets = React.useMemo(() => bucket(daily, grain, store, channel), [daily, grain, store, channel])
+  const buckets = React.useMemo(
+    () => bucket(daily, grain, store, channel, sources, weeksBack),
+    [daily, grain, store, channel, sources, weeksBack],
+  )
+
+  /** How far back the data goes, so Older can be disabled at the end. */
+  const maxWeeksBack = Math.max(0, Math.floor(daily.length / DAYS_SHOWN) - 1)
+
+  // What the chart is showing, in words. On the daily view that is the actual
+  // dates in the window rather than "last 7 days", which would be a lie as
+  // soon as you stepped backwards.
+  const rangeLabel =
+    grain === 'day'
+      ? buckets.length > 0
+        ? `${buckets[0].label} – ${buckets[buckets.length - 1].label}`
+        : 'no days'
+      : grain === 'week'
+        ? 'Last 12 weeks'
+        : 'Last 12 months'
 
   const maxRevenue = niceCeiling(Math.max(...buckets.map((b) => b.revenueCents), 0))
   const maxViews = niceCeiling(Math.max(...buckets.map((b) => b.views), 0))
@@ -213,6 +255,7 @@ export function SalesVsViews({
           onChange={(g) => {
             setGrain(g)
             setPicked(null)
+            setWeeksBack(0)
           }}
           options={[
             { value: 'day' as Grain, label: 'Days' },
@@ -220,9 +263,41 @@ export function SalesVsViews({
             { value: 'month' as Grain, label: 'Months' },
           ]}
         />
-        <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-          {GRAIN_LABEL[grain]}
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Only the daily view is a window you can walk; twelve weeks and
+              twelve months already reach back further than the data does. */}
+          {grain === 'day' && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setWeeksBack((w) => Math.min(w + 1, maxWeeksBack))
+                  setPicked(null)
+                }}
+                disabled={weeksBack >= maxWeeksBack}
+                className="rounded-full border border-neutral-300 px-2 py-1 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-30"
+                aria-label="Earlier week"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWeeksBack((w) => Math.max(w - 1, 0))
+                  setPicked(null)
+                }}
+                disabled={weeksBack === 0}
+                className="rounded-full border border-neutral-300 px-2 py-1 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-30"
+                aria-label="Later week"
+              >
+                ›
+              </button>
+            </div>
+          )}
+          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+            {rangeLabel}
+          </span>
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -240,6 +315,32 @@ export function SalesVsViews({
           ]}
         />
       </div>
+
+      {available.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+            Views from
+          </span>
+          {available.map((src) => (
+            <label key={src} className="flex cursor-pointer items-center gap-1.5 text-xs text-neutral-700">
+              <input
+                type="checkbox"
+                checked={sources.has(src)}
+                onChange={(e) =>
+                  setSources((prev) => {
+                    const next = new Set(prev)
+                    if (e.target.checked) next.add(src)
+                    else next.delete(src)
+                    return next
+                  })
+                }
+                className="h-3.5 w-3.5 rounded border-neutral-300 text-orange-500 focus:ring-orange-500"
+              />
+              {SOURCE_LABEL[src]}
+            </label>
+          ))}
+        </div>
+      )}
 
       {/* The selected bar, or the totals. One line, so nothing jumps about. */}
       <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
@@ -263,7 +364,7 @@ export function SalesVsViews({
             {shown && grain !== 'day' ? `· ${num(Math.round(shown.views / perDay))} a day` : 'views'}
           </span>
         </span>
-        <span className="text-neutral-400">{shown ? shown.title : GRAIN_LABEL[grain].toLowerCase()}</span>
+        <span className="text-neutral-400">{shown ? shown.title : rangeLabel.toLowerCase()}</span>
       </div>
 
       {!anything ? (
@@ -287,7 +388,7 @@ export function SalesVsViews({
           </div>
 
           <div className="min-w-0 flex-1 overflow-x-auto">
-            <div style={{ minWidth: buckets.length * (grain === 'day' ? 26 : 44) }}>
+            <div style={{ minWidth: buckets.length * 44 }}>
               <div className="relative" style={{ height: CHART_H }}>
                 {Array.from({ length: GRID_LINES + 1 }, (_, i) => (
                   <div
@@ -344,7 +445,7 @@ export function SalesVsViews({
               </div>
 
               <div className="mt-1.5 flex gap-1 sm:gap-2">
-                {buckets.map((b, i) => (
+                {buckets.map((b) => (
                   <span
                     key={b.key}
                     className={
@@ -352,8 +453,7 @@ export function SalesVsViews({
                       (picked === b.key ? 'font-semibold text-neutral-900' : 'text-neutral-500')
                     }
                   >
-                    {/* Every other label on the daily view, or they collide. */}
-                    {grain === 'day' && i % 2 === 1 ? '' : b.label}
+                    {b.label}
                   </span>
                 ))}
               </div>
@@ -381,6 +481,8 @@ export function SalesVsViews({
       <p className="mt-3 text-xs leading-relaxed text-neutral-400">
         Dollars read off the left axis, views off the right — two scales, because a dollar and a
         view are not comparable quantities. The bars show whether takings and reach moved together.
+        Email counts opens, not the size of the list: a campaign sent to forty thousand people and
+        opened by two thousand reached two thousand.
         {store !== 'all' &&
           ' Views stay organisation-wide: Meta and Mailchimp cannot tell which shop an impression belonged to, so only the sales figure is filtered.'}
       </p>

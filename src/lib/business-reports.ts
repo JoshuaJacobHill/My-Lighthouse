@@ -12,6 +12,7 @@
  */
 
 import prisma from '@/lib/prisma'
+import type { ViewSource } from '@/lib/view-sources'
 import type { SalesChannel, SocialPlatform, SocialKind } from '@prisma/client'
 
 const BNE = 'Australia/Brisbane'
@@ -310,10 +311,18 @@ export async function getTopSocial(
     .sort(byViews)
     .slice(0, take)
 
+  // Email ranks on opens, not on views.
+  //
+  // For a Mailchimp campaign, SocialPost.views holds emails_sent — the size of
+  // the list. Every campaign goes to the same list, so those figures land
+  // within a dozen of each other and ranking by them is very nearly random.
+  // Opens are the figure that differs, and the one that means anything: an
+  // unopened email reached nobody. `views` is left as sent, because
+  // opens ÷ sent is the open rate and that is worth keeping.
   const email = posts
     .filter((p) => p.platform === 'MAILCHIMP')
     .map((p) => shape(p))
-    .sort(byViews)
+    .sort((a, b) => b.engagements - a.engagements || b.clicks - a.clicks)
     .slice(0, take)
 
   return {
@@ -337,11 +346,16 @@ export type TrendDay = {
    */
   sales: Record<string, number>
   /**
-   * Views are organisation-wide. Meta and Mailchimp do not know which shop an
-   * impression belonged to, so this figure cannot be split by store — which
-   * the chart says out loud rather than implying a split that does not exist.
+   * Views by source, so each can be included or excluded.
+   *
+   * Organisation-wide, all of them. Meta and Mailchimp do not know which shop
+   * an impression belonged to, so views cannot be split by store — which the
+   * chart says out loud rather than implying a split that does not exist.
+   *
+   * MAILCHIMP counts **opens**, never the size of the list. An email sent to
+   * forty thousand people and opened by two thousand reached two thousand.
    */
-  views: number
+  views: Partial<Record<ViewSource, number>>
 }
 
 /**
@@ -377,10 +391,10 @@ export async function getDailyTrend(days = 365, now = new Date()): Promise<Trend
     prisma.socialPost.findMany({
       where: {
         kind: 'ORGANIC',
-        platform: { in: ['FACEBOOK', 'INSTAGRAM'] },
+        platform: { in: ['FACEBOOK', 'INSTAGRAM', 'TIKTOK'] },
         publishedAt: { gte: from, lte: endInstant },
       },
-      select: { publishedAt: true, views: true },
+      select: { publishedAt: true, views: true, platform: true },
     }),
     // Opens, not sends — the same choice the exposure panel makes.
     prisma.socialPost.findMany({
@@ -392,7 +406,14 @@ export async function getDailyTrend(days = 365, now = new Date()): Promise<Trend
   const byDay = new Map<string, TrendDay>()
   for (let i = 0; i < days; i++) {
     const key = new Date(from.getTime() + i * 86_400_000).toISOString().slice(0, 10)
-    byDay.set(key, { day: key, sales: {}, views: 0 })
+    byDay.set(key, { day: key, sales: {}, views: {} })
+  }
+
+  const addView = (dayKey: string, source: ViewSource, n: number) => {
+    if (n === 0) return
+    const bucket = byDay.get(dayKey)
+    if (!bucket) return
+    bucket.views[source] = (bucket.views[source] ?? 0) + n
   }
 
   for (const r of sales) {
@@ -403,10 +424,7 @@ export async function getDailyTrend(days = 365, now = new Date()): Promise<Trend
     const key = `${r.store}|${r.channel}`
     bucket.sales[key] = (bucket.sales[key] ?? 0) + cents
   }
-  for (const r of ads) {
-    const bucket = byDay.get(r.day.toISOString().slice(0, 10))
-    if (bucket) bucket.views += r._sum.views ?? 0
-  }
+  for (const r of ads) addView(r.day.toISOString().slice(0, 10), 'ADS', r._sum.views ?? 0)
   // Published instants are UTC; the day they belong to is Brisbane's.
   const bneDay = (at: Date) =>
     new Intl.DateTimeFormat('en-CA', {
@@ -415,14 +433,10 @@ export async function getDailyTrend(days = 365, now = new Date()): Promise<Trend
       month: '2-digit',
       day: '2-digit',
     }).format(at)
-  for (const r of organic) {
-    const bucket = byDay.get(bneDay(r.publishedAt))
-    if (bucket) bucket.views += r.views
-  }
-  for (const r of email) {
-    const bucket = byDay.get(bneDay(r.publishedAt))
-    if (bucket) bucket.views += r.engagements
-  }
+  for (const r of organic) addView(bneDay(r.publishedAt), r.platform as ViewSource, r.views)
+  // Opens, never emails_sent: SocialPost.views holds the size of the list for
+  // a campaign, which is not a measure of anyone having seen it.
+  for (const r of email) addView(bneDay(r.publishedAt), 'MAILCHIMP', r.engagements)
 
   return [...byDay.values()]
 }
