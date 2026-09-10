@@ -129,6 +129,10 @@ export type GapSaleHeader = {
   itemCount?: number
   /** Cents. 7194 is $71.94. */
   totalAmount: number
+  /** 1 for a web order. Counter sales are 0 and carry a `machineName` lane. */
+  externalSale?: number | boolean
+  /** The till. Null on web orders, which is the same signal from the other side. */
+  machineName?: string | null
   /** Unambiguous instant where EMC provides one. */
   created?: string
   /** Brisbane wall-clock fallback. */
@@ -162,6 +166,22 @@ export type GapSaleDetail = {
 
 /** EMC's way of saying "no customer". */
 export const EMPTY_GUID = '00000000-0000-0000-0000-000000000000'
+
+/**
+ * Whether a sale came in from the web rather than a till.
+ *
+ * Two independent signals agree in the live data — `externalSale = 1` and no
+ * `machineName` — so either will do and the flag is the more explicit of the
+ * two. Tolerates a boolean as well as 0/1 because the tenant returns numbers
+ * and nothing documents that it always will.
+ */
+export function isExternalSale(header: Pick<GapSaleHeader, 'externalSale' | 'machineName'>): boolean {
+  const flag = header.externalSale
+  if (flag === true || flag === 1) return true
+  if (flag === false || flag === 0) return false
+  // No flag at all: fall back to the missing till lane.
+  return !header.machineName
+}
 
 export function hasRealCustomer(detail: Pick<GapSaleDetail, 'customerGuid'>): boolean {
   const g = detail.customerGuid?.trim().toLowerCase()

@@ -4,6 +4,7 @@ import {
   findRows,
   gapStores,
   getAllStoreSales,
+  isExternalSale,
   TAKE,
   createToken,
   getSaleDetail,
@@ -323,5 +324,30 @@ describe('windows bigger than one request', () => {
     await getAllStoreSales(cfg, loganholme, { ...whole, onNote: (n) => notes.push(n) })
     expect(notes.length).toBeGreaterThan(0)
     expect(notes[0]).toMatch(/sales may be missing/)
+  })
+})
+
+describe('telling a web order from a counter sale', () => {
+  it('reads the externalSale flag', () => {
+    expect(isExternalSale({ externalSale: 1 })).toBe(true)
+    expect(isExternalSale({ externalSale: 0, machineName: 'LANE03' })).toBe(false)
+  })
+
+  it('accepts a boolean as well as 0/1', () => {
+    // The tenant returns numbers, and nothing documents that it always will.
+    expect(isExternalSale({ externalSale: true })).toBe(true)
+    expect(isExternalSale({ externalSale: false, machineName: 'LANE02' })).toBe(false)
+  })
+
+  it('falls back to the missing till lane when there is no flag', () => {
+    // The two signals agree in the live data: all 56 external sales had no
+    // machineName, and every counter sale had one.
+    expect(isExternalSale({ machineName: null })).toBe(true)
+    expect(isExternalSale({})).toBe(true)
+    expect(isExternalSale({ machineName: 'LANE03' })).toBe(false)
+  })
+
+  it('trusts the flag over the lane when they disagree', () => {
+    expect(isExternalSale({ externalSale: 0, machineName: null })).toBe(false)
   })
 })

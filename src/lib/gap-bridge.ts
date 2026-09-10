@@ -36,6 +36,7 @@ import {
   gapConfig,
   getAllStoreSales,
   getSaleDetail,
+  isExternalSale,
   hasRealCustomer,
   saleInstant,
   probeSales,
@@ -242,15 +243,26 @@ export async function processSale(
     totalCents: header.totalAmount,
     occurredAt: at,
     day,
+    isExternal: isExternalSale(header),
     inspectedAt: new Date(),
   }
 
   const existing = await prisma.gapSale.findUnique({
     where: { saleIdentifier: header.saleIdentifier },
-    select: { status: true, attemptCount: true },
+    select: { status: true, attemptCount: true, isExternal: true },
   })
 
   if (!shouldReprocess(existing, settings) && !opts?.force) {
+    // Settled for Meta, but the report still reads this row. Keeping the
+    // structural facts current costs one cheap write and no detail request —
+    // and means a newly added column fills itself in on the next run instead
+    // of needing a backfill.
+    if (existing!.isExternal !== base.isExternal) {
+      await prisma.gapSale.update({
+        where: { saleIdentifier: header.saleIdentifier },
+        data: { isExternal: base.isExternal },
+      })
+    }
     return { saleIdentifier: header.saleIdentifier, status: existing!.status, reason: 'already_settled', valueAud }
   }
 
@@ -444,7 +456,7 @@ export async function rollUpSalesFacts(store: GapStore, days: Date[]): Promise<n
   if (days.length === 0) return 0
 
   const grouped = await prisma.gapSale.groupBy({
-    by: ['day'],
+    by: ['day', 'isExternal'],
     where: {
       day: { in: days },
       storeID: store.id,
@@ -455,19 +467,20 @@ export async function rollUpSalesFacts(store: GapStore, days: Date[]): Promise<n
   })
 
   for (const row of grouped) {
+    const channel = row.isExternal ? SalesChannel.ONLINE : SalesChannel.IN_STORE
     await prisma.salesFact.upsert({
       where: {
         day_store_channel_source: {
           day: row.day,
           store: store.name,
-          channel: SalesChannel.IN_STORE,
+          channel,
           source: GAP_SOURCE,
         },
       },
       create: {
         day: row.day,
         store: store.name,
-        channel: SalesChannel.IN_STORE,
+        channel,
         source: GAP_SOURCE,
         orders: row._count._all,
         revenueCents: row._sum.totalCents ?? 0,
@@ -479,7 +492,23 @@ export async function rollUpSalesFacts(store: GapStore, days: Date[]): Promise<n
     })
   }
 
-  return grouped.length
+  // A day that had online sales and then does not must fall back to zero, or
+  // yesterday's figure sits there looking like today's.
+  const days_ = [...new Set(grouped.map((g) => g.day.getTime()))]
+  for (const t of days_) {
+    for (const channel of [SalesChannel.IN_STORE, SalesChannel.ONLINE]) {
+      const present = grouped.some(
+        (g) => g.day.getTime() === t && (g.isExternal ? SalesChannel.ONLINE : SalesChannel.IN_STORE) === channel,
+      )
+      if (present) continue
+      await prisma.salesFact.updateMany({
+        where: { day: new Date(t), store: store.name, channel, source: GAP_SOURCE },
+        data: { orders: 0, revenueCents: 0 },
+      })
+    }
+  }
+
+  return new Set(grouped.map((g) => g.day.getTime())).size
 }
 
 // ─── A run ────────────────────────────────────────────────────────────────────
@@ -951,6 +980,43 @@ export async function salesShape(hours = 24): Promise<
         .slice(0, 8),
     })
   }
+
+  // How much money sits behind each transaction type.
+  //
+  // Refunds show as tranType -1, and whether EMC reports them as a negative
+  // amount decides how the report counts them. Subtracting an amount that is
+  // already negative would double the refund; adding one that is positive
+  // would count a refund as a sale. Neither guess is acceptable, so measure.
+  const byType = new Map<string, { n: number; total: number; min: number; max: number }>()
+  for (const r of rows) {
+    const key = String(r.tranType ?? '(null)')
+    const amount = Number(r.totalAmount ?? 0)
+    const e = byType.get(key) ?? { n: 0, total: 0, min: Infinity, max: -Infinity }
+    e.n++
+    e.total += amount
+    e.min = Math.min(e.min, amount)
+    e.max = Math.max(e.max, amount)
+    byType.set(key, e)
+  }
+  fields.push({
+    name: 'amount by tranType (dollars)',
+    values: [...byType.entries()]
+      .sort((a, b) => b[1].n - a[1].n)
+      .map(([type, e]) => ({
+        value: `type ${type}: ${e.n} sales, total ${(e.total / 100).toFixed(2)}, from ${(e.min / 100).toFixed(2)} to ${(e.max / 100).toFixed(2)}`,
+        count: e.n,
+      })),
+  })
+
+  // Online versus counter, the split the report now uses.
+  const online = rows.filter((r) => r.externalSale === 1 || r.externalSale === true).length
+  fields.push({
+    name: 'channel split',
+    values: [
+      { value: `in store: ${rows.length - online}`, count: rows.length - online },
+      { value: `online: ${online}`, count: online },
+    ],
+  })
 
   // The identifier prefix differs between sales and may encode the till.
   const prefixes = new Map<string, number>()
