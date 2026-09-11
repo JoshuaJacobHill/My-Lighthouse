@@ -3,6 +3,7 @@ import { ChevronLeft, ExternalLink } from 'lucide-react'
 import { requireCapability } from '@/lib/permissions'
 import { getTikTokStatus } from '@/lib/integrations/tiktok'
 import { FeedRefresh } from '../FeedRefresh'
+import { DisconnectButton } from './DisconnectButton'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'TikTok' }
@@ -116,6 +117,7 @@ export default async function TikTokPage({
                 <ExternalLink className="h-4 w-4" aria-hidden="true" />
               </a>
               {status.connected && <FeedRefresh feed="tiktok" label="TikTok" />}
+              {status.connected && <DisconnectButton />}
             </div>
           )}
 

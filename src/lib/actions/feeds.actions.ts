@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { hasCapability } from '@/lib/permissions'
 import { ingestMeta } from '@/lib/integrations/meta'
 import { ingestMailchimp } from '@/lib/integrations/mailchimp'
-import { ingestTikTok } from '@/lib/integrations/tiktok'
+import { disconnectTikTok, ingestTikTok } from '@/lib/integrations/tiktok'
 import { runOnce } from '@/lib/gap-bridge'
 
 /**
@@ -75,5 +75,28 @@ export async function refreshFeedAction(
     }
   } catch (err) {
     return { success: false, message: err instanceof Error ? err.message : 'Something went wrong.' }
+  }
+}
+
+/**
+ * Disconnect the TikTok account.
+ *
+ * For the case the wrong account was authorised — easy to do, since TikTok
+ * approves whichever account the browser is signed into.
+ */
+export async function disconnectTikTokAction(): Promise<{
+  success: boolean
+  message: string
+}> {
+  if (!(await hasCapability('business.reports'))) {
+    return { success: false, message: 'Not allowed.' }
+  }
+  const r = await disconnectTikTok()
+  revalidatePath('/dashboard/business/tiktok')
+  return {
+    success: r.cleared,
+    message: r.revokedAtTikTok
+      ? 'Disconnected, and the permission was withdrawn at TikTok.'
+      : (r.note ?? 'Disconnected here.'),
   }
 }

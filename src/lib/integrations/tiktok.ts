@@ -34,6 +34,7 @@ import prisma from '@/lib/prisma'
 
 const OAUTH_URL = 'https://open.tiktokapis.com/v2/oauth/token/'
 const VIDEO_LIST_URL = 'https://open.tiktokapis.com/v2/video/list/'
+const REVOKE_URL = 'https://open.tiktokapis.com/v2/oauth/revoke/'
 
 /** Where the rotating refresh token is kept. */
 const REFRESH_KEY = 'tiktok.refresh_token'
@@ -504,4 +505,61 @@ export async function getTikTokStatus(): Promise<TikTokStatus> {
     videos,
     videoCount,
   }
+}
+
+// ─── Disconnecting ────────────────────────────────────────────────────────────
+
+/**
+ * Forget the account, and tell TikTok to forget us.
+ *
+ * Two separate things, and the order matters. Revoking at TikTok's end is
+ * attempted first but is **best effort**: it can fail because the token has
+ * already lapsed, or because the app's client key has changed since the grant
+ * was made, in which case the credentials we hold no longer match the
+ * credentials that issued it.
+ *
+ * Clearing our own record always happens regardless. A disconnect that
+ * refuses to disconnect because a remote call failed would be worse than
+ * useless — it would leave the wrong account attached with no way to change
+ * it. What the caller gets back is an honest account of which half worked,
+ * because a failed revoke means the grant is still sitting in that TikTok
+ * account's app permissions and only its owner can remove it.
+ */
+export async function disconnectTikTok(): Promise<{
+  cleared: boolean
+  revokedAtTikTok: boolean
+  note?: string
+}> {
+  const cfg = tiktokConfig()
+  let revoked = false
+  let note: string | undefined
+
+  if (cfg) {
+    try {
+      const at = await token(cfg)
+      const res = await fetch(REVOKE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_key: cfg.clientKey,
+          client_secret: cfg.clientSecret,
+          token: at,
+        }),
+        cache: 'no-store',
+      })
+      revoked = res.ok
+      if (!res.ok) note = `TikTok would not revoke the token (${res.status}).`
+    } catch (err) {
+      note = err instanceof Error ? err.message : 'Could not reach TikTok to revoke.'
+    }
+  }
+
+  await prisma.appSetting.deleteMany({ where: { key: { in: [REFRESH_KEY, SCOPES_KEY] } } })
+  resetTikTokToken()
+
+  if (!revoked) {
+    note = `${note ?? 'Not revoked at TikTok.'} The connection is cleared here, but that TikTok account may still list this app under Settings → Security → Apps. Remove it there to be certain.`
+  }
+
+  return { cleared: true, revokedAtTikTok: revoked, note }
 }
