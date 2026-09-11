@@ -90,6 +90,14 @@ export default async function TikTokPage({
                 {status.connected ? 'Connected' : 'Not connected'}
               </dd>
             </div>
+            {status.clientKey && (
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-neutral-600">Client key in use</dt>
+                <dd className="break-all text-right font-mono text-xs text-neutral-600">
+                  {status.clientKey}
+                </dd>
+              </div>
+            )}
             {status.scopesGranted.length > 0 && (
               <div className="flex items-start justify-between gap-3">
                 <dt className="text-neutral-600">Permissions granted</dt>
@@ -99,6 +107,13 @@ export default async function TikTokPage({
               </div>
             )}
           </dl>
+
+          {status.clientKeyHadWhitespace && (
+            <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+              The credentials in Vercel have a space or newline around them. They are trimmed
+              before use, so this is not breaking anything now, but it is worth tidying.
+            </p>
+          )}
 
           {!status.configured ? (
             <p className="mt-4 rounded-2xl bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-600">

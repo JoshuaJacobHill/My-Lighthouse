@@ -71,13 +71,16 @@ export type TikTokConfig = {
 }
 
 export function tiktokConfig(): TikTokConfig | null {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET
+  // Trimmed, because a copied credential very often arrives with a trailing
+  // newline or a leading space, and TikTok's answer to that is a flat
+  // "correct the following: client_key" that says nothing about whitespace.
+  const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim()
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET?.trim()
   if (!clientKey || !clientSecret) return null
   return {
     clientKey,
     clientSecret,
-    seedRefreshToken: process.env.TIKTOK_REFRESH_TOKEN || undefined,
+    seedRefreshToken: process.env.TIKTOK_REFRESH_TOKEN?.trim() || undefined,
   }
 }
 
@@ -443,6 +446,17 @@ export async function probeTikTok(): Promise<
 export type TikTokStatus = {
   /** Client key and secret are present in the environment. */
   configured: boolean
+  /**
+   * The client key in use, shown in full.
+   *
+   * Not a secret: it travels in the authorize URL as a query parameter, so
+   * TikTok's own login page already displays it to anyone watching. Showing
+   * it here is the only way to check the value in Vercel against the value in
+   * the portal, which is what a rejected client_key usually comes down to.
+   */
+  clientKey: string | null
+  /** Whether the raw variable had whitespace around it, since that alone breaks it. */
+  clientKeyHadWhitespace: boolean
   /** A refresh token exists, so the account has been authorised. */
   connected: boolean
   scopesGranted: string[]
@@ -494,8 +508,15 @@ export async function getTikTokStatus(): Promise<TikTokStatus> {
     .map((x) => x.trim())
     .filter(Boolean)
 
+  const rawKey = process.env.TIKTOK_CLIENT_KEY
+  const rawSecret = process.env.TIKTOK_CLIENT_SECRET
+
   return {
     configured: Boolean(cfg),
+    clientKey: cfg?.clientKey ?? null,
+    clientKeyHadWhitespace: Boolean(
+      (rawKey && rawKey !== rawKey.trim()) || (rawSecret && rawSecret !== rawSecret.trim()),
+    ),
     connected: Boolean(refresh?.value?.trim() || cfg?.seedRefreshToken),
     scopesGranted: granted,
     // Only claimed when TikTok actually said so. Assuming it would turn a
