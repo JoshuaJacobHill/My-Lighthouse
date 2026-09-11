@@ -6,6 +6,7 @@ import {
   backfillAction,
   coverageAction,
   diagnoseGapAction,
+  probeExternalSalesAction,
   probeHourlyAction,
   runBridgeNowAction,
   salesShapeAction,
@@ -57,6 +58,8 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
   const [shapeError, setShapeError] = React.useState('')
   const [hourly, setHourly] = React.useState<SalesProbe[] | null>(null)
   const [hourlyError, setHourlyError] = React.useState('')
+  const [ext, setExt] = React.useState<SalesProbe[] | null>(null)
+  const [extError, setExtError] = React.useState('')
   const [backfill, setBackfill] = React.useState<{
     running: boolean
     days: number
@@ -438,6 +441,81 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
         </button>
 
         {shapeError && <p className="mt-3 text-sm text-red-700">{shapeError}</p>}
+
+        <div className="mt-5 border-t border-neutral-100 pt-4">
+          <p className="text-sm font-semibold text-neutral-800">Web orders endpoint</p>
+          <p className="mt-1 text-sm text-neutral-500">
+            Tries <code className="font-mono">api/store/{'{id}'}/externalSales</code>. If it
+            returns web orders directly, the online figure can come from the source instead of a
+            flag we interpret — which is where the channel split is currently going wrong.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setExt(null)
+              setExtError('')
+              startTransition(async () => {
+                const res = await probeExternalSalesAction()
+                if (!res.success || !res.probes) {
+                  setExtError(res.error ?? 'Something went wrong.')
+                  return
+                }
+                setExt(res.probes)
+              })
+            }}
+            disabled={pending}
+            className="mt-3 inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+          >
+            {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            Probe web orders
+          </button>
+
+          {extError && <p className="mt-3 text-sm text-red-700">{extError}</p>}
+
+          {ext && (
+            <>
+              <table className="mt-3 w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
+                    <th className="py-2 pr-3">Parameters</th>
+                    <th className="py-2 pr-3">HTTP</th>
+                    <th className="py-2 pr-3">Rows</th>
+                    <th className="py-2">Shape</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ext.map((p) => (
+                    <tr key={p.label} className="border-b border-neutral-100 align-top">
+                      <td className="py-2 pr-3">{p.label}</td>
+                      <td className="py-2 pr-3 tabular-nums">{p.status || '—'}</td>
+                      <td
+                        className={
+                          'py-2 pr-3 font-bold tabular-nums ' +
+                          (p.count > 0 ? 'text-lime-700' : 'text-neutral-400')
+                        }
+                      >
+                        {p.count}
+                      </td>
+                      <td className="py-2 font-mono text-xs text-neutral-500">
+                        {p.error ?? p.shape}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {ext.find((p) => p.firstRow) && (
+                <pre className="mt-3 overflow-x-auto rounded-2xl bg-neutral-50 p-3 text-xs text-neutral-700">
+                  {JSON.stringify(ext.find((p) => p.firstRow)!.firstRow, null, 2)}
+                </pre>
+              )}
+              {ext.find((p) => p.firstRowKeys) && (
+                <p className="mt-2 font-mono text-xs text-neutral-500">
+                  fields: {ext.find((p) => p.firstRowKeys)!.firstRowKeys!.join(', ')}
+                </p>
+              )}
+            </>
+          )}
+        </div>
 
         <div className="mt-5 border-t border-neutral-100 pt-4">
           <p className="text-sm font-semibold text-neutral-800">Hourly sales</p>

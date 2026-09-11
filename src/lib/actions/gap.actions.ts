@@ -6,6 +6,7 @@ import {
   backfillDays,
   customerCoverage,
   diagnose,
+  probeExternalSales,
   probeHourly,
   salesShape,
   type ShapeField,
@@ -146,6 +147,19 @@ export async function probeHourlyAction(): Promise<{
 }> {
   if (!(await guard())) return { success: false, error: 'Not allowed.' }
   const res = await probeHourly()
+  if (!res.ok) return { success: false, error: res.error }
+  return { success: true, store: res.store, probes: res.probes }
+}
+
+/** What `api/store/{id}/externalSales` returns, and for which parameters. */
+export async function probeExternalSalesAction(): Promise<{
+  success: boolean
+  store?: GapStore
+  probes?: SalesProbe[]
+  error?: string
+}> {
+  if (!(await guard())) return { success: false, error: 'Not allowed.' }
+  const res = await probeExternalSales()
   if (!res.ok) return { success: false, error: res.error }
   return { success: true, store: res.store, probes: res.probes }
 }

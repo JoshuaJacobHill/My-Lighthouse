@@ -1115,6 +1115,49 @@ export async function customerCoverage(limit = 25): Promise<
   }
 }
 
+// ─── External (web) sales ─────────────────────────────────────────────────────
+
+/**
+ * What `api/store/{id}/externalSales` answers.
+ *
+ * Worth knowing because the channel split is currently wrong: Gap's `/sales`
+ * reports 59 web orders in a day and we record one. If this endpoint returns
+ * web orders directly then the classification problem stops mattering — the
+ * online figure comes from the source rather than from a flag we have to
+ * interpret, and the two can be reconciled against each other.
+ *
+ * Tried several ways because its parameters are undocumented, and both verbs
+ * because `api/hourlysales` turned out to be POST-only.
+ */
+export async function probeExternalSales(): Promise<
+  { ok: false; error: string } | { ok: true; store: GapStore; probes: SalesProbe[] }
+> {
+  const cfg = gapConfig()
+  if (!cfg) return { ok: false, error: 'EMC credentials or stores not configured' }
+
+  const store = cfg.stores[0]
+  const today = brisbaneToday()
+  const weekAgo = brisbaneToday(new Date(Date.now() - 7 * 86_400_000))
+
+  const window = {
+    StartDate: `${today}T00:00:00`,
+    EndDate: `${today}T23:59:59`,
+  }
+
+  const probes = await probeEndpoint(cfg, `/api/store/${store.id}/externalSales`, [
+    { label: 'GET · today', params: { ...window, Take: '10' } },
+    { label: 'GET · today, ExcludeVoids', params: { ...window, ExcludeVoids: 'true', Take: '10' } },
+    {
+      label: 'GET · last 7 days',
+      params: { StartDate: `${weekAgo}T00:00:00`, EndDate: `${today}T23:59:59`, Take: '10' },
+    },
+    { label: 'GET · no parameters', params: {} },
+    { label: 'POST · today', method: 'POST', params: { ...window, Take: '10' } },
+  ])
+
+  return { ok: true, store, probes }
+}
+
 // ─── Hourly sales ─────────────────────────────────────────────────────────────
 
 /**
