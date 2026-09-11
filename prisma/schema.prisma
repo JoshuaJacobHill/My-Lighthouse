@@ -1594,6 +1594,16 @@ model GapSale {
   /// online without integrating MyFoodLink at all.
   isExternal Boolean @default(false)
 
+  /// The till, e.g. LANE02. Null on web orders.
+  ///
+  /// Stored because the classification went wrong and could not be diagnosed
+  /// from the database: 59 sales arrived flagged online and one was recorded
+  /// that way, and with no raw signal kept there was no way to tell a
+  /// detection fault from a persistence fault without asking someone to read
+  /// a number off a screen. A till name is not personal information, and
+  /// keeping it makes the next disagreement answerable directly.
+  machineName String?
+
   status       GapSaleStatus @default(PENDING)
   attemptCount Int           @default(0)
   lastError    String?       @db.Text
@@ -1693,7 +1703,15 @@ model AdDayStat {
   reach       Int            @default(0)
   clicks      Int            @default(0)
   spendCents  Int            @default(0)
+  /// Purchases Meta attributed to this ad on this day.
   conversions Int            @default(0)
+  /// What those purchases were worth, in cents. ROAS is this over spend.
+  ///
+  /// Separate from `conversions` because a count answers "how many" and only
+  /// the value answers "was it worth it" — ten $8 purchases and one $300 one
+  /// are not the same result, and a charity's ad budget deserves the
+  /// distinction.
+  conversionValueCents Int   @default(0)
   fetchedAt   DateTime       @default(now())
 
   @@unique([platform, externalId, day])

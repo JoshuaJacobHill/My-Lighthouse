@@ -13,6 +13,7 @@ import { SalesVsViews, type Grain } from './SalesVsViews'
 import { FeedRefresh } from './FeedRefresh'
 import { PostRow } from './PostRow'
 import { TopOrganic } from './TopOrganic'
+import { TopPaid } from './TopPaid'
 import type { FeedName } from '@/lib/actions/feeds.actions'
 import { PeriodTabs } from './PeriodTabs'
 
@@ -247,11 +248,7 @@ export default async function BusinessReportPage({
 
           {social.paid.length > 0 && (
             <Card title="Top paid">
-              <ul className="divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
-                {social.paid.map((p) => (
-                  <PostRow key={p.id} post={p} />
-                ))}
-              </ul>
+              <TopPaid posts={social.paid} />
             </Card>
           )}
         </div>

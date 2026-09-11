@@ -180,6 +180,10 @@ export type TopPost = {
   engagements: number
   clicks: number
   spendCents: number
+  /** Purchases Meta attributed. Paid only; zero elsewhere. */
+  conversions: number
+  /** What they were worth, in cents. Paid only. */
+  conversionValueCents: number
   audience: string | null
   /** Engagements as a share of views — comparable across platforms. */
   engagementRate: number
@@ -241,11 +245,26 @@ export async function getTopSocial(
     prisma.adDayStat.groupBy({
       by: ['platform', 'externalId'],
       where: { day: { gte: current.from, lte: current.to } },
-      _sum: { views: true, clicks: true, spendCents: true },
+      _sum: {
+        views: true,
+        clicks: true,
+        spendCents: true,
+        conversions: true,
+        conversionValueCents: true,
+      },
     }),
   ])
 
-  const shape = (r: (typeof posts)[number], over?: { views: number; clicks: number; spendCents: number }): TopPost => {
+  const shape = (
+    r: (typeof posts)[number],
+    over?: {
+      views: number
+      clicks: number
+      spendCents: number
+      conversions?: number
+      conversionValueCents?: number
+    },
+  ): TopPost => {
     const views = over?.views ?? r.views
     return {
       id: r.id,
@@ -259,6 +278,8 @@ export async function getTopSocial(
       engagements: r.engagements,
       clicks: over?.clicks ?? r.clicks,
       spendCents: over?.spendCents ?? r.spendCents,
+      conversions: over?.conversions ?? 0,
+      conversionValueCents: over?.conversionValueCents ?? 0,
       audience: r.audience,
       engagementRate: rate(r.engagements, views),
     }
@@ -288,13 +309,17 @@ export async function getTopSocial(
         views: a._sum.views ?? 0,
         clicks: a._sum.clicks ?? 0,
         spendCents: a._sum.spendCents ?? 0,
+        conversions: a._sum.conversions ?? 0,
+        conversionValueCents: a._sum.conversionValueCents ?? 0,
       })
     })
     .filter((x): x is TopPost => x !== null)
-    // Spend is the honest ranking for paid: it is what you chose to put behind
-    // it, and engagement rate on an ad mostly reflects budget.
+    // Sorted in the browser, which offers spend, views, clicks, purchases and
+    // return. Spend remains the default — it is what you chose to put behind
+    // the ad — but which measure matters depends on what the ad was for, and
+    // that is the reader's call rather than this function's.
     .sort((a, b) => b.spendCents - a.spendCents)
-    .slice(0, take)
+    .slice(0, Math.max(take, 10))
 
   // Ranked by views, not engagement rate.
   //

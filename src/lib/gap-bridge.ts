@@ -277,12 +277,13 @@ export async function processSale(
     occurredAt: at,
     day,
     isExternal: isExternalSale(header),
+    machineName: header.machineName ?? null,
     inspectedAt: new Date(),
   }
 
   const existing = await prisma.gapSale.findUnique({
     where: { saleIdentifier: header.saleIdentifier },
-    select: { status: true, attemptCount: true, isExternal: true },
+    select: { status: true, attemptCount: true, isExternal: true, machineName: true },
   })
 
   if (!shouldReprocess(existing, settings) && !opts?.force) {
@@ -290,10 +291,10 @@ export async function processSale(
     // structural facts current costs one cheap write and no detail request —
     // and means a newly added column fills itself in on the next run instead
     // of needing a backfill.
-    if (existing!.isExternal !== base.isExternal) {
+    if (existing!.isExternal !== base.isExternal || existing!.machineName !== base.machineName) {
       await prisma.gapSale.update({
         where: { saleIdentifier: header.saleIdentifier },
-        data: { isExternal: base.isExternal },
+        data: { isExternal: base.isExternal, machineName: base.machineName },
       })
     }
     return { saleIdentifier: header.saleIdentifier, status: existing!.status, reason: 'already_settled', valueAud }

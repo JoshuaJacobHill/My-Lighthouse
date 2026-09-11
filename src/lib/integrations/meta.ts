@@ -142,6 +142,39 @@ type AdRow = {
   clicks?: string
   impressions?: string
   date_start: string
+  /** What people did, by type. Absent when an ad drove nothing. */
+  actions?: { action_type: string; value: string }[]
+  /** What those actions were worth, same shape. */
+  action_values?: { action_type: string; value: string }[]
+}
+
+/**
+ * Which actions count as a purchase.
+ *
+ * Meta reports the same purchase under several names depending on where it
+ * happened, and they overlap: `omni_purchase` already includes the web and
+ * offline ones, so adding them together would count the same sale twice.
+ * Preference order, first match wins.
+ *
+ * `offline_conversion.purchase` is the one the POS bridge feeds — in-store
+ * sales sent to Meta as physical_store events. Once attribution accrues, this
+ * is where counter trade starts showing up against ad spend.
+ */
+const PURCHASE_ACTIONS = [
+  'omni_purchase',
+  'purchase',
+  'offline_conversion.purchase',
+  'onsite_web_purchase',
+]
+
+/** First matching action type, so overlapping definitions cannot double-count. */
+function firstAction(rows: { action_type: string; value: string }[] | undefined): number {
+  if (!rows?.length) return 0
+  for (const type of PURCHASE_ACTIONS) {
+    const hit = rows.find((r) => r.action_type === type)
+    if (hit) return Number(hit.value) || 0
+  }
+  return 0
 }
 
 async function ingestAds(cfg: Cfg, days: number): Promise<number> {
@@ -155,7 +188,7 @@ async function ingestAds(cfg: Cfg, days: number): Promise<number> {
     `${cfg.adAccountId}/insights`,
     {
       level: 'ad',
-      fields: 'ad_id,ad_name,spend,reach,clicks,impressions',
+      fields: 'ad_id,ad_name,spend,reach,clicks,impressions,actions,action_values',
       time_increment: '1',
       time_range: JSON.stringify({ since: iso(since), until: iso(until) }),
       limit: '500',
@@ -217,12 +250,16 @@ async function ingestAds(cfg: Cfg, days: number): Promise<number> {
         reach: int(r.reach),
         clicks: int(r.clicks),
         spendCents: cents(r.spend),
+        conversions: firstAction(r.actions),
+        conversionValueCents: Math.round(firstAction(r.action_values) * 100),
       },
       update: {
         views: int(r.impressions),
         reach: int(r.reach),
         clicks: int(r.clicks),
         spendCents: cents(r.spend),
+        conversions: firstAction(r.actions),
+        conversionValueCents: Math.round(firstAction(r.action_values) * 100),
         fetchedAt: new Date(),
       },
     })
