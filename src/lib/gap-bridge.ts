@@ -1126,8 +1126,13 @@ export async function customerCoverage(limit = 25): Promise<
  * online figure comes from the source rather than from a flag we have to
  * interpret, and the two can be reconciled against each other.
  *
- * Tried several ways because its parameters are undocumented, and both verbs
- * because `api/hourlysales` turned out to be POST-only.
+ * Two paths, because they are different controllers and may carry different
+ * permissions: `api/store/{id}/externalSales` answered 405 to every GET and
+ * 403 to POST — right verb, account not allowed — while `api/externalSales`
+ * is unrelated and may not be closed in the same way.
+ *
+ * Both verbs, because `api/hourlysales` turned out to be POST-only and
+ * assuming GET wasted a round trip there.
  */
 export async function probeExternalSales(): Promise<
   { ok: false; error: string } | { ok: true; store: GapStore; probes: SalesProbe[] }
@@ -1144,18 +1149,31 @@ export async function probeExternalSales(): Promise<
     EndDate: `${today}T23:59:59`,
   }
 
-  const probes = await probeEndpoint(cfg, `/api/store/${store.id}/externalSales`, [
-    { label: 'GET · today', params: { ...window, Take: '10' } },
-    { label: 'GET · today, ExcludeVoids', params: { ...window, ExcludeVoids: 'true', Take: '10' } },
-    {
-      label: 'GET · last 7 days',
-      params: { StartDate: `${weekAgo}T00:00:00`, EndDate: `${today}T23:59:59`, Take: '10' },
-    },
-    { label: 'GET · no parameters', params: {} },
-    { label: 'POST · today', method: 'POST', params: { ...window, Take: '10' } },
+  const [perStore, global] = await Promise.all([
+    probeEndpoint(cfg, `/api/store/${store.id}/externalSales`, [
+      { label: 'store · GET · today', params: { ...window, Take: '10' } },
+      { label: 'store · POST · today', method: 'POST', params: { ...window, Take: '10' } },
+    ]),
+    probeEndpoint(cfg, '/api/externalSales', [
+      { label: 'global · GET · today', params: { ...window, Take: '10' } },
+      {
+        label: 'global · GET · with StoreID',
+        params: { StoreID: String(store.id), ...window, Take: '10' },
+      },
+      {
+        label: 'global · GET · last 7 days',
+        params: { StartDate: `${weekAgo}T00:00:00`, EndDate: `${today}T23:59:59`, Take: '10' },
+      },
+      { label: 'global · GET · no parameters', params: {} },
+      {
+        label: 'global · POST · today',
+        method: 'POST',
+        params: { StoreID: String(store.id), ...window, Take: '10' },
+      },
+    ]),
   ])
 
-  return { ok: true, store, probes }
+  return { ok: true, store, probes: [...perStore, ...global] }
 }
 
 // ─── Hourly sales ─────────────────────────────────────────────────────────────
