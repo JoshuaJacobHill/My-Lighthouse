@@ -209,7 +209,8 @@ export async function getTopSocial(
   take = 5,
 ): Promise<{
   range: Range
-  organic: TopPost[]
+  /** Best posts per platform, because the counts are not comparable. */
+  organicByPlatform: { platform: SocialPlatform; posts: TopPost[] }[]
   paid: TopPost[]
   email: TopPost[]
   platforms: SocialPlatform[]
@@ -305,11 +306,34 @@ export async function getTopSocial(
   const byViews = (a: TopPost, b: TopPost) =>
     b.views - a.views || b.engagements - a.engagements || b.engagementRate - a.engagementRate
 
-  const organic = posts
-    .filter((p) => p.kind === 'ORGANIC' && p.platform !== 'MAILCHIMP')
-    .map((p) => shape(p))
-    .sort(byViews)
-    .slice(0, take)
+  /**
+   * Grouped by platform rather than ranked against each other.
+   *
+   * One list looked reasonable and was not: Facebook counts `post_media_view`,
+   * Instagram counts `total_views`, TikTok counts its own views, and those are
+   * not the same measurement. Facebook averages 24,000 a post against TikTok's
+   * 3,500, so a single ranking put Facebook in every slot and TikTok in none —
+   * which reads as "TikTok is not working" when TikTok is doing fine.
+   *
+   * A ranking across incomparable numbers answers a question nobody asked.
+   * Within a platform the comparison is sound, so that is where the ranking
+   * belongs.
+   */
+  const organicPosts = posts.filter((p) => p.kind === 'ORGANIC' && p.platform !== 'MAILCHIMP')
+  const organicByPlatform = [...new Set(organicPosts.map((p) => p.platform))]
+    .map((platform) => ({
+      platform,
+      posts: organicPosts
+        .filter((p) => p.platform === platform)
+        .map((p) => shape(p))
+        .sort(byViews)
+        .slice(0, take),
+    }))
+    // Busiest platform first, by total reach within the period.
+    .sort(
+      (a, b) =>
+        b.posts.reduce((n, p) => n + p.views, 0) - a.posts.reduce((n, p) => n + p.views, 0),
+    )
 
   // Email ranks on opens, not on views.
   //
@@ -327,7 +351,7 @@ export async function getTopSocial(
 
   return {
     range: current,
-    organic,
+    organicByPlatform,
     paid,
     email,
     platforms: [...new Set(posts.map((p) => p.platform))],

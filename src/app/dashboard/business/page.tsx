@@ -181,7 +181,7 @@ export default async function BusinessReportPage({
 
   const hasSales = sales.stores.length > 0
   const hasSocial =
-    social.organic.length > 0 || social.paid.length > 0 || social.email.length > 0
+    social.organicByPlatform.length > 0 || social.paid.length > 0 || social.email.length > 0
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
@@ -300,16 +300,37 @@ export default async function BusinessReportPage({
           <Card title="Top organic">
             {!hasSocial ? (
               <NotConnected what="Meta, TikTok or Mailchimp" />
-            ) : social.organic.length === 0 ? (
+            ) : social.organicByPlatform.length === 0 ? (
               <p className="rounded-[28px] border border-dashed border-neutral-300 px-5 py-8 text-center text-sm text-neutral-500">
                 Nothing organic in this period.
               </p>
             ) : (
-              <ul className="divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
-                {social.organic.map((p) => (
-                  <PostRow key={p.id} post={p} />
-                ))}
-              </ul>
+              <>
+                {/* Per platform, not one ranked list. Facebook counts media
+                    views, Instagram counts total views and TikTok counts its
+                    own — ranking those against each other put Facebook in
+                    every slot and TikTok in none, which reads as "TikTok is
+                    not working" when TikTok is doing fine. */}
+                <div className="space-y-5">
+                  {social.organicByPlatform.map((group) => (
+                    <div key={group.platform}>
+                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-400">
+                        {PLATFORM_LABEL[group.platform] ?? group.platform}
+                      </h3>
+                      <ul className="divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
+                        {group.posts.map((p) => (
+                          <PostRow key={p.id} post={p} />
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-neutral-400">
+                  Ranked within each platform, not against each other — Facebook, Instagram and
+                  TikTok each count a &ldquo;view&rdquo; differently, so a single league table
+                  would rank the counting method rather than the post.
+                </p>
+              </>
             )}
           </Card>
 
