@@ -91,6 +91,15 @@ export function BridgeControls({ dryRun }: { dryRun: boolean }) {
         },
         { tone: 'ok', text: `${s.sent} sent · ${s.skipped} skipped · ${s.failed} failed` },
         { tone: 'ok', text: `${s.daysRolledUp} day(s) rolled into the sales report` },
+        ...(s.channel
+          ? [
+              {
+                tone:
+                  s.channel.seenOnline === s.channel.ledgerOnline ? ('ok' as const) : ('bad' as const),
+                text: `Channel: saw ${s.channel.seenOnline} online, ${s.channel.seenInStore} in store — ledger holds ${s.channel.ledgerOnline} online for those days`,
+              },
+            ]
+          : []),
         ...(s.notes ?? []).map((n) => ({ tone: 'bad' as const, text: `Possible truncation — ${n}` })),
         ...(s.dryRun ? [{ tone: 'warn' as const, text: 'Dry run — nothing was sent to Meta.' }] : []),
       ])

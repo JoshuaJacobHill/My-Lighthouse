@@ -8,10 +8,11 @@ import {
   getExposure,
   getDailyTrend,
   type Period,
-  type TopPost,
 } from '@/lib/business-reports'
 import { SalesVsViews, type Grain } from './SalesVsViews'
 import { FeedRefresh } from './FeedRefresh'
+import { PostRow } from './PostRow'
+import { TopOrganic } from './TopOrganic'
 import type { FeedName } from '@/lib/actions/feeds.actions'
 import { PeriodTabs } from './PeriodTabs'
 
@@ -32,13 +33,6 @@ const CHANNEL_LABEL: Record<string, string> = {
   IN_STORE: 'In store',
   CLICK_AND_COLLECT: 'Click & collect',
   HOME_DELIVERY: 'Home delivery',
-}
-
-const PLATFORM_LABEL: Record<string, string> = {
-  FACEBOOK: 'Facebook',
-  INSTAGRAM: 'Instagram',
-  TIKTOK: 'TikTok',
-  MAILCHIMP: 'Mailchimp',
 }
 
 const money = (cents: number) =>
@@ -68,74 +62,6 @@ function Delta({ now, before }: { now: number; before: number }) {
   )
 }
 
-function PostRow({ post }: { post: TopPost }) {
-  return (
-    <li className="flex items-start gap-3 p-4">
-      {post.thumbnailUrl ? (
-        // A plain img on purpose: these are Meta CDN links that expire and
-        // rotate, so next/image would optimise and cache a URL that later dies.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={post.thumbnailUrl}
-          alt=""
-          loading="lazy"
-          className="h-14 w-14 shrink-0 rounded-xl object-cover"
-        />
-      ) : (
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-[10px] font-bold uppercase text-neutral-400">
-          {PLATFORM_LABEL[post.platform]?.slice(0, 2) ?? '—'}
-        </span>
-      )}
-      <span className="mt-0.5 rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-bold uppercase text-neutral-600">
-        {PLATFORM_LABEL[post.platform] ?? post.platform}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-sm text-neutral-900">
-          {post.caption?.trim() || <span className="text-neutral-400">No caption</span>}
-        </p>
-        {/* An email is measured differently from a post.
-            SocialPost.views holds emails_sent for a campaign — the size of the
-            list, not a measure of anyone seeing it — so leading with it as
-            "views" overstated every campaign by a factor of fifteen. Opens are
-            what reached somebody; sent is kept because opens over sent is the
-            open rate. */}
-        {post.platform === 'MAILCHIMP' ? (
-          <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
-            <span className="font-semibold text-neutral-700">
-              {num(post.engagements)} opened
-            </span>
-            <span>{num(post.views)} sent</span>
-            <span className="font-semibold text-neutral-700">
-              {post.engagementRate.toFixed(1)}% open rate
-            </span>
-            {post.clicks > 0 && <span>{num(post.clicks)} clicked</span>}
-            {post.audience && <span className="text-neutral-400">{post.audience}</span>}
-          </p>
-        ) : (
-          <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
-            <span>{num(post.views)} views</span>
-            <span>{num(post.engagements)} engaged</span>
-            <span className="font-semibold text-neutral-700">{post.engagementRate.toFixed(1)}%</span>
-            {post.spendCents > 0 && (
-              <span className="font-semibold text-neutral-700">{money(post.spendCents)} spent</span>
-            )}
-            {post.audience && <span className="text-neutral-400">{post.audience}</span>}
-          </p>
-        )}
-      </div>
-      {post.permalink && (
-        <a
-          href={post.permalink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 text-xs font-semibold text-orange-600 hover:underline"
-        >
-          Open
-        </a>
-      )}
-    </li>
-  )
-}
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -305,32 +231,7 @@ export default async function BusinessReportPage({
                 Nothing organic in this period.
               </p>
             ) : (
-              <>
-                {/* Per platform, not one ranked list. Facebook counts media
-                    views, Instagram counts total views and TikTok counts its
-                    own — ranking those against each other put Facebook in
-                    every slot and TikTok in none, which reads as "TikTok is
-                    not working" when TikTok is doing fine. */}
-                <div className="space-y-5">
-                  {social.organicByPlatform.map((group) => (
-                    <div key={group.platform}>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-400">
-                        {PLATFORM_LABEL[group.platform] ?? group.platform}
-                      </h3>
-                      <ul className="divide-y divide-neutral-100 rounded-[28px] border border-neutral-200">
-                        {group.posts.map((p) => (
-                          <PostRow key={p.id} post={p} />
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs leading-relaxed text-neutral-400">
-                  Ranked within each platform, not against each other — Facebook, Instagram and
-                  TikTok each count a &ldquo;view&rdquo; differently, so a single league table
-                  would rank the counting method rather than the post.
-                </p>
-              </>
+              <TopOrganic groups={social.organicByPlatform} />
             )}
           </Card>
 

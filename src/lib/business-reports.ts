@@ -327,7 +327,10 @@ export async function getTopSocial(
         .filter((p) => p.platform === platform)
         .map((p) => shape(p))
         .sort(byViews)
-        .slice(0, take),
+        // Deeper than `take`: the list is filterable now, and picking a
+        // platform should show more of it than the mixed view does. The
+        // combined view trims to a few per platform in the browser.
+        .slice(0, Math.max(take, 10)),
     }))
     // Busiest platform first, by total reach within the period.
     .sort(

@@ -691,6 +691,15 @@ export type RunSummary = {
   skipped: number
   failed: number
   daysRolledUp: number
+  /**
+   * How the run classified each sale's channel, and how the ledger ended up.
+   *
+   * Added because the two disagreed: the labelling probe saw 59 online sales
+   * in a day and the ledger held one. Counting both sides of the same run is
+   * the only way to tell a detection fault from a persistence fault, and the
+   * database cannot answer it alone because the raw signals are not stored.
+   */
+  channel?: { seenOnline: number; seenInStore: number; ledgerOnline: number }
   /** Set when EMC's row cap could not be worked around — sales may be missing. */
   notes?: string[]
   dryRun: boolean
@@ -757,6 +766,9 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
   let daysRolledUp = 0
   let detailBudget = settings.detailBudget
   let deferred = 0
+  let seenOnline = 0
+  let seenInStore = 0
+  let ledgerOnline = 0
   const notes: string[] = []
 
   try {
@@ -776,6 +788,8 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
 
       for (const header of headers) {
         inspected++
+        if (isExternalSale(header)) seenOnline++
+        else seenInStore++
         try {
           const outcome = await processSale(header, cfg, store, capi, settings, {
             skipDetail: detailBudget <= 0,
@@ -811,6 +825,11 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
 
       const dayValues = [...days].map((d) => calendarDay(d)).filter((d): d is Date => d !== null)
       daysRolledUp += await rollUpSalesFacts(store, dayValues)
+
+      // What actually landed, for the same days, so the two can be compared.
+      ledgerOnline += await prisma.gapSale.count({
+        where: { day: { in: dayValues }, storeID: store.id, isExternal: true },
+      })
     }
 
     await prisma.ingestRun.update({
@@ -830,6 +849,7 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
       skipped,
       failed,
       daysRolledUp,
+      channel: { seenOnline, seenInStore, ledgerOnline },
       ...(deferred > 0
         ? {
             notes: [
