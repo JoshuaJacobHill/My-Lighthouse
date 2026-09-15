@@ -14,24 +14,45 @@ const P = 'margin:0 0 16px 0;line-height:1.7;color:#374151;font-size:15px;'
 
 // ─── GET /api/cron/task-reminders ─────────────────────────────────────────────
 //
-// Runs once a day at 5pm Brisbane (Hobby plan allows daily crons only). Chases
-// anything past its hard deadline: overdue assigned tasks go to the person they
-// belong to, overdue checklist items go to every staff member. Fails CLOSED
-// (valid CRON_SECRET, or an admin session for a manual run).
+// Runs once a day at 5pm Brisbane (Hobby plan allows daily crons only).
+//
+// Two different jobs with deliberately different reach:
+//
+//   Assigned tasks  — daily, to the one person the task belongs to.
+//   Checklist       — Thursdays only, a summary, to admins.
+//
+// The checklist half used to go to every staff member, every day, listing
+// every overdue item — which with 289 items in the template is a wall of text
+// nobody can act on and everybody learns to delete. A backlog is a management
+// question, not a to-do list, so it is now a count on one day of the week.
+//
+// Fails CLOSED (valid CRON_SECRET, or an admin session for a manual run).
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   const hasValidSecret = Boolean(cronSecret) && authHeader === `Bearer ${cronSecret}`
+  let byHand = false
   if (!hasValidSecret) {
     const session = await getSession()
     const isAdmin = isAdminRole(session?.role)
     if (!isAdmin) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    byHand = true
   }
+
+  /**
+   * `?checklist=now` runs the weekly summary on any day.
+   *
+   * For an admin checking what the email looks like without waiting for
+   * Thursday. Deliberately not available to the cron token: a leaked token
+   * should not be able to send staff email seven days a week.
+   */
+  const forceChecklist = byHand && request.nextUrl.searchParams.get('checklist') === 'now'
 
   const now = new Date()
   const dayAgo = new Date(now.getTime() - 20 * 60 * 60 * 1000)
   let taskEmails = 0
   let checklistEmails = 0
+  let outstandingChecklistItems = 0
 
   try {
     // ── Overdue assigned tasks — nag the assignee, at most once a day ──
@@ -96,66 +117,97 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Overdue recurring checklist items — tell the staff team ──
-    const items = await prisma.checklistItem.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        title: true,
-        frequency: true,
-        dueTime: true,
-        weekday: true,
-        dayOfMonth: true,
-        location: { select: { name: true } },
-      },
-    })
+    // ── Overdue recurring checklist items — a weekly summary for admins ──
+    //
+    // Thursday only. A daily nag about a standing backlog is noise: the same
+    // items are outstanding on Wednesday as on Tuesday, and an email that
+    // repeats itself every evening stops being read within a week. Thursday
+    // leaves Friday and Saturday to act on it before the trading week closes.
+    const brisbaneWeekday = new Date(`${brisbaneToday(now)}T00:00:00.000Z`).getUTCDay()
+    const THURSDAY = 4
+    const checklistDay = brisbaneWeekday === THURSDAY || forceChecklist
 
-    const stillOpen: { title: string; where: string | null; freq: string }[] = []
-    for (const i of items) {
-      if (!isOverdue(i, now)) continue
-      const done = await prisma.checklistCompletion.findUnique({
-        where: { itemId_periodKey: { itemId: i.id, periodKey: periodKey(i.frequency, now) } },
-        select: { id: true },
+    if (checklistDay) {
+      const items = await prisma.checklistItem.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          frequency: true,
+          dueTime: true,
+          weekday: true,
+          dayOfMonth: true,
+          location: { select: { name: true } },
+        },
       })
-      if (!done) stillOpen.push({ title: i.title, where: i.location?.name ?? null, freq: i.frequency })
-    }
 
-    if (stillOpen.length > 0) {
-      const staff = await prisma.user.findMany({
-        where: { isStaff: true, isActive: true, email: { not: '' } },
-        select: { email: true, name: true },
-      })
-      const list = stillOpen
-        .map(
-          (s) =>
-            `<li style="margin-bottom:6px;">${s.title}<span style="color:#9ca3af;"> — ${s.freq.toLowerCase()}${s.where ? `, ${s.where}` : ''}</span></li>`
-        )
-        .join('')
+      const byFrequency = new Map<string, number>()
+      const byLocation = new Map<string, number>()
+      let total = 0
 
-      for (const person of staff) {
-        const firstName = person.name?.trim().split(/\s+/)[0] || 'team'
-        try {
-          await sendEmail({
-            to: person.email,
-            subject: `${stillOpen.length} checklist item${stillOpen.length === 1 ? '' : 's'} still outstanding`,
-            html: wrapEmailHtml(
-              `
-              <p style="${P}">Hi ${firstName},</p>
-              <p style="${P}">${stillOpen.length === 1 ? 'This is' : 'These are'} past the deadline and not ticked off yet:</p>
-              <ul style="margin:0 0 18px 0;padding-left:20px;color:#374151;font-size:15px;">${list}</ul>
-              <p style="${P}">If someone has already done it, just tick it off so the team knows.</p>
-              <p style="margin:22px 0;"><a href="${APP_URL}/dashboard/tasks" style="background:#f97316;color:#fff;padding:13px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;font-size:14px;">Open the checklist &rarr;</a></p>
-              <p style="${P};margin-bottom:0;">Thanks,<br>The Lighthouse Care team</p>
-            `,
-              APP_URL
-            ),
-            text: `Hi ${firstName},\n\nPast deadline and not ticked off:\n${stillOpen
-              .map((s) => `- ${s.title} (${s.freq.toLowerCase()}${s.where ? `, ${s.where}` : ''})`)
-              .join('\n')}\n\nOpen the checklist: ${APP_URL}/dashboard/tasks`,
-          })
-          checklistEmails++
-        } catch (err) {
-          console.error('[task-reminders] checklist email failed', err)
+      for (const i of items) {
+        if (!isOverdue(i, now)) continue
+        const done = await prisma.checklistCompletion.findUnique({
+          where: { itemId_periodKey: { itemId: i.id, periodKey: periodKey(i.frequency, now) } },
+          select: { id: true },
+        })
+        if (done) continue
+        total++
+        outstandingChecklistItems++
+        byFrequency.set(i.frequency, (byFrequency.get(i.frequency) ?? 0) + 1)
+        const where = i.location?.name ?? 'Everywhere'
+        byLocation.set(where, (byLocation.get(where) ?? 0) + 1)
+      }
+
+      if (total > 0) {
+        /**
+         * Admins, not all staff.
+         *
+         * Checklist items carry a location and an area but never a person, so
+         * there is no assignee to send this to — the closest honest audience
+         * is whoever would chase a backlog. Giving items an owner would let
+         * this be personal, and would be a schema change plus somewhere to
+         * set it.
+         */
+        const everyone = await prisma.user.findMany({
+          where: { isStaff: true, isActive: true, email: { not: '' } },
+          select: { email: true, name: true, role: true },
+        })
+        const recipients = everyone.filter((u) => isAdminRole(u.role))
+
+        const order = ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY']
+        const freqLine = order
+          .filter((f) => byFrequency.has(f))
+          .map((f) => `${byFrequency.get(f)} ${f.toLowerCase()}`)
+          .join(', ')
+
+        const placeLine = [...byLocation.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([place, n]) => `${place}: ${n}`)
+          .join(' · ')
+
+        for (const person of recipients) {
+          const firstName = person.name?.trim().split(/\s+/)[0] || 'team'
+          try {
+            await sendEmail({
+              to: person.email,
+              subject: `${total} checklist item${total === 1 ? '' : 's'} outstanding`,
+              html: wrapEmailHtml(
+                `
+                <p style="${P}">Hi ${firstName},</p>
+                <p style="${P}"><strong style="font-size:22px;color:#111827;">${total}</strong> checklist item${total === 1 ? '' : 's'} ${total === 1 ? 'is' : 'are'} past the deadline and not ticked off.</p>
+                <p style="${P}">${freqLine}.</p>
+                <p style="${P};color:#6b7280;font-size:14px;">${placeLine}</p>
+                <p style="margin:22px 0;"><a href="${APP_URL}/dashboard/tasks" style="background:#f97316;color:#fff;padding:13px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;font-size:14px;">Open the checklist &rarr;</a></p>
+                <p style="${P};margin-bottom:0;">Thanks,<br>The Lighthouse Care team</p>
+              `,
+                APP_URL
+              ),
+              text: `Hi ${firstName},\n\n${total} checklist item${total === 1 ? '' : 's'} past the deadline and not ticked off.\n${freqLine}.\n${placeLine}\n\nOpen the checklist: ${APP_URL}/dashboard/tasks`,
+            })
+            checklistEmails++
+          } catch (err) {
+            console.error('[task-reminders] checklist email failed', err)
+          }
         }
       }
     }
@@ -173,7 +225,10 @@ export async function GET(request: NextRequest) {
       clearedCheers,
       overdueTasks: overdueTasks.length,
       taskEmails,
-      outstandingChecklistItems: stillOpen.length,
+      // Says whether it looked, so a Tuesday run does not read as "nothing
+      // outstanding" when it simply is not checklist day.
+      checklistChecked: brisbaneWeekday === THURSDAY || forceChecklist,
+      outstandingChecklistItems,
       checklistEmails,
     })
   } catch (err) {
