@@ -119,22 +119,26 @@ export default async function BusinessReportPage({
         <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
           Sales &amp; marketing
         </h1>
-        <p className="mt-2 text-neutral-500">{sales.range.label}</p>
-
-        <div className="mt-6">
-          <PeriodTabs active={period} />
-        </div>
-
         {/* Did takings and reach move together? The question the two halves of
             this page exist to answer, and which no single figure can — so it
-            leads rather than trailing the detail it summarises. */}
-        <div className="mt-8 rounded-[28px] border border-neutral-200 p-5">
+            leads rather than trailing the detail it summarises.
+            
+            Above the period tabs, deliberately: it carries its own
+            Days/Weeks/Months control and the tabs do not affect it. Sitting
+            underneath them implied a relationship that was not there. */}
+        <div className="mt-7 rounded-[28px] border border-neutral-200 p-5">
           <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
             Sales and views
           </h2>
           <div className="mt-4">
             <SalesVsViews daily={trend} defaultGrain={openingGrain} />
           </div>
+        </div>
+
+        {/* Everything below here does follow the tabs, so they sit with it. */}
+        <div className="mt-10">
+          <PeriodTabs active={period} />
+          <p className="mt-3 text-neutral-500">{sales.range.label}</p>
         </div>
 
         {/* Headline */}

@@ -45,9 +45,24 @@ function bneDate(y: number, m: number, d: number): Date {
   return new Date(Date.UTC(y, m - 1, d))
 }
 
-function fmtRange(from: Date, to: Date, period: Period): string {
+/**
+ * @param partial True when the range stops short of the whole period.
+ *
+ * A clamped comparison window must not be labelled "August 2026" when it is
+ * really the first sixteen days of it — that is the same distortion the
+ * clamping exists to remove, moved from the number into the caption.
+ */
+function fmtRange(from: Date, to: Date, period: Period, partial = false): string {
   const d = (x: Date) =>
     new Intl.DateTimeFormat('en-AU', { timeZone: 'UTC', day: 'numeric', month: 'short' }).format(x)
+
+  if (partial) {
+    // Spell out the actual days, and the year when it is not this one.
+    const sameYear = from.getUTCFullYear() === new Date().getUTCFullYear()
+    const year = sameYear ? '' : ` ${from.getUTCFullYear()}`
+    return from.getTime() === to.getTime() ? `${d(from)}${year}` : `${d(from)} – ${d(to)}${year}`
+  }
+
   if (period === 'day') {
     return new Intl.DateTimeFormat('en-AU', {
       timeZone: 'UTC',
@@ -95,9 +110,39 @@ export function periodRange(period: Period, now = new Date()): { current: Range;
     prevTo = bneDate(y - 1, 12, 31)
   }
 
+  /**
+   * Compare like with like: the same elapsed portion, not the whole period.
+   *
+   * On a Wednesday, two days of this week were being set against seven days of
+   * last week and reported as "-74%". That is not a fall in trade, it is a
+   * fall in how much of the week has happened — and it made every figure on
+   * the page read as a catastrophe every Monday and a triumph every Sunday.
+   *
+   * So the previous window is shortened to however far through the current one
+   * we are. Only ever shortened: a month following a shorter month would
+   * otherwise reach past its own end, and February would flatter January.
+   *
+   * Left alone for `day`, where it cannot be fixed here — comparing this
+   * morning with all of yesterday needs figures by hour, and SalesFact holds
+   * one row per day.
+   */
+  let previousIsPartial = false
+  if (period !== 'day') {
+    const elapsed = Math.max(0, Math.round((today.getTime() - from.getTime()) / 86_400_000))
+    const matched = new Date(prevFrom.getTime() + elapsed * 86_400_000)
+    if (matched.getTime() < prevTo.getTime()) {
+      prevTo = matched
+      previousIsPartial = true
+    }
+  }
+
   return {
     current: { from, to, label: fmtRange(from, to, period) },
-    previous: { from: prevFrom, to: prevTo, label: fmtRange(prevFrom, prevTo, period) },
+    previous: {
+      from: prevFrom,
+      to: prevTo,
+      label: fmtRange(prevFrom, prevTo, period, previousIsPartial),
+    },
   }
 }
 
