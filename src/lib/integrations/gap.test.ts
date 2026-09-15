@@ -5,6 +5,7 @@ import {
   gapStores,
   getAllStoreSales,
   isExternalSale,
+  saleIdentity,
   TAKE,
   createToken,
   getSaleDetail,
@@ -349,5 +350,32 @@ describe('telling a web order from a counter sale', () => {
 
   it('trusts the flag over the lane when they disagree', () => {
     expect(isExternalSale({ externalSale: 0, machineName: null })).toBe(false)
+  })
+})
+
+describe('identifying a sale', () => {
+  it('uses the identifier EMC gives when there is one', () => {
+    expect(saleIdentity({ saleIdentifier: '0010425360034', saleHeaderID: 396613 }))
+      .toBe('0010425360034')
+  })
+
+  it('falls back to the row id for a web order, which has none', () => {
+    // The bug this exists for: web orders arrive with saleIdentifier empty,
+    // so all of them upserted onto one blank-keyed row and overwrote each
+    // other. Fifty-eight orders in a day became a single row.
+    expect(saleIdentity({ saleIdentifier: '', saleHeaderID: 396605 })).toBe('emc-396605')
+    expect(saleIdentity({ saleHeaderID: 396605 })).toBe('emc-396605')
+    expect(saleIdentity({ saleIdentifier: '   ', saleHeaderID: 396605 })).toBe('emc-396605')
+  })
+
+  it('gives the same sale the same identity every time', () => {
+    // It is also the Meta event_id: an identity that changed between runs
+    // would have Meta count one purchase twice.
+    const header = { saleIdentifier: '', saleHeaderID: 12345 }
+    expect(saleIdentity(header)).toBe(saleIdentity(header))
+  })
+
+  it('cannot be mistaken for one the POS issued', () => {
+    expect(saleIdentity({ saleIdentifier: '', saleHeaderID: 1 })).toMatch(/^emc-/)
   })
 })

@@ -123,7 +123,15 @@ export class GapError extends Error {
 
 export type GapSaleHeader = {
   saleHeaderID: number
-  saleIdentifier: string
+  /**
+   * Optional, because web orders arrive without one.
+   *
+   * It was declared as always present, which is what let the collapse happen
+   * quietly: the type promised an identity every sale had, the data did not
+   * supply it, and an empty string is a perfectly good unique key until the
+   * second row wants it too. Use `saleIdentity()` rather than this directly.
+   */
+  saleIdentifier?: string
   storeID: number
   tranType: number
   itemCount?: number
@@ -175,6 +183,29 @@ export const EMPTY_GUID = '00000000-0000-0000-0000-000000000000'
  * two. Tolerates a boolean as well as 0/1 because the tenant returns numbers
  * and nothing documents that it always will.
  */
+/**
+ * A stable identity for a sale, even when EMC gives it none.
+ *
+ * Web orders arrive with `saleIdentifier` empty. That is not cosmetic: the
+ * identifier is this bridge's unique key, so every web order upserted onto the
+ * same blank-keyed row and overwrote the last one. Fifty-eight orders in a day
+ * became a single row holding whichever arrived most recently, and the online
+ * column of the sales report showed one sale.
+ *
+ * `saleHeaderID` is EMC's own primary key — present on every sale, stable, and
+ * already unique in our table — so it is the natural fallback. Prefixed rather
+ * than used bare so nobody later mistakes a synthesised identity for one the
+ * POS issued.
+ *
+ * It also becomes the Meta `event_id`, which is why stability matters more
+ * than prettiness: the same sale must produce the same id on every run or Meta
+ * counts the purchase twice.
+ */
+export function saleIdentity(header: Pick<GapSaleHeader, 'saleIdentifier' | 'saleHeaderID'>): string {
+  const given = header.saleIdentifier?.trim()
+  return given || `emc-${header.saleHeaderID}`
+}
+
 export function isExternalSale(header: Pick<GapSaleHeader, 'externalSale' | 'machineName'>): boolean {
   const flag = header.externalSale
   if (flag === true || flag === 1) return true

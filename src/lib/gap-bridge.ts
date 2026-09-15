@@ -38,6 +38,7 @@ import {
   getAllStoreSales,
   getSaleDetail,
   isExternalSale,
+  saleIdentity,
   hasRealCustomer,
   saleInstant,
   probeEndpoint,
@@ -262,6 +263,8 @@ export async function processSale(
   },
 ): Promise<SaleOutcome> {
   const valueAud = centsToAmount(header.totalAmount)
+  // Web orders carry no saleIdentifier; fall back to EMC's own row id.
+  const identity = saleIdentity(header)
   const instant = saleInstant(header)
   const at = instant?.at ?? new Date()
   const dayString = brisbaneToday(at)
@@ -269,7 +272,7 @@ export async function processSale(
 
   const base = {
     saleHeaderID: header.saleHeaderID,
-    saleIdentifier: header.saleIdentifier,
+    saleIdentifier: identity,
     storeID: header.storeID,
     tranType: header.tranType,
     itemCount: header.itemCount ?? null,
@@ -282,7 +285,7 @@ export async function processSale(
   }
 
   const existing = await prisma.gapSale.findUnique({
-    where: { saleIdentifier: header.saleIdentifier },
+    where: { saleIdentifier: identity },
     select: { status: true, attemptCount: true, isExternal: true, machineName: true },
   })
 
@@ -293,11 +296,11 @@ export async function processSale(
     // of needing a backfill.
     if (existing!.isExternal !== base.isExternal || existing!.machineName !== base.machineName) {
       await prisma.gapSale.update({
-        where: { saleIdentifier: header.saleIdentifier },
+        where: { saleIdentifier: identity },
         data: { isExternal: base.isExternal, machineName: base.machineName },
       })
     }
-    return { saleIdentifier: header.saleIdentifier, status: existing!.status, reason: 'already_settled', valueAud }
+    return { saleIdentifier: identity, status: existing!.status, reason: 'already_settled', valueAud }
   }
 
   // Anything that is not a normal completed sale is recorded and left alone.
@@ -307,7 +310,7 @@ export async function processSale(
     await upsert(base, GapSaleStatus.SKIPPED_TRAN_TYPE, { hasCustomer: false })
     const reason = header.storeID !== store.id ? 'other_store' : `tran_type_${header.tranType}`
     log({ event: 'skipped', ...ids(header), reason, status: 'SKIPPED_TRAN_TYPE' })
-    return { saleIdentifier: header.saleIdentifier, status: GapSaleStatus.SKIPPED_TRAN_TYPE, reason, valueAud }
+    return { saleIdentifier: identity, status: GapSaleStatus.SKIPPED_TRAN_TYPE, reason, valueAud }
   }
 
   // Too old for Meta to accept, so the customer is not worth fetching. The
@@ -317,7 +320,7 @@ export async function processSale(
   if (ageDays > settings.maxEventAgeDays) {
     await upsert(base, GapSaleStatus.SKIPPED_TOO_OLD, { hasCustomer: false })
     return {
-      saleIdentifier: header.saleIdentifier,
+      saleIdentifier: identity,
       status: GapSaleStatus.SKIPPED_TOO_OLD,
       reason: `${Math.floor(ageDays)} days old`,
       valueAud,
@@ -328,7 +331,7 @@ export async function processSale(
   if (opts?.skipDetail) {
     await upsert(base, GapSaleStatus.PENDING, { hasCustomer: false })
     return {
-      saleIdentifier: header.saleIdentifier,
+      saleIdentifier: identity,
       status: GapSaleStatus.PENDING,
       reason: 'detail_budget_spent',
       valueAud,
@@ -343,7 +346,7 @@ export async function processSale(
     await upsert(base, GapSaleStatus.SKIPPED_NO_CUSTOMER, { hasCustomer: false })
     log({ event: 'skipped', ...ids(header), reason: 'no_matchable_customer', status: 'SKIPPED_NO_CUSTOMER' })
     return {
-      saleIdentifier: header.saleIdentifier,
+      saleIdentifier: identity,
       status: GapSaleStatus.SKIPPED_NO_CUSTOMER,
       reason: 'no_matchable_customer',
       valueAud,
@@ -356,7 +359,7 @@ export async function processSale(
     await upsert(base, GapSaleStatus.SKIPPED_NO_CUSTOMER, { hasCustomer: true })
     log({ event: 'skipped', ...ids(header), reason: 'no_usable_identifiers', status: 'SKIPPED_NO_CUSTOMER' })
     return {
-      saleIdentifier: header.saleIdentifier,
+      saleIdentifier: identity,
       status: GapSaleStatus.SKIPPED_NO_CUSTOMER,
       reason: 'no_usable_identifiers',
       valueAud,
@@ -369,7 +372,7 @@ export async function processSale(
     await upsert(base, GapSaleStatus.SKIPPED_IDENTIFIERS_OFF, { hasCustomer: true })
     log({ event: 'skipped', ...ids(header), reason: 'identifiers_disabled', matchKeys, status: 'SKIPPED_IDENTIFIERS_OFF' })
     return {
-      saleIdentifier: header.saleIdentifier,
+      saleIdentifier: identity,
       status: GapSaleStatus.SKIPPED_IDENTIFIERS_OFF,
       reason: 'identifiers_disabled',
       matchKeys,
@@ -380,7 +383,7 @@ export async function processSale(
   // Reached only when forcing, and the one thing forcing must never do.
   if (existing?.status === GapSaleStatus.SENT) {
     return {
-      saleIdentifier: header.saleIdentifier,
+      saleIdentifier: identity,
       status: GapSaleStatus.SENT,
       reason: 'already_sent — not sent again',
       matchKeys,
@@ -390,12 +393,12 @@ export async function processSale(
 
   if (!capi) {
     await upsert(base, GapSaleStatus.PENDING, { hasCustomer: true })
-    return { saleIdentifier: header.saleIdentifier, status: GapSaleStatus.PENDING, reason: 'meta_not_configured', valueAud }
+    return { saleIdentifier: identity, status: GapSaleStatus.PENDING, reason: 'meta_not_configured', valueAud }
   }
 
   const payload = buildPurchasePayload(
     {
-      saleIdentifier: header.saleIdentifier,
+      saleIdentifier: identity,
       occurredAt: at,
       totalCents: header.totalAmount,
       userData: user,
@@ -414,7 +417,7 @@ export async function processSale(
       matchKeys,
       dryRun: true,
     })
-    return { saleIdentifier: header.saleIdentifier, status: GapSaleStatus.PENDING, reason: 'dry_run', matchKeys, valueAud }
+    return { saleIdentifier: identity, status: GapSaleStatus.PENDING, reason: 'dry_run', matchKeys, valueAud }
   }
 
   const result = await sendEvents(payload, capi)
@@ -430,7 +433,7 @@ export async function processSale(
       eventsReceived: result.eventsReceived,
       fbtraceId: result.fbtraceId,
     })
-    return { saleIdentifier: header.saleIdentifier, status: GapSaleStatus.SENT, matchKeys, valueAud }
+    return { saleIdentifier: identity, status: GapSaleStatus.SENT, matchKeys, valueAud }
   }
 
   await upsert(base, GapSaleStatus.FAILED, {
@@ -447,7 +450,7 @@ export async function processSale(
     fbtraceId: result.fbtraceId,
     reason: result.error,
   })
-  return { saleIdentifier: header.saleIdentifier, status: GapSaleStatus.FAILED, reason: result.error, matchKeys, valueAud }
+  return { saleIdentifier: identity, status: GapSaleStatus.FAILED, reason: result.error, matchKeys, valueAud }
 }
 
 function ids(h: GapSaleHeader) {
@@ -754,6 +757,17 @@ export async function runOnce(opts?: { lookbackMinutes?: number }): Promise<RunS
     return { ...empty, skippedRun: 'already_running' }
   }
 
+  /**
+   * Remove the blank-keyed row web orders used to collapse onto.
+   *
+   * Before web orders had an identity, every one of them upserted onto a
+   * single row keyed on an empty string. That row holds whichever order
+   * arrived last and would otherwise sit in the report forever as one phantom
+   * online sale, now that real rows exist alongside it. Self-healing rather
+   * than a manual delete, because it must not be forgotten.
+   */
+  await prisma.gapSale.deleteMany({ where: { saleIdentifier: '' } })
+
   const run = await prisma.ingestRun.create({ data: { source: RUN_SOURCE } })
 
   const lookback = opts?.lookbackMinutes ?? settings.lookbackMinutes
@@ -915,10 +929,6 @@ export async function processOneSale(saleHeaderID: number): Promise<
       totalAmount: Number(detail.totalAmount ?? 0),
       created: typeof detail.created === 'string' ? detail.created : undefined,
       createdLocal: typeof detail.createdLocal === 'string' ? detail.createdLocal : undefined,
-    }
-
-    if (!header.saleIdentifier) {
-      return { ok: false, error: 'That sale has no saleIdentifier, so it cannot be deduplicated safely.' }
     }
 
     // Match the sale to a configured store rather than assuming the first one,
