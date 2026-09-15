@@ -109,8 +109,8 @@ enum UserRole {
 }
 
 model User {
-  id                     String    @id @default(cuid())
-  email                  String    @unique
+  id                     String      @id @default(cuid())
+  email                  String      @unique
   emailVerified          DateTime?
   passwordHash           String?
   name                   String?
@@ -118,21 +118,24 @@ model User {
   // volunteering). Set explicitly on their profile, or inferred from giving /
   // corporate volunteer history.
   company                String?
-  role                   UserRole  @default(VOLUNTEER)
-  isActive               Boolean   @default(true)
+  role                   UserRole    @default(VOLUNTEER)
+  isActive               Boolean     @default(true)
   // Admin permission: may see donations, donors, funds, fundraisers & events
   // (the money/PII side). SUPER_ADMIN always can; grant to specific ADMINs.
-  canViewDonations       Boolean   @default(false)
+  canViewDonations       Boolean     @default(false)
   /// Sees the sales and marketing report. Switched on per person, like
   /// canViewDonations, because store revenue and ad spend are not something
   /// every admin needs to see.
-  canViewBusinessReports Boolean   @default(false)
+  canViewBusinessReports Boolean     @default(false)
+  orgMemberships         OrgMember[]
+  orgPosts               OrgPost[]   @relation("OrgPostAuthor")
+
   /// Retired. Held when and whether someone was sent the September 2026
   /// fair-play notice; nothing reads them now the warnings have come down.
   /// Kept because the production schema is additive-only, and because the
   /// record of a message of that kind should not quietly disappear.
-  fairPlayNoticeAt       DateTime?
-  fairPlayNoticeAckAt    DateTime?
+  fairPlayNoticeAt    DateTime?
+  fairPlayNoticeAckAt DateTime?
 
   /// Notification preferences. Booleans on the user rather than a separate
   /// table: there are a handful of them, they are read on every send, and a
@@ -893,6 +896,228 @@ model Fundraiser {
 
   @@index([fundId])
   @@index([isActive])
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CORPORATE PARTNERS
+//
+// A public profile per supporting organisation, which their own people can
+// keep up to date. The point is recognition that lasts: a company that ran a
+// toy drive in 2025 and a golf day in 2026 should have both visible years
+// later, and their staff should see their own volunteering day appear on it.
+//
+// Additive. Nothing below is referenced by the volunteer portal, the kiosk or
+// the checklist, and nothing existing changes.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Where an organisation is in its life.
+///
+/// One model rather than a separate "application" table. An application is
+/// simply an organisation nobody has approved yet — giving it its own table
+/// would duplicate every field and then need copying across on approval,
+/// which is how the name on the application and the name on the page end up
+/// different.
+enum OrgStatus {
+  /// Somebody applied. Not visible anywhere public.
+  PENDING
+  /// Approved by us.
+  ACTIVE
+  /// Declined. Kept rather than deleted so the same company reapplying is
+  /// recognisable, and so a decision has a record.
+  DECLINED
+}
+
+/// Whether a person's place in an organisation is settled.
+enum OrgMemberStatus {
+  /// Asked to join, waiting on their admin or on us.
+  PENDING
+  ACTIVE
+}
+
+/// What someone can do within one organisation.
+///
+/// Deliberately not a global role. Every permission in this app so far has
+/// been organisation-wide — you are staff, or you can see reports — and this
+/// is the first that is scoped to a single row: Amy administers Fulton Hogan
+/// and nothing else. A global "partner admin" role would hand whoever held it
+/// every company's profile at once.
+enum OrgMemberRole {
+  /// The person who applied, and anyone they hand it to.
+  ///
+  /// Edits the name, logo, website and blurb; adds and removes colleagues;
+  /// posts. Cannot award badges — those are ours.
+  ADMIN
+  /// A colleague an admin added.
+  ///
+  /// Posts about a volunteering day, and appears on the team. Nothing else:
+  /// not the profile, not the team list, not the badges. The company's page
+  /// should not change because someone on a working bee had a spare minute.
+  MEMBER
+}
+
+/// Why an organisation is being recognised, so a badge can be read at a glance.
+enum OrgRecognitionKind {
+  /// A standing relationship, e.g. Lighthouse Foundation Partner.
+  PARTNER
+  /// Backed a specific event, e.g. Good Food Festival gold sponsor.
+  SPONSOR
+  /// Supported a campaign, e.g. the 2025 Christmas appeal toy drive.
+  APPEAL
+  /// Ran something themselves on our behalf, e.g. a golf day.
+  FUNDRAISER
+  /// Brought a team to volunteer.
+  VOLUNTEERING
+}
+
+/// A supporting company, club or school.
+model Organisation {
+  id   String @id @default(cuid())
+  name String
+  /// Public URL: /partners/fulton-hogan
+  slug String @unique
+
+  logoUrl String?
+  website String?
+  about   String? @db.Text
+
+  /// Who we deal with. NOT shown publicly — a public page naming a person and
+  /// their direct line is a page that invites unsolicited contact.
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+
+  /// The company's email domain, e.g. "fultonhogan.com".
+  ///
+  /// Unique on purpose. It is what stops the second person from a company
+  /// creating a duplicate profile: an application from an address at a domain
+  /// we already hold becomes a request to join that organisation instead of a
+  /// new one.
+  ///
+  /// Null where there is no domain to go on — a free provider, or a company
+  /// whose people use an address that does not match the trading name. Those
+  /// applications still arrive; they simply come with `requestNote` instead of
+  /// evidence, and somebody here reads them. Refusing them outright would shut
+  /// out every small business running on Gmail, which is a great many of the
+  /// people who support us.
+  emailDomain String? @unique
+
+  status OrgStatus @default(PENDING)
+
+  /// Who asked for the page, and who here decided.
+  requestedById String?
+  /// What the applicant told us about themselves.
+  ///
+  /// Carries the weight when there is no domain match: who they are, what the
+  /// company is, why they should have the page. The only evidence we have in
+  /// that case, so there has to be somewhere to write it.
+  requestNote   String?   @db.Text
+  reviewedById  String?
+  reviewedAt    DateTime?
+  /// Why it was declined, so the applicant can be told something useful.
+  reviewNote    String?   @db.Text
+
+  /// Approved is not the same as ready. A profile can be ACTIVE while its
+  /// owner is still writing the blurb, and should not be public until they
+  /// are done — a half-finished page about a real company is worse than none.
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      OrgMember[]
+  recognitions OrgRecognition[]
+  posts        OrgPost[]
+
+  @@index([isPublished])
+  @@index([status])
+}
+
+/// A person's place in an organisation.
+model OrgMember {
+  id             String          @id @default(cuid())
+  organisationId String
+  userId         String
+  role           OrgMemberRole   @default(MEMBER)
+  status         OrgMemberStatus @default(ACTIVE)
+  /// Their job title, e.g. "Community Engagement Manager".
+  ///
+  /// Asked for on the application because it is the one thing that makes a
+  /// stranger's request assessable — "Marketing Coordinator at Fulton Hogan"
+  /// is a claim we can weigh, and an empty form is not.
+  position       String?
+  /// Who added them — ours or theirs. Worth keeping when the question later is
+  /// "who gave this person access to that profile".
+  addedById      String?
+  createdAt      DateTime        @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, userId])
+  @@index([userId])
+}
+
+/// A badge: what they did, and when.
+///
+/// **Ours to write, never theirs.** A partner admin can change their logo,
+/// their blurb and their team; they cannot award themselves a badge. Every row
+/// here is a claim Lighthouse Care is making about what a company did, and a
+/// recognition anyone can grant themselves is worth nothing to the companies
+/// who earned one. The page's whole value rests on that.
+///
+/// One flexible row rather than a column per kind of support, because the list
+/// grows every year and a schema change per badge type would guarantee the
+/// history stops being kept. "2017 Gold Event Sponsor" and "Lighthouse
+/// Foundation Partner" are the same shape.
+model OrgRecognition {
+  id             String             @id @default(cuid())
+  organisationId String
+  kind           OrgRecognitionKind
+  /// The year it belongs to. Null for a standing relationship with no year.
+  year           Int?
+  /// e.g. "Gold", "Platinum". Null where a tier makes no sense.
+  tier           String?
+  /// What it was: "Good Food Festival", "Christmas Appeal toy drive".
+  label          String
+  detail         String?            @db.Text
+  /// Optional and private by default — some partners would rather the amount
+  /// were not on a public page, and it is not ours to publish by default.
+  amountCents    Int?
+  showAmount     Boolean            @default(false)
+  sortOrder      Int                @default(0)
+  createdAt      DateTime           @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId, year])
+}
+
+/// A photo and a few words from a volunteering day.
+model OrgPost {
+  id             String  @id @default(cuid())
+  organisationId String
+  authorId       String?
+
+  caption    String?   @db.Text
+  imageUrl   String?
+  happenedAt DateTime?
+
+  /// Held until someone here approves it.
+  ///
+  /// This lands on a public page carrying a real company's name, and the
+  /// people in the photograph are their staff. Publishing first and checking
+  /// later is the wrong way round for both reputations.
+  isApproved   Boolean   @default(false)
+  approvedAt   DateTime?
+  approvedById String?
+
+  createdAt DateTime @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  author       User?        @relation("OrgPostAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([organisationId, isApproved])
 }
 
 // ─── Event ticketing ──────────────────────────────────────────────────────────
@@ -1694,25 +1919,25 @@ model IngestRun {
 /// becomes an aggregation over the days in the month, matching how SalesFact
 /// already works.
 model AdDayStat {
-  id          String         @id @default(cuid())
-  platform    SocialPlatform
+  id                   String         @id @default(cuid())
+  platform             SocialPlatform
   /// The platform's ad id. Metadata for it lives on SocialPost.
-  externalId  String
-  day         DateTime       @db.Date
-  views       Int            @default(0)
-  reach       Int            @default(0)
-  clicks      Int            @default(0)
-  spendCents  Int            @default(0)
+  externalId           String
+  day                  DateTime       @db.Date
+  views                Int            @default(0)
+  reach                Int            @default(0)
+  clicks               Int            @default(0)
+  spendCents           Int            @default(0)
   /// Purchases Meta attributed to this ad on this day.
-  conversions Int            @default(0)
+  conversions          Int            @default(0)
   /// What those purchases were worth, in cents. ROAS is this over spend.
   ///
   /// Separate from `conversions` because a count answers "how many" and only
   /// the value answers "was it worth it" — ten $8 purchases and one $300 one
   /// are not the same result, and a charity's ad budget deserves the
   /// distinction.
-  conversionValueCents Int   @default(0)
-  fetchedAt   DateTime       @default(now())
+  conversionValueCents Int            @default(0)
+  fetchedAt            DateTime       @default(now())
 
   @@unique([platform, externalId, day])
   @@index([day])
