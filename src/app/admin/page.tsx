@@ -63,6 +63,7 @@ const AREA_LINKS: { capability: Capability; href: string; label: string; blurb: 
   { capability: 'care.tasks', href: '/admin/tasks', label: 'Tasks & checklists', blurb: 'Assign work and keep the checklists on track.' },
   { capability: 'care.stories', href: '/admin/stories', label: 'Good news', blurb: 'Write and publish stories for supporters.' },
   { capability: 'care.giving', href: '/admin/funds', label: 'Funds & fundraisers', blurb: 'Appeals, events and Lighthouse Care giving.' },
+  { capability: 'care.giving', href: '/admin/partners', label: 'Partners', blurb: 'Company profiles, badges and their teams.' },
   { capability: 'system.settings', href: '/admin/settings', label: 'Settings', blurb: 'Email templates, induction content and more.' },
 ]
 
