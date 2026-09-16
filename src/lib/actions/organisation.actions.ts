@@ -36,6 +36,171 @@ function refresh(id?: string) {
   revalidatePath('/partners')
 }
 
+// ─── Who watches the queue ────────────────────────────────────────────────────
+
+/** Changeable without a deploy, because the right person for this will change. */
+const REVIEWER_SETTING = 'partners.reviewer_emails'
+const DEFAULT_REVIEWERS = ['josh@lighthousecare.org.au']
+
+/**
+ * Tell whoever is watching that an application has arrived.
+ *
+ * An application form nobody is watching is worse than no form: people apply,
+ * hear nothing, and conclude we are not interested — which is the opposite of
+ * what the feature exists to do.
+ *
+ * Read from AppSetting rather than hard-coded, so handing this to somebody
+ * else is a settings change and not a deploy. Falls back to a default so it
+ * cannot quietly notify nobody.
+ */
+async function notifyReviewers(input: {
+  title: string
+  body: string
+  href: string
+  createdById?: string
+}): Promise<void> {
+  const setting = await prisma.appSetting.findUnique({
+    where: { key: REVIEWER_SETTING },
+    select: { value: true },
+  })
+
+  const emails = (setting?.value ?? DEFAULT_REVIEWERS.join(','))
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+
+  const reviewers = await prisma.user.findMany({
+    where: { email: { in: emails, mode: 'insensitive' }, isActive: true },
+    select: { id: true },
+  })
+
+  if (reviewers.length === 0) {
+    // Worth a log line rather than silence: the queue is now unwatched, and
+    // nothing else in the system would say so.
+    console.warn('[partners] no reviewer found for', emails.join(', '))
+    return
+  }
+
+  await notify({
+    audience: { kind: 'users', ids: reviewers.map((r) => r.id) },
+    category: 'GENERAL',
+    title: input.title,
+    body: input.body,
+    href: input.href,
+    actionLabel: 'Review it',
+    createdById: input.createdById,
+  })
+}
+
+// ─── Applying ─────────────────────────────────────────────────────────────────
+
+/**
+ * Ask for a partner page.
+ *
+ * Open to any signed-in person, which is why so little of it is taken on
+ * trust: the page is created PENDING, it is visible to nobody, and the badges
+ * — the part that carries any weight — cannot be touched by the applicant at
+ * all. Approval is the only gate that matters, and a person does that.
+ */
+export async function applyForOrgAction(input: {
+  name: string
+  website?: string
+  logoUrl?: string
+  position: string
+  note?: string
+}): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in first.' }
+
+  const me = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { id: true, name: true, email: true, emailVerified: true },
+  })
+  if (!me) return { success: false, error: 'Please sign in first.' }
+
+  // A domain claim is worthless from an address nobody has proved they own.
+  if (!me.emailVerified) {
+    return {
+      success: false,
+      error: 'Please confirm your email address first — check your inbox for our verification link.',
+    }
+  }
+
+  const name = input.name?.trim()
+  const position = input.position?.trim()
+  if (!name) return { success: false, error: 'What is the company called?' }
+  if (!position) return { success: false, error: 'What is your role there?' }
+
+  const domain = corporateDomain(me.email)
+
+  // Already on our books? Then this is a colleague asking to join, not a
+  // second page for the same company — which is what keeps this from becoming
+  // a list of near-duplicates within a year.
+  if (domain) {
+    const existing = await prisma.organisation.findUnique({
+      where: { emailDomain: domain },
+      select: { id: true, name: true },
+    })
+    if (existing) {
+      await prisma.orgMember.upsert({
+        where: { organisationId_userId: { organisationId: existing.id, userId: me.id } },
+        create: {
+          organisationId: existing.id,
+          userId: me.id,
+          role: OrgMemberRole.MEMBER,
+          status: OrgMemberStatus.PENDING,
+          position,
+        },
+        update: { position },
+      })
+
+      await notifyReviewers({
+        title: `${me.name ?? me.email} wants to join ${existing.name}`,
+        body: `${position} · ${me.email}`,
+        href: `/admin/partners/${existing.id}`,
+        createdById: me.id,
+      })
+
+      return {
+        success: true,
+        id: existing.id,
+        error: undefined,
+      }
+    }
+  }
+
+  const org = await prisma.organisation.create({
+    data: {
+      name,
+      slug: await uniqueSlug(name),
+      website: input.website?.trim() || null,
+      logoUrl: input.logoUrl?.trim() || null,
+      emailDomain: domain,
+      requestedById: me.id,
+      requestNote: input.note?.trim() || null,
+      status: OrgStatus.PENDING,
+      members: {
+        create: {
+          userId: me.id,
+          role: OrgMemberRole.ADMIN,
+          status: OrgMemberStatus.ACTIVE,
+          position,
+        },
+      },
+    },
+    select: { id: true },
+  })
+
+  await notifyReviewers({
+    title: `${name} has asked for a partner page`,
+    body: `${me.name ?? me.email}, ${position}${domain ? ` · ${domain}` : ' · no company domain'}`,
+    href: `/admin/partners/${org.id}`,
+    createdById: me.id,
+  })
+
+  return { success: true, id: org.id }
+}
+
 // ─── Creating ─────────────────────────────────────────────────────────────────
 
 /**

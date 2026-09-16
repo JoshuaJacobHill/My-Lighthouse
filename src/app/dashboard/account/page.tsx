@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Bell,
+  Building2,
   KeyRound,
   HandHeart,
   Church,
@@ -143,6 +144,12 @@ export default async function AccountPage() {
               tone="accent"
             />
           )}
+          <Row
+            href="/dashboard/account/partner"
+            icon={Building2}
+            title="Your company"
+            hint="A profile for a business that supports us"
+          />
           <SignOutRow />
         </div>
 
