@@ -185,12 +185,12 @@ export default async function PartnerPage({ params }: { params: Promise<{ slug: 
           >
             Give today
           </Link>
-          <a
-            href="https://lighthousecare.org.au"
+          <Link
+            href="/contact"
             className="inline-flex rounded-full border border-neutral-300 px-6 py-3 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-100"
           >
             Talk to us
-          </a>
+          </Link>
         </div>
       </div>
     </div>

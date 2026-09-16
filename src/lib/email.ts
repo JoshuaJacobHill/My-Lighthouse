@@ -21,6 +21,13 @@ interface SendEmailOptions {
   /** Pass true to CC volunteer@lighthousecare.org.au — admin/coordinator emails only */
   ccAdmin?: boolean
   /**
+   * Blind copy. Use where someone should receive it without the recipient
+   * seeing that they did — an enquiry going to a shared inbox with one person
+   * kept in the loop, say. A CC would put that address in front of whoever
+   * replies.
+   */
+  bcc?: string | string[]
+  /**
    * Where replies should go. If omitted and `volunteerId` is set, this is
    * resolved automatically to that volunteer's store coordinator, so a reply
    * reaches the person who actually knows them.
@@ -103,6 +110,7 @@ async function sendViaResend(
     from: options.from ?? resolveFromAddress(settings, options.fromName),
     to: options.to,
     ...(options.ccAdmin ? { cc: CC_ADDRESS } : {}),
+    ...(options.bcc ? { bcc: options.bcc } : {}),
     ...(options.replyTo ? { replyTo: options.replyTo } : options.ccAdmin ? { replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
     html: options.html,
@@ -144,6 +152,7 @@ async function sendViaSMTP(
     from: options.from ?? resolveFromAddress(settings, options.fromName),
     to: options.to,
     ...(options.ccAdmin ? { cc: CC_ADDRESS } : {}),
+    ...(options.bcc ? { bcc: options.bcc } : {}),
     ...(options.replyTo ? { replyTo: options.replyTo } : options.ccAdmin ? { replyTo: CC_ADDRESS } : {}),
     subject: options.subject,
     html: options.html,

@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { MapPin, Phone, Mail } from 'lucide-react'
 
 const footerLinks = [
+  { href: '/contact', label: 'Contact Us' },
+  { href: '/partners', label: 'Our Partners' },
   { href: '/privacy', label: 'Privacy Policy' },
   { href: '/volunteer/register', label: 'Become a Volunteer' },
   { href: '/login', label: 'Volunteer Sign In' },

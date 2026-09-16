@@ -66,14 +66,12 @@ export default async function PartnersPage() {
           Bring a team to pack hampers, sponsor an event, or run something of your own. If your
           company already supports us and you would like a profile here, ask us for one.
         </p>
-        {/* The portal has no public contact page; the main site does. Swap
-            this for an internal route if one ever lands. */}
-        <a
-          href="https://lighthousecare.org.au"
+        <Link
+          href="/contact"
           className="mt-5 inline-flex rounded-full bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
         >
           Talk to us
-        </a>
+        </Link>
       </div>
     </div>
   )
