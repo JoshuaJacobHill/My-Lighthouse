@@ -41,7 +41,6 @@ export function NewPartnerButton() {
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Fulton Hogan"
           className="w-full rounded-full border border-neutral-300 px-4 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
         />
       </label>

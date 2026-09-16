@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, ExternalLink } from 'lucide-react'
+import prisma from '@/lib/prisma'
 import { requireCapability } from '@/lib/permissions'
 import { getOrgForAdmin } from '@/lib/organisations'
 import { PartnerControls } from './PartnerControls'
@@ -23,6 +24,24 @@ export default async function AdminPartnerPage({ params }: { params: Promise<{ i
   await requireCapability('care.giving')
   const org = await getOrgForAdmin((await params).id)
   if (!org) notFound()
+
+  // This partner's fundraisers, and every one attached to nobody — the second
+  // set is what the "attach an existing fundraiser" picker offers, so an
+  // appeal a company ran before they had a page can be moved onto it.
+  const fundraisers = await prisma.fundraiser.findMany({
+    where: { OR: [{ organisationId: org.id }, { organisationId: null }] },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, title: true, slug: true, isActive: true, organisationId: true },
+  })
+  const raisedBy = new Map(
+    (
+      await prisma.donation.groupBy({
+        by: ['fundraiserId'],
+        where: { fundraiserId: { in: fundraisers.map((f) => f.id) } },
+        _sum: { amount: true },
+      })
+    ).map((r) => [r.fundraiserId, Math.round(Number(r._sum.amount ?? 0) * 100)]),
+  )
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
@@ -113,6 +132,14 @@ export default async function AdminPartnerPage({ params }: { params: Promise<{ i
           isApproved: p.isApproved,
           authorName: p.author?.name ?? null,
           createdAt: p.createdAt.toISOString(),
+        }))}
+        fundraisers={fundraisers.map((f) => ({
+          id: f.id,
+          title: f.title,
+          slug: f.slug,
+          isActive: f.isActive,
+          organisationId: f.organisationId,
+          raisedCents: raisedBy.get(f.id) ?? 0,
         }))}
         kindLabels={KIND_LABEL}
       />

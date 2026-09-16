@@ -1,7 +1,9 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import { Loader2, Trash2 } from 'lucide-react'
+import { LogoUpload } from '@/components/partners/LogoUpload'
 import {
   addOrgMemberAction,
   addRecognitionAction,
@@ -9,6 +11,7 @@ import {
   declineOrgAction,
   removeOrgMemberAction,
   removeRecognitionAction,
+  setFundraiserOrganisationAction,
   setOrgPublishedAction,
   setPostApprovedAction,
   updateOrgAction,
@@ -57,6 +60,17 @@ type Member = {
   email: string
 }
 
+/** A fundraiser, as this screen needs it. */
+type Fundraiser = {
+  id: string
+  title: string
+  slug: string
+  isActive: boolean
+  /** Null on the ones not yet attached to anybody. */
+  organisationId: string | null
+  raisedCents: number
+}
+
 type Post = {
   id: string
   caption: string | null
@@ -87,12 +101,15 @@ export function PartnerControls({
   recognitions,
   members,
   posts,
+  fundraisers,
   kindLabels,
 }: {
   org: Org
   recognitions: Recognition[]
   members: Member[]
   posts: Post[]
+  /** This partner's fundraisers, plus every one attached to nobody. */
+  fundraisers: Fundraiser[]
   kindLabels: Record<string, string>
 }) {
   const [pending, startTransition] = React.useTransition()
@@ -123,8 +140,12 @@ export function PartnerControls({
 
   // ── new member ──
   const [memberEmail, setMemberEmail] = React.useState('')
+  const [linkId, setLinkId] = React.useState('')
   const [memberRole, setMemberRole] = React.useState<OrgMemberRole>('MEMBER' as OrgMemberRole)
   const [declineNote, setDeclineNote] = React.useState('')
+
+  const mine = fundraisers.filter((f) => f.organisationId === org.id)
+  const spare = fundraisers.filter((f) => f.organisationId === null)
 
   return (
     <div>
@@ -196,10 +217,10 @@ export function PartnerControls({
             <span className="mb-1 block font-medium text-neutral-700">Website</span>
             <input value={website} onChange={(e) => setWebsite(e.target.value)} className={input} />
           </label>
-          <label className="text-sm sm:col-span-2">
-            <span className="mb-1 block font-medium text-neutral-700">Logo URL</span>
-            <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className={input} />
-          </label>
+          <div className="text-sm sm:col-span-2">
+            <span className="mb-1 block font-medium text-neutral-700">Logo</span>
+            <LogoUpload organisationId={org.id} value={logoUrl} onChange={setLogoUrl} />
+          </div>
           <label className="text-sm sm:col-span-2">
             <span className="mb-1 block font-medium text-neutral-700">About</span>
             <textarea
@@ -362,6 +383,89 @@ export function PartnerControls({
           Show the amount publicly — off by default, since not every partner wants the figure on a
           public page
         </label>
+      </Card>
+
+      {/* ── Fundraisers ── */}
+      <Card title="Fundraisers">
+        <p className="mt-1 text-sm text-neutral-500">
+          Shown on their public page with a live total. A company admin can propose one from their
+          account; it arrives switched off, and stays that way until it is given the right fund and
+          turned on in{' '}
+          <Link href="/admin/fundraisers" className="font-semibold text-orange-600 hover:underline">
+            Fundraisers
+          </Link>
+          .
+        </p>
+
+        {mine.length > 0 ? (
+          <ul className="mt-4 divide-y divide-neutral-100 rounded-2xl border border-neutral-200">
+            {mine.map((f) => (
+              <li key={f.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
+                <span className="min-w-0 flex-1">
+                  <Link
+                    href={`/admin/fundraisers/${f.id}/edit`}
+                    className="font-semibold text-neutral-900 hover:underline"
+                  >
+                    {f.title}
+                  </Link>
+                  <span className="block text-xs text-neutral-400">
+                    {money(f.raisedCents)} raised
+                  </span>
+                </span>
+                <span
+                  className={
+                    'shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ' +
+                    (f.isActive ? 'bg-lime-100 text-lime-800' : 'bg-amber-100 text-amber-800')
+                  }
+                >
+                  {f.isActive ? 'live' : 'not live yet'}
+                </span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => run(() => setFundraiserOrganisationAction(f.id, null))}
+                  className="shrink-0 rounded-full border border-neutral-300 px-4 py-1.5 text-xs font-semibold text-neutral-700 disabled:opacity-40"
+                >
+                  Unlink
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-neutral-500">None attached to this company yet.</p>
+        )}
+
+        {spare.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <select
+              value={linkId}
+              onChange={(e) => setLinkId(e.target.value)}
+              className={input + ' max-w-sm'}
+            >
+              <option value="">Attach an existing fundraiser…</option>
+              {spare.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.title}
+                  {f.isActive ? '' : ' (not live)'}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={pending || !linkId}
+              onClick={() =>
+                run(async () => {
+                  const res = await setFundraiserOrganisationAction(linkId, org.id)
+                  if (res.success) setLinkId('')
+                  return res
+                })
+              }
+              className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              Attach
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* ── Team ── */}

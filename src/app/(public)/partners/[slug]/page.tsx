@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Heart } from 'lucide-react'
 import { getPublicPartner } from '@/lib/organisations'
 
 export const dynamic = 'force-dynamic'
@@ -128,6 +128,80 @@ export default async function PartnerPage({ params }: { params: Promise<{ slug: 
                 )}
               </li>
             ))}
+          </ul>
+        </section>
+      )}
+
+      {partner.fundraisers.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
+            {partner.fundraisers.some((f) => f.isOpen)
+              ? 'What they are raising for'
+              : 'What they raised for'}
+          </h2>
+          <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+            {partner.fundraisers.map((f) => {
+              const pct =
+                f.goalCents && f.goalCents > 0
+                  ? Math.min(100, Math.round((f.raisedCents / f.goalCents) * 100))
+                  : null
+              return (
+                <li
+                  key={f.id}
+                  className="flex flex-col overflow-hidden rounded-[28px] border border-neutral-200"
+                >
+                  {f.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={f.imageUrl} alt="" className="h-40 w-full object-cover" />
+                  )}
+                  <div className="flex flex-1 flex-col p-5">
+                    <h3 className="text-lg font-extrabold tracking-tight">{f.title}</h3>
+
+                    <p className="mt-2 text-sm text-neutral-600">
+                      <span className="text-xl font-extrabold text-neutral-900">
+                        {money(f.raisedCents)}
+                      </span>
+                      {f.goalCents ? ` of ${money(f.goalCents)}` : ' raised'}
+                    </p>
+
+                    {pct !== null && (
+                      <div
+                        className="mt-2 h-2 w-full overflow-hidden rounded-full bg-neutral-100"
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${f.title} progress`}
+                      >
+                        <div className="h-full rounded-full bg-orange-500" style={{ width: `${pct}%` }} />
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap gap-2 pt-1">
+                      {f.isOpen ? (
+                        <Link
+                          href={`/donate?fundraiser=${f.slug}`}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                        >
+                          <Heart className="h-4 w-4" aria-hidden="true" />
+                          Give to this
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-neutral-100 px-4 py-2 text-xs font-bold uppercase text-neutral-500">
+                          Finished
+                        </span>
+                      )}
+                      <Link
+                        href={`/fundraisers/${f.slug}`}
+                        className="inline-flex items-center rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-100"
+                      >
+                        Read the story
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         </section>
       )}

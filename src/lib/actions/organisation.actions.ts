@@ -1,11 +1,12 @@
 'use server'
 
+import { put } from '@vercel/blob'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { hasCapability } from '@/lib/permissions'
 import { notify } from '@/lib/notifications'
-import { corporateDomain, uniqueSlug } from '@/lib/organisations'
+import { canAdminOrg, corporateDomain, findOrgByName, uniqueSlug } from '@/lib/organisations'
 import { OrgMemberRole, OrgMemberStatus, OrgRecognitionKind, OrgStatus } from '@prisma/client'
 
 /**
@@ -21,7 +22,17 @@ import { OrgMemberRole, OrgMemberStatus, OrgRecognitionKind, OrgStatus } from '@
  * would be worth nothing to the companies who earned theirs.
  */
 
-type Result = { success: boolean; error?: string; id?: string }
+type Result = {
+  success: boolean
+  error?: string
+  id?: string
+  /** What actually happened, where the form needs to say something different. */
+  outcome?: 'applied' | 'joined'
+}
+
+/** A logo renders at 80px tall. Nobody needs megabytes of it. */
+const LOGO_MAX_BYTES = 2 * 1024 * 1024
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
 
 async function guard(): Promise<{ userId: string } | null> {
   const session = await getSession()
@@ -133,41 +144,54 @@ export async function applyForOrgAction(input: {
 
   const domain = corporateDomain(me.email)
 
+  /**
+   * Turn an application into a request to join the company already here.
+   *
+   * Always PENDING, never ACTIVE. Recognising a name is not the same as
+   * knowing somebody works there — this only ever puts the request in front of
+   * a person, with whatever they wrote attached.
+   */
+  const askToJoin = async (existing: { id: string; name: string }): Promise<Result> => {
+    await prisma.orgMember.upsert({
+      where: { organisationId_userId: { organisationId: existing.id, userId: me.id } },
+      create: {
+        organisationId: existing.id,
+        userId: me.id,
+        role: OrgMemberRole.MEMBER,
+        status: OrgMemberStatus.PENDING,
+        position,
+      },
+      update: { position },
+    })
+
+    await notifyReviewers({
+      title: `${me.name ?? me.email} wants to join ${existing.name}`,
+      body: `${position} · ${me.email}${input.note?.trim() ? ` · ${input.note.trim()}` : ''}`,
+      href: `/admin/partners/${existing.id}`,
+      createdById: me.id,
+    })
+
+    return { success: true, id: existing.id, outcome: 'joined' }
+  }
+
   // Already on our books? Then this is a colleague asking to join, not a
   // second page for the same company — which is what keeps this from becoming
   // a list of near-duplicates within a year.
+  //
+  // Two ways in. The domain is the strong one: an address at a domain we hold
+  // is evidence. The name is the weak one, and catches the case the domain
+  // cannot — somebody applying from a personal address for a company that is
+  // already here. Both land in the same place, which is somebody's queue.
   if (domain) {
     const existing = await prisma.organisation.findUnique({
       where: { emailDomain: domain },
       select: { id: true, name: true },
     })
-    if (existing) {
-      await prisma.orgMember.upsert({
-        where: { organisationId_userId: { organisationId: existing.id, userId: me.id } },
-        create: {
-          organisationId: existing.id,
-          userId: me.id,
-          role: OrgMemberRole.MEMBER,
-          status: OrgMemberStatus.PENDING,
-          position,
-        },
-        update: { position },
-      })
-
-      await notifyReviewers({
-        title: `${me.name ?? me.email} wants to join ${existing.name}`,
-        body: `${position} · ${me.email}`,
-        href: `/admin/partners/${existing.id}`,
-        createdById: me.id,
-      })
-
-      return {
-        success: true,
-        id: existing.id,
-        error: undefined,
-      }
-    }
+    if (existing) return askToJoin(existing)
   }
+
+  const sameName = await findOrgByName(name)
+  if (sameName) return askToJoin(sameName)
 
   const org = await prisma.organisation.create({
     data: {
@@ -198,7 +222,32 @@ export async function applyForOrgAction(input: {
     createdById: me.id,
   })
 
-  return { success: true, id: org.id }
+  return { success: true, id: org.id, outcome: 'applied' }
+}
+
+/**
+ * Is this company already here?
+ *
+ * Asked as somebody types the name, so the form can say so before they write
+ * a paragraph about a company that already has a page. Deliberately thin: a
+ * name, whether it is public, and nothing else. It answers for any signed-in
+ * person, so it must not become a way to read the pending queue — an
+ * unapproved page returns `found` and nothing more.
+ */
+export async function lookupPartnerNameAction(name: string): Promise<{
+  found: boolean
+  name?: string
+  /** Only where there is a live page to link to. */
+  slug?: string
+}> {
+  const session = await getSession()
+  if (!session || !name?.trim()) return { found: false }
+
+  const org = await findOrgByName(name)
+  if (!org) return { found: false }
+
+  const live = org.status === OrgStatus.ACTIVE && org.isPublished
+  return { found: true, name: live ? org.name : undefined, slug: live ? org.slug : undefined }
 }
 
 // ─── Creating ─────────────────────────────────────────────────────────────────
@@ -222,6 +271,18 @@ export async function createOrgAction(input: {
 
   const name = input.name?.trim()
   if (!name) return { success: false, error: 'A name is needed.' }
+
+  // The same check the application form makes, for the same reason: two pages
+  // for one company split its history across both, and nothing here would
+  // ever tell us that had happened.
+  const already = await findOrgByName(name)
+  if (already) {
+    return {
+      success: false,
+      id: already.id,
+      error: `${already.name} is already here — open that one rather than adding a second.`,
+    }
+  }
 
   const org = await prisma.organisation.create({
     data: {
@@ -503,4 +564,229 @@ export async function removeOrgMemberAction(id: string): Promise<Result> {
   })
   refresh(row.organisationId)
   return { success: true }
+}
+
+// ─── Logos ────────────────────────────────────────────────────────────────────
+
+/**
+ * Upload a company logo.
+ *
+ * Its own narrow door rather than reusing uploadImageAction, which is
+ * admin-only because it also handles story artwork — relaxing that guard to
+ * cover logos would have opened story uploads to anyone who could apply for a
+ * partner page.
+ *
+ * Two callers, two rules. Someone applying may upload before an organisation
+ * exists, so there is nothing to check them against beyond being signed in and
+ * verified; the file is only ever attached to the application they are in the
+ * middle of making. Once an organisation exists, only its admins — or we —
+ * may replace its logo.
+ */
+export async function uploadOrgLogoAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in first.' }
+
+  const organisationId = formData.get('organisationId')
+  if (typeof organisationId === 'string' && organisationId) {
+    const mine = await canAdminOrg(organisationId)
+    const ours = await hasCapability('care.giving')
+    if (!mine && !ours) return { success: false, error: 'Not allowed.' }
+  }
+
+  const file = formData.get('file')
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: 'Choose a file first.' }
+  }
+  if (!LOGO_TYPES.includes(file.type)) {
+    return { success: false, error: 'That needs to be a PNG, JPEG, WebP or SVG.' }
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    return { success: false, error: 'That file is over 2MB — please pick a smaller one.' }
+  }
+
+  try {
+    const blob = await put(`partner-logos/${organisationId || session.userId}`, file, {
+      access: 'public',
+      addRandomSuffix: true,
+      contentType: file.type,
+    })
+
+    if (typeof organisationId === 'string' && organisationId) {
+      await prisma.organisation.update({
+        where: { id: organisationId },
+        data: { logoUrl: blob.url },
+      })
+      refresh(organisationId)
+    }
+
+    return { success: true, id: blob.url }
+  } catch (err) {
+    console.error('uploadOrgLogoAction failed', err)
+    return { success: false, error: 'Could not upload that. Please try again.' }
+  }
+}
+
+// ─── Fundraisers a partner is running ─────────────────────────────────────────
+
+/**
+ * A partner's fundraisers are ordinary fundraisers with a company attached.
+ *
+ * Deliberately not a second kind of fundraiser. One donation path, one public
+ * page, one place the money lands — the organisation link only decides whose
+ * partner page it also appears on. Anything else would mean a second set of
+ * receipting and reconciliation rules for the same gift.
+ *
+ * Which fund it pays into stays ours to set, and so does whether it goes live.
+ * A company can write the appeal; they cannot point it at an account.
+ */
+
+/** Where a proposed fundraiser's gifts land until somebody here says otherwise. */
+const DEFAULT_FUND_SETTING = 'partners.fundraiser_fund_id'
+
+async function defaultFundId(): Promise<string | null> {
+  const setting = await prisma.appSetting.findUnique({
+    where: { key: DEFAULT_FUND_SETTING },
+    select: { value: true },
+  })
+  if (setting?.value) {
+    const chosen = await prisma.fund.findUnique({
+      where: { id: setting.value },
+      select: { id: true },
+    })
+    if (chosen) return chosen.id
+  }
+  const fallback = await prisma.fund.findFirst({
+    where: { isActive: true },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true },
+  })
+  return fallback?.id ?? null
+}
+
+/** A fundraiser slug nothing else is using. */
+async function uniqueFundraiserSlug(title: string): Promise<string> {
+  const base =
+    title
+      .toLowerCase()
+      .trim()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'fundraiser'
+  for (let n = 0; n < 50; n++) {
+    const slug = n === 0 ? base : `${base}-${n + 1}`
+    const clash = await prisma.fundraiser.findUnique({ where: { slug }, select: { id: true } })
+    if (!clash) return slug
+  }
+  return `${base}-${Date.now().toString(36)}`
+}
+
+/**
+ * A partner admin proposes a fundraiser.
+ *
+ * Created switched off. Nothing about it is public — not the page, not the
+ * link on their profile — until somebody here reads it, sets the fund and
+ * turns it on in /admin/fundraisers. A live public appeal in our name,
+ * created by someone outside the organisation without review, is not a thing
+ * we should be able to build by accident.
+ */
+export async function proposeFundraiserAction(input: {
+  organisationId: string
+  title: string
+  story: string
+  goalAmount?: number | null
+}): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in first.' }
+  if (!(await canAdminOrg(input.organisationId))) {
+    return { success: false, error: 'Only a company admin can do that.' }
+  }
+
+  const org = await prisma.organisation.findUnique({
+    where: { id: input.organisationId },
+    select: { id: true, name: true, status: true },
+  })
+  if (!org || org.status !== OrgStatus.ACTIVE) {
+    return { success: false, error: 'This company page has not been approved yet.' }
+  }
+
+  const title = input.title.trim()
+  const story = input.story.trim()
+  if (title.length < 3) return { success: false, error: 'Please give it a title.' }
+  if (story.length < 40) {
+    return { success: false, error: 'Please tell us a bit more about what it is for.' }
+  }
+  if (story.length > 8000) return { success: false, error: 'That is a little long — could you trim it?' }
+
+  const goal =
+    input.goalAmount && Number.isFinite(input.goalAmount) && input.goalAmount > 0
+      ? Math.min(Math.round(input.goalAmount), 10_000_000)
+      : null
+
+  const fundId = await defaultFundId()
+  if (!fundId) {
+    // Nothing the person on the form can do about this one, so it says so
+    // plainly rather than pretending the request failed on their account.
+    console.error('[partners] no fund available for a proposed fundraiser')
+    return { success: false, error: 'We cannot accept this just now — please contact us directly.' }
+  }
+
+  const me = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { id: true, name: true, email: true },
+  })
+
+  const fr = await prisma.fundraiser.create({
+    data: {
+      title,
+      slug: await uniqueFundraiserSlug(title),
+      story,
+      goalAmount: goal,
+      organiserName: org.name,
+      organiserEmail: me?.email ?? null,
+      fundId,
+      organisationId: org.id,
+      isActive: false,
+    },
+    select: { id: true },
+  })
+
+  await notifyReviewers({
+    title: `${org.name} proposed a fundraiser`,
+    body: `${title}${goal ? ` · goal $${goal.toLocaleString('en-AU')}` : ''} · from ${me?.name ?? me?.email ?? 'their admin'}`,
+    href: `/admin/fundraisers/${fr.id}/edit`,
+    createdById: me?.id,
+  })
+
+  revalidatePath('/admin/fundraisers')
+  refresh(org.id)
+  return { success: true, id: fr.id }
+}
+
+/**
+ * Attach an existing fundraiser to a partner, or detach it.
+ *
+ * Ours, not theirs — the link decides which company's name sits above a public
+ * appeal, and that is a claim about who ran it.
+ */
+export async function setFundraiserOrganisationAction(
+  fundraiserId: string,
+  organisationId: string | null,
+): Promise<Result> {
+  const admin = await guard()
+  if (!admin) return { success: false, error: 'Not allowed.' }
+
+  const fr = await prisma.fundraiser.findUnique({
+    where: { id: fundraiserId },
+    select: { id: true, organisationId: true },
+  })
+  if (!fr) return { success: false, error: 'That fundraiser no longer exists.' }
+
+  await prisma.fundraiser.update({ where: { id: fundraiserId }, data: { organisationId } })
+
+  // Both pages: the one it is joining and, on a move, the one it is leaving.
+  if (organisationId) refresh(organisationId)
+  if (fr.organisationId && fr.organisationId !== organisationId) refresh(fr.organisationId)
+  revalidatePath('/admin/fundraisers')
+  return { success: true, id: fundraiserId }
 }

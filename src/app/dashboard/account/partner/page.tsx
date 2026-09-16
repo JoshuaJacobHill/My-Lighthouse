@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { corporateDomain } from '@/lib/organisations'
 import { ApplyForm } from './ApplyForm'
+import { FundraiserProposal } from './FundraiserProposal'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Your company' }
@@ -35,6 +36,37 @@ export default async function AccountPartnerPage() {
   ])
 
   const hasCompanyDomain = Boolean(corporateDomain(me?.email))
+
+  // Fundraisers belonging to the companies they administer, with live totals
+  // — the same figures the public page shows, from the same donations.
+  const adminOf = memberships
+    .filter((m) => m.role === 'ADMIN' && m.status === 'ACTIVE' && m.organisation.status === 'ACTIVE')
+    .map((m) => m.organisation.id)
+
+  const fundraisers = adminOf.length
+    ? await prisma.fundraiser.findMany({
+        where: { organisationId: { in: adminOf } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          isActive: true,
+          goalAmount: true,
+          organisationId: true,
+        },
+      })
+    : []
+
+  const raisedBy = new Map(
+    (
+      await prisma.donation.groupBy({
+        by: ['fundraiserId'],
+        where: { fundraiserId: { in: fundraisers.map((f) => f.id) } },
+        _sum: { amount: true },
+      })
+    ).map((r) => [r.fundraiserId, Math.round(Number(r._sum.amount ?? 0) * 100)]),
+  )
 
   return (
     <div className="-m-4 min-h-full bg-white lg:-m-6">
@@ -82,6 +114,23 @@ export default async function AccountPartnerPage() {
                     See the page
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   </Link>
+                )}
+
+                {adminOf.includes(m.organisation.id) && (
+                  <FundraiserProposal
+                    organisationId={m.organisation.id}
+                    existing={fundraisers
+                      .filter((f) => f.organisationId === m.organisation.id)
+                      .map((f) => ({
+                        id: f.id,
+                        title: f.title,
+                        slug: f.slug,
+                        isActive: f.isActive,
+                        goalCents:
+                          f.goalAmount === null ? null : Math.round(Number(f.goalAmount) * 100),
+                        raisedCents: raisedBy.get(f.id) ?? 0,
+                      }))}
+                  />
                 )}
               </li>
             ))}

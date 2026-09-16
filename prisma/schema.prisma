@@ -891,11 +891,20 @@ model Fundraiser {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  fund      Fund       @relation(fields: [fundId], references: [id])
-  donations Donation[]
+  /// The company running it, where one is behind it.
+  ///
+  /// A fundraiser belongs to a fund regardless — that is where the money
+  /// lands, and it stays ours to set. This only records whose fundraiser it
+  /// is, so it can appear on their partner page alongside their badges.
+  organisationId String?
+
+  fund         Fund          @relation(fields: [fundId], references: [id])
+  organisation Organisation? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  donations    Donation[]
 
   @@index([fundId])
   @@index([isActive])
+  @@index([organisationId])
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1028,6 +1037,7 @@ model Organisation {
   members      OrgMember[]
   recognitions OrgRecognition[]
   posts        OrgPost[]
+  fundraisers  Fundraiser[]
 
   @@index([isPublished])
   @@index([status])

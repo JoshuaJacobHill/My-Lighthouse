@@ -13,6 +13,7 @@
 
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { isDonorPortalEnabled } from '@/lib/features'
 import { OrgMemberRole, OrgMemberStatus, OrgStatus } from '@prisma/client'
 
 // ─── Slugs ────────────────────────────────────────────────────────────────────
@@ -42,6 +43,34 @@ export async function uniqueSlug(name: string, exceptId?: string): Promise<strin
     if (!clash || clash.id === exceptId) return slug
   }
   return `${base}-${Date.now().toString(36)}`
+}
+
+/**
+ * An organisation already on our books under this name.
+ *
+ * Matched on the slug rather than the raw string, so "Fulton Hogan",
+ * "fulton hogan" and "Fulton  Hogan" all find the same company. It is the
+ * name that people recognise and the name they type, and without this check
+ * the second person from a company — one on a personal address, so with no
+ * domain to go on — quietly creates a second page for it.
+ *
+ * Not a guarantee of sameness. Two unrelated businesses can share a trading
+ * name, which is why this only ever redirects a request to a human rather
+ * than deciding anything on its own.
+ */
+export async function findOrgByName(name: string): Promise<{
+  id: string
+  name: string
+  slug: string
+  status: OrgStatus
+  isPublished: boolean
+} | null> {
+  const wanted = slugify(name)
+  if (!wanted) return null
+  return prisma.organisation.findFirst({
+    where: { OR: [{ slug: wanted }, { name: { equals: name.trim(), mode: 'insensitive' } }] },
+    select: { id: true, name: true, slug: true, status: true, isPublished: true },
+  })
 }
 
 // ─── Email domains ────────────────────────────────────────────────────────────
@@ -135,6 +164,18 @@ export type PublicBadge = {
   amountCents: number | null
 }
 
+/** A fundraiser the company is running, as it appears on their page. */
+export type PublicFundraiser = {
+  id: string
+  title: string
+  slug: string
+  imageUrl: string | null
+  goalCents: number | null
+  raisedCents: number
+  /** Whether it is still taking gifts, so a finished one can read as finished. */
+  isOpen: boolean
+}
+
 export type PublicPartner = {
   name: string
   slug: string
@@ -151,6 +192,53 @@ export type PublicPartner = {
     /** First name only — a public page does not need anyone's surname. */
     authorFirstName: string | null
   }[]
+  /** Open first, then most recently finished. Empty when giving is switched off. */
+  fundraisers: PublicFundraiser[]
+}
+
+/**
+ * The live fundraisers belonging to one organisation, with their totals.
+ *
+ * Totals come from the donations rather than `Fundraiser.raisedAmount`,
+ * matching the fundraiser's own page. Two places showing the same appeal at
+ * two different figures is the kind of thing a supporter notices and nobody
+ * can explain afterwards.
+ */
+async function partnerFundraisers(organisationId: string): Promise<PublicFundraiser[]> {
+  // The public fundraiser pages are behind the donor-portal flag. Linking to
+  // one while that is off sends people to a 404.
+  if (!isDonorPortalEnabled()) return []
+
+  const rows = await prisma.fundraiser.findMany({
+    where: { organisationId, isActive: true },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, title: true, slug: true, imageUrl: true, goalAmount: true, endsAt: true },
+  })
+  if (rows.length === 0) return []
+
+  const sums = await prisma.donation.groupBy({
+    by: ['fundraiserId'],
+    where: { fundraiserId: { in: rows.map((r) => r.id) } },
+    _sum: { amount: true },
+  })
+  const raised = new Map(
+    sums.map((s) => [s.fundraiserId, Math.round(Number(s._sum.amount ?? 0) * 100)]),
+  )
+
+  const now = Date.now()
+  const out = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    slug: r.slug,
+    imageUrl: r.imageUrl,
+    goalCents: r.goalAmount === null ? null : Math.round(Number(r.goalAmount) * 100),
+    raisedCents: raised.get(r.id) ?? 0,
+    isOpen: !r.endsAt || r.endsAt.getTime() > now,
+  }))
+
+  // Still running before finished — a page should lead with what someone can
+  // still give to.
+  return out.sort((a, b) => Number(b.isOpen) - Number(a.isOpen))
 }
 
 /**
@@ -164,6 +252,7 @@ export async function getPublicPartner(slug: string): Promise<PublicPartner | nu
   const org = await prisma.organisation.findUnique({
     where: { slug },
     select: {
+      id: true,
       name: true,
       slug: true,
       logoUrl: true,
@@ -201,6 +290,8 @@ export async function getPublicPartner(slug: string): Promise<PublicPartner | nu
 
   if (!org || org.status !== OrgStatus.ACTIVE || !org.isPublished) return null
 
+  const fundraisers = await partnerFundraisers(org.id)
+
   return {
     name: org.name,
     slug: org.slug,
@@ -225,6 +316,7 @@ export async function getPublicPartner(slug: string): Promise<PublicPartner | nu
       happenedAt: p.happenedAt,
       authorFirstName: p.author?.name?.trim().split(/\s+/)[0] ?? null,
     })),
+    fundraisers,
   }
 }
 
