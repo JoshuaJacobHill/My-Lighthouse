@@ -4,7 +4,7 @@ import { ingestMeta } from '@/lib/integrations/meta'
 import { hasCapability } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300
+export const maxDuration = 60
 
 // ─── GET /api/cron/ingest-meta ───────────────────────────────────────────────
 //
@@ -15,6 +15,10 @@ export const maxDuration = 300
 // ?days=90 widens the ad window for a first backfill. Admin only — a cron token
 // gets the normal window, so a leaked token cannot be used to hammer the Graph
 // API with three-month pulls.
+//
+// For the Instagram back catalogue use /api/admin/ig-backfill instead. A large
+// ?posts= value here will be killed at the sixty-second limit: this route has
+// no way to resume, so the run is lost.
 //
 // Fails CLOSED: a valid CRON_SECRET, or someone who can see the report.
 export async function GET(request: NextRequest) {

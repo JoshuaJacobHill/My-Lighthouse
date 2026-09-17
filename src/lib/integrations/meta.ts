@@ -360,118 +360,214 @@ async function ingestFacebookPosts(cfg: Cfg, pt: string, limit = POST_LIMIT): Pr
 
 // ── Organic: Instagram ───────────────────────────────────────────────────────
 
-async function ingestInstagram(cfg: Cfg, pt: string, limit = POST_LIMIT): Promise<number> {
-  const media = await graph<{
-    data: {
-      id: string
-      caption?: string
-      timestamp: string
-      permalink?: string
-      media_url?: string
-      thumbnail_url?: string
-      /** REELS, FEED, STORY or AD — decides which view metric is the right one. */
-      media_product_type?: string
-    }[]
-  }>(
-    `${cfg.igUserId}/media`,
-    {
-      fields: 'id,caption,timestamp,permalink,media_url,thumbnail_url,media_product_type',
-      limit: String(limit),
-    },
-    pt,
-  )
-
-  let written = 0
-  for (const m of media.data ?? []) {
-    let views = 0
-    let reach = 0
-    let engagements = 0
-    try {
-      const ins = await graph<{ data: { name: string; values: { value: number }[] }[] }>(
-        `${m.id}/insights`,
-        { metric: 'views,reach,likes,comments,saved,shares' },
-        pt,
-      )
-      for (const metric of ins.data ?? []) {
-        const v = int(metric.values?.[0]?.value)
-        if (metric.name === 'views') views = v
-        else if (metric.name === 'reach') reach = v
-        else engagements += v // likes + comments + saved + shares
+/**
+ * A small concurrency pool.
+ *
+ * Instagram needs two insight requests per post, and doing three hundred posts
+ * one at a time is six hundred sequential round-trips — minutes of waiting,
+ * against a sixty-second function limit. Six at a time turns that into a
+ * manageable number of rounds without hammering the Graph API hard enough to
+ * get rate limited.
+ */
+async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(size, items.length) }, async () => {
+      for (;;) {
+        const i = next++
+        if (i >= items.length) return
+        out[i] = await fn(items[i])
       }
-    } catch {
-      // Stories and some media types expose a different metric set.
+    }),
+  )
+  return out
+}
+
+/** How many insight requests run at once. Raise with care — 429s start here. */
+const IG_CONCURRENCY = 6
+
+type IgMedia = {
+  id: string
+  caption?: string
+  timestamp: string
+  permalink?: string
+  media_url?: string
+  thumbnail_url?: string
+  /** REELS, FEED, STORY or AD — decides which view metric is the right one. */
+  media_product_type?: string
+}
+
+export type IgIngestResult = {
+  written: number
+  scanned: number
+  /**
+   * Where to pick up from, when the run stopped before the end.
+   *
+   * Absent means finished. Present means the budget ran out and the caller
+   * should come back with it — which is the whole reason a backfill of several
+   * hundred posts can complete on a platform that kills a request at sixty
+   * seconds.
+   */
+  nextAfter?: string
+}
+
+/**
+ * Read one post's insights.
+ *
+ * Split out of the loop so several can be in flight at once. Every failure is
+ * swallowed deliberately: stories and some media types expose a different
+ * metric set, and one refusal must not take down the whole backfill.
+ */
+async function igMetrics(mediaId: string, pt: string) {
+  let views = 0
+  let reach = 0
+  let engagements = 0
+
+  try {
+    const ins = await graph<{ data: { name: string; values: { value: number }[] }[] }>(
+      `${mediaId}/insights`,
+      { metric: 'views,reach,likes,comments,saved,shares' },
+      pt,
+    )
+    for (const metric of ins.data ?? []) {
+      const v = int(metric.values?.[0]?.value)
+      if (metric.name === 'views') views = v
+      else if (metric.name === 'reach') reach = v
+      else engagements += v // likes + comments + saved + shares
     }
-
-    /**
-     * `total_views` in its own request.
-     *
-     * Instagram's `views` is one surface. These reels are crossposted to
-     * Facebook, and the API exposes `facebook_views` and `crossposted_views`
-     * separately — so `views` is a slice, and `total_views` is the figure that
-     * accounts for all of them, which is what Instagram shows on the profile.
-     *
-     * Asked separately rather than added to the metric list above, because
-     * availability varies by media product type: a metric a reel answers, a
-     * carousel refuses, and one refusal fails the entire request. That is why
-     * the whole insight block sits in a try/catch to begin with.
-     *
-     * Only ever allowed to raise the figure. A media type that does not
-     * support it returns nothing, and a total is never less than a part.
-     */
-    try {
-      const totals = await graph<{
-        data: { values?: { value: number }[]; total_value?: { value: number } }[]
-      }>(`${m.id}/insights`, { metric: 'total_views' }, pt)
-      const row = totals.data?.[0]
-      const n = int(row?.total_value?.value ?? row?.values?.[0]?.value)
-      if (n > views) views = n
-    } catch {
-      // Not available for this media product type; `views` stands.
-    }
-
-    /**
-     * There is no plays metric. Asked and answered:
-     *
-     *   ig_reels_aggregated_all_plays_count  →  rejected
-     *   plays                                →  rejected
-     *   video_views                          →  rejected
-     *   clips_replays_count                  →  rejected
-     *   impressions                          →  not supported here
-     *
-     * `views` and `reach` are the only view figures the Media Insights API
-     * will give for a reel. An earlier version of this file asked for the
-     * plays count anyway, on the assumption that it was what Instagram shows
-     * on the profile grid — a wasted request per reel that could never
-     * succeed. Removed rather than left in a try/catch: dead code that fails
-     * silently is worse than no code, because it reads as a working fallback.
-     */
-
-    await prisma.socialPost.upsert({
-      where: { platform_externalId: { platform: 'INSTAGRAM', externalId: m.id } },
-      create: {
-        platform: 'INSTAGRAM',
-        kind: 'ORGANIC',
-        externalId: m.id,
-        caption: m.caption ?? null,
-        permalink: m.permalink ?? null,
-        thumbnailUrl: m.thumbnail_url ?? m.media_url ?? null,
-        publishedAt: new Date(m.timestamp),
-        views,
-        reach,
-        engagements,
-      },
-      update: {
-        views,
-        reach,
-        engagements,
-        caption: m.caption ?? null,
-        thumbnailUrl: m.thumbnail_url ?? m.media_url ?? null,
-        fetchedAt: new Date(),
-      },
-    })
-    written++
+  } catch {
+    // Stories and some media types expose a different metric set.
   }
-  return written
+
+  /**
+   * `total_views` in its own request.
+   *
+   * Instagram's `views` is one surface. These reels are crossposted to
+   * Facebook, and the API exposes `facebook_views` and `crossposted_views`
+   * separately — so `views` is a slice, and `total_views` is the figure that
+   * accounts for all of them, which is what Instagram shows on the profile.
+   *
+   * Asked separately rather than added to the metric list above, because
+   * availability varies by media product type: a metric a reel answers, a
+   * carousel refuses, and one refusal fails the entire request.
+   *
+   * Only ever allowed to raise the figure. A media type that does not support
+   * it returns nothing, and a total is never less than a part.
+   *
+   * There is no plays metric. Asked and answered: ig_reels_aggregated_all_plays_count,
+   * plays, video_views and clips_replays_count are all rejected, and impressions
+   * is not supported here. `views` and `reach` are what the Media Insights API
+   * will give for a reel.
+   */
+  try {
+    const totals = await graph<{
+      data: { values?: { value: number }[]; total_value?: { value: number } }[]
+    }>(`${mediaId}/insights`, { metric: 'total_views' }, pt)
+    const row = totals.data?.[0]
+    const n = int(row?.total_value?.value ?? row?.values?.[0]?.value)
+    if (n > views) views = n
+  } catch {
+    // Not available for this media product type; `views` stands.
+  }
+
+  return { views, reach, engagements }
+}
+
+/**
+ * Pull Instagram media and their insights.
+ *
+ * Reads the media edge a page at a time and stops when the time budget is
+ * nearly spent, handing back the cursor it stopped at. The nightly run passes
+ * no budget and behaves as it always has; a backfill passes one and resumes.
+ */
+export async function ingestInstagramPage(
+  cfg: Cfg,
+  pt: string,
+  limit = POST_LIMIT,
+  opts: { after?: string; budgetMs?: number; skipFreshHours?: number } = {},
+): Promise<IgIngestResult> {
+  const deadline = opts.budgetMs ? Date.now() + opts.budgetMs : null
+  const outOfTime = () => deadline !== null && Date.now() > deadline
+
+  // The media edge caps a page well below the numbers a backfill asks for, so
+  // a request for 300 silently returns far fewer. Page through instead.
+  const pageSize = Math.min(limit, 50)
+
+  let after = opts.after
+  let written = 0
+  let scanned = 0
+
+  for (;;) {
+    const page = await graph<{ data: IgMedia[]; paging?: { cursors?: { after?: string } } }>(
+      `${cfg.igUserId}/media`,
+      {
+        fields: 'id,caption,timestamp,permalink,media_url,thumbnail_url,media_product_type',
+        limit: String(pageSize),
+        ...(after ? { after } : {}),
+      },
+      pt,
+    )
+
+    let media = page.data ?? []
+    if (media.length === 0) return { written, scanned, nextAfter: undefined }
+
+    // On a resumed backfill, posts we already read recently are skipped rather
+    // than re-read. Their numbers have long since settled, and skipping them is
+    // what lets a second run reach further back than the first.
+    if (opts.skipFreshHours) {
+      const since = new Date(Date.now() - opts.skipFreshHours * 3_600_000)
+      const known = await prisma.socialPost.findMany({
+        where: {
+          platform: 'INSTAGRAM',
+          externalId: { in: media.map((m) => m.id) },
+          fetchedAt: { gt: since },
+        },
+        select: { externalId: true },
+      })
+      const seen = new Set(known.map((k) => k.externalId))
+      scanned += media.filter((m) => seen.has(m.id)).length
+      media = media.filter((m) => !seen.has(m.id))
+    }
+
+    await pool(media, IG_CONCURRENCY, async (m) => {
+      const { views, reach, engagements } = await igMetrics(m.id, pt)
+      await prisma.socialPost.upsert({
+        where: { platform_externalId: { platform: 'INSTAGRAM', externalId: m.id } },
+        create: {
+          platform: 'INSTAGRAM',
+          kind: 'ORGANIC',
+          externalId: m.id,
+          caption: m.caption ?? null,
+          permalink: m.permalink ?? null,
+          thumbnailUrl: m.thumbnail_url ?? m.media_url ?? null,
+          publishedAt: new Date(m.timestamp),
+          views,
+          reach,
+          engagements,
+        },
+        update: {
+          views,
+          reach,
+          engagements,
+          caption: m.caption ?? null,
+          thumbnailUrl: m.thumbnail_url ?? m.media_url ?? null,
+          fetchedAt: new Date(),
+        },
+      })
+      written++
+    })
+
+    scanned += media.length
+    after = page.paging?.cursors?.after
+
+    // Nothing further back, or we have taken what was asked for.
+    if (!after || scanned >= limit) return { written, scanned, nextAfter: undefined }
+
+    // Stop on the near side of the limit and say where to resume, rather than
+    // being killed mid-page with nothing to show for it.
+    if (outOfTime()) return { written, scanned, nextAfter: after }
+  }
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -512,7 +608,7 @@ export async function ingestMeta(
       problems.push(`facebook: ${(e as Error).message}`)
     }
     try {
-      rows += await ingestInstagram(cfg, pt, posts)
+      rows += (await ingestInstagramPage(cfg, pt, posts)).written
     } catch (e) {
       problems.push(`instagram: ${(e as Error).message}`)
     }
@@ -531,6 +627,36 @@ export async function ingestMeta(
     },
   })
   return { ok, rows, error: problems.join(' | ') || undefined }
+}
+
+/**
+ * Back-fill Instagram on its own, in resumable slices.
+ *
+ * Separate from `ingestMeta` because the shapes of the two jobs are different.
+ * The nightly run is small, fixed and unattended. A backfill is hundreds of
+ * posts against a function that gets killed at sixty seconds, so it has to be
+ * able to stop politely and say where it got to.
+ *
+ * Call it, and if the result carries `nextAfter`, call it again with that.
+ */
+export async function backfillInstagram(
+  opts: { posts?: number; after?: string; budgetMs?: number; skipFreshHours?: number } = {},
+): Promise<IgIngestResult & { ok: boolean; error?: string }> {
+  const cfg = metaConfig()
+  if (!cfg) {
+    return { ok: false, written: 0, scanned: 0, error: 'META_ACCESS_TOKEN / IDs not configured' }
+  }
+  try {
+    const pt = await pageToken(cfg)
+    const res = await ingestInstagramPage(cfg, pt, opts.posts ?? 200, {
+      after: opts.after,
+      budgetMs: opts.budgetMs,
+      skipFreshHours: opts.skipFreshHours,
+    })
+    return { ok: true, ...res }
+  } catch (e) {
+    return { ok: false, written: 0, scanned: 0, error: (e as Error).message }
+  }
 }
 
 export const META_PLATFORMS: SocialPlatform[] = ['FACEBOOK', 'INSTAGRAM']
