@@ -22,6 +22,7 @@ import { SendInviteButton } from '@/components/admin/SendInviteButton'
 import { getDonorGifts, summariseGifts } from '@/lib/donations'
 import { listRecurringForEmail } from '@/lib/admin-recurring'
 import { StaffToggles } from '@/components/admin/StaffToggles'
+import { BusinessReportsToggle } from '@/components/admin/BusinessReportsToggle'
 import { ChurchMemberToggle } from '@/components/admin/ChurchMemberToggle'
 import { USER_ROLES } from '@/lib/constants'
 
@@ -49,6 +50,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
       isActive: true,
       isChurchMember: true,
       isStaff: true,
+      canViewBusinessReports: true,
       passwordHash: true,
       isTrainee: true,
       createdAt: true,
@@ -161,6 +163,16 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
               <SendInviteButton userId={user.id} hasPassword={Boolean(user.passwordHash)} />
             </div>
           </div>
+
+          {/* Only the person who owns the numbers hands them out — the action
+              refuses anyone else, so for everybody else this is not here. */}
+          {me.role === 'SUPER_ADMIN' && (
+            <BusinessReportsToggle
+              userId={user.id}
+              name={user.name?.split(/\s+/)[0] ?? 'They'}
+              canView={user.canViewBusinessReports}
+            />
+          )}
         </div>
       </div>
 
