@@ -81,3 +81,38 @@ Three areas today:
 - The additive-only rule for prod schema changes.
 - Booking/availability logic in `ShiftsClient.tsx` / `AvailabilityEditorClient.tsx` (restyles were class-only; keep it that way).
 - The donations-permission gating on `admin/(finance)/*` and donor data.
+
+## Marketing assistant (Sept 2026)
+
+Claude on `/dashboard/business`, reading the sales and marketing figures. Three
+files carry the design, and the split between them is the safety model:
+
+- **`src/lib/marketing-tools.ts`** — everything the assistant may know. Every
+  query reads aggregates; none can select a person. This file is the list of
+  what we are willing to send to a third-party API, so read it that way before
+  adding to it.
+- **`src/lib/marketing-assistant.ts`** — the system prompt and the streaming
+  tool loop. The `propose_*` tools write a `MarketingProposal` DRAFT row and
+  stop. Nothing here can publish or spend.
+- **`src/lib/integrations/meta-write.ts`** — the only code that publishes or
+  changes spend, imported by `marketing.actions.ts` and nowhere else. If you
+  find it imported from the chat path, that is the bug.
+
+`/admin/marketing` is the approval queue: approve and execute are one action,
+the button says what it will do, and a post's image is shown because Claude
+only ever saw its filename. Budget ceiling `MAX_DAILY_BUDGET_CENTS` ($500/day)
+is enforced in `meta-write.ts`, not in the form.
+
+**Blocked on Meta scopes.** Posting and ad writes need `pages_manage_posts`,
+`instagram_content_publish` and `ads_management` on the system user; the
+read-only ingest does not. Until they are granted, approving a card fails with
+Meta's own message naming the missing scope, and the card can be retried after.
+Phases 1 and 2 (analysis, drafting) work without them.
+
+**Who can approve** is `business.reports` — currently Josh plus the three
+CARE_MANAGERs. That means they can approve a public post and an ad spend
+change. Narrow it to SUPER_ADMIN in `marketing.actions.ts` `guard()` if that is
+not intended.
+
+TikTok posting is not built: it needs the Content Posting API and an app audit,
+and our TikTok app is still sandbox.
