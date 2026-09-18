@@ -16,14 +16,21 @@ import { metaConfig } from '@/lib/integrations/meta'
 const V = 'v26.0'
 const BASE = `https://graph.facebook.com/${V}`
 
-/** Needed by the nightly ingest. Losing one of these breaks the reports. */
+/**
+ * Needed by the nightly ingest. Losing one of these breaks the reports.
+ *
+ * `business_management` is deliberately not here, though it is the scope a
+ * Meta setup guide will tell you to grant. This app never calls a Business
+ * Manager endpoint — it reads the page, the Instagram account and the ad
+ * account directly, each of which is covered above. Listing it only sent
+ * someone looking for a permission nothing needed.
+ */
 export const READ_SCOPES = [
   'ads_read',
   'pages_read_engagement',
   'pages_show_list',
   'instagram_basic',
   'instagram_manage_insights',
-  'business_management',
 ] as const
 
 /** Needed by the approval queue. Nothing else uses them. */

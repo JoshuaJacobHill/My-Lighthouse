@@ -101,6 +101,8 @@ export default async function MetaScopesPage() {
           </h2>
           <p className="mt-1 text-xs text-neutral-500">
             If one of these went missing when the token was regenerated, the figures stop updating.
+            Anything else on the token is harmless — <code>business_management</code> in particular
+            is commonly granted and nothing here uses it.
           </p>
           <ul className="mt-2 divide-y divide-neutral-100">
             {report.read.map((r) => (
