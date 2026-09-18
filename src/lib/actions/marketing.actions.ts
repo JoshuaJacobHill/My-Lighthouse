@@ -10,6 +10,11 @@ import {
   publishInstagramPost,
   setAdSetBudget,
   setAdSetStatus,
+  createAd,
+  createAdCreative,
+  createBoostCreative,
+  setAdStatus,
+  getAdPreview,
 } from '@/lib/integrations/meta-write'
 import { MarketingActionKind, MarketingActionStatus } from '@prisma/client'
 
@@ -55,6 +60,17 @@ function refresh() {
 type PostPayload = { platforms: string[]; caption: string; imageUrl: string | null }
 type BudgetPayload = { adSetId: string; adSetName: string; dailyBudgetCents: number }
 type StatusPayload = { adSetId: string; adSetName: string; status: 'PAUSED' | 'ACTIVE' }
+type CreatePayload = {
+  adSetId: string
+  adSetName: string
+  name: string
+  message: string
+  imageUrl: string
+  linkUrl?: string
+  headline?: string
+  callToAction?: string
+}
+type BoostPayload = { adSetId: string; adSetName: string; postId: string; name: string }
 
 async function execute(
   kind: MarketingActionKind,
@@ -80,8 +96,39 @@ async function execute(
     return { budget: await setAdSetBudget(p.adSetId, p.dailyBudgetCents) }
   }
 
-  const p = payload as StatusPayload
-  return { status: await setAdSetStatus(p.adSetId, p.status) }
+  if (kind === MarketingActionKind.AD_STATUS) {
+    const p = payload as StatusPayload
+    return { status: await setAdSetStatus(p.adSetId, p.status) }
+  }
+
+  if (kind === MarketingActionKind.AD_CREATE) {
+    const p = payload as CreatePayload
+    // Creative first, then the ad that points at it. Both are cheap and
+    // neither spends anything — the ad is created paused, and going live is a
+    // separate press after somebody has looked at the preview.
+    const creative = await createAdCreative({
+      name: p.name,
+      message: p.message,
+      imageUrl: p.imageUrl,
+      linkUrl: p.linkUrl,
+      headline: p.headline,
+      callToAction: p.callToAction,
+    })
+    const ad = await createAd({ name: p.name, adSetId: p.adSetId, creativeId: creative.id })
+    return { creativeId: creative.id, adId: ad.id, live: false }
+  }
+
+  if (kind === MarketingActionKind.AD_BOOST) {
+    const p = payload as BoostPayload
+    const creative = await createBoostCreative({ name: p.name, postId: p.postId })
+    const ad = await createAd({ name: p.name, adSetId: p.adSetId, creativeId: creative.id })
+    return { creativeId: creative.id, adId: ad.id, live: false }
+  }
+
+  // AD_ACTIVATE — the second half of a create, once the preview has been seen.
+  const p = payload as { adId: string; adName: string }
+  await setAdStatus(p.adId, 'ACTIVE')
+  return { adId: p.adId, live: true }
 }
 
 /**
@@ -261,4 +308,100 @@ export async function listMarketingAssetsAction(): Promise<
     name: b.pathname.replace('marketing-assets/', ''),
     size: b.size,
   }))
+}
+
+// ─── Seeing it, and turning it on ─────────────────────────────────────────────
+
+/**
+ * Meta's own rendering of an ad it has created.
+ *
+ * Fetched on demand rather than stored, because a preview is a picture of the
+ * ad as it is now — a stored copy would go stale the moment anything changed
+ * and would then be the most misleading thing on the page.
+ *
+ * The returned HTML is a Meta iframe. Checked for that shape before it reaches
+ * the DOM: this is markup from a third party going into our page, and the only
+ * form it should ever take is one embedded frame.
+ */
+export async function getAdPreviewAction(
+  adId: string,
+): Promise<{ success: boolean; html?: string; error?: string }> {
+  const me = await guard()
+  if (!me) return { success: false, error: 'Not allowed.' }
+  if (!/^\d+$/.test(adId)) return { success: false, error: 'That is not an ad id.' }
+
+  try {
+    const html = await getAdPreview(adId)
+    if (!html) return { success: false, error: 'Meta returned no preview for that ad.' }
+    if (!html.trim().startsWith('<iframe')) {
+      // Never seen in practice, but rendering whatever came back would be a
+      // hole in the page, and refusing is free.
+      return { success: false, error: 'The preview came back in an unexpected form.' }
+    }
+    return { success: true, html }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Turn on an ad this queue created.
+ *
+ * Deliberately only reachable from a proposal that produced an ad, so the
+ * thing being switched on is one somebody drafted, approved and previewed
+ * here — not an arbitrary id typed into a form.
+ */
+export async function activateAdAction(proposalId: string): Promise<Result> {
+  const me = await guard()
+  if (!me) return { success: false, error: 'Not allowed.' }
+
+  const row = await prisma.marketingProposal.findUnique({
+    where: { id: proposalId },
+    select: { id: true, status: true, result: true, summary: true },
+  })
+  if (!row) return { success: false, error: 'That proposal no longer exists.' }
+  if (row.status !== MarketingActionStatus.EXECUTED) {
+    return { success: false, error: 'That ad has not been created yet.' }
+  }
+
+  const result = (row.result ?? {}) as { adId?: string; live?: boolean }
+  if (!result.adId) return { success: false, error: 'There is no ad attached to that one.' }
+  if (result.live) return { success: false, error: 'That ad is already live.' }
+
+  try {
+    await setAdStatus(result.adId, 'ACTIVE')
+    await prisma.marketingProposal.update({
+      where: { id: proposalId },
+      data: { result: { ...result, live: true, liveAt: new Date().toISOString() } },
+    })
+    refresh()
+    return { success: true, id: result.adId }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+/** Pause an ad this queue created, without leaving the page. */
+export async function pauseAdAction(proposalId: string): Promise<Result> {
+  const me = await guard()
+  if (!me) return { success: false, error: 'Not allowed.' }
+
+  const row = await prisma.marketingProposal.findUnique({
+    where: { id: proposalId },
+    select: { result: true },
+  })
+  const result = (row?.result ?? {}) as { adId?: string; live?: boolean }
+  if (!result.adId) return { success: false, error: 'There is no ad attached to that one.' }
+
+  try {
+    await setAdStatus(result.adId, 'PAUSED')
+    await prisma.marketingProposal.update({
+      where: { id: proposalId },
+      data: { result: { ...result, live: false } },
+    })
+    refresh()
+    return { success: true, id: result.adId }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
 }

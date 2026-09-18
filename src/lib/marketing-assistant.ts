@@ -38,6 +38,7 @@ ABSOLUTE RULES — these override everything else:
 - You cannot see images. The asset tool gives you filenames and URLs only. Never describe what is in an image, and say plainly that you are going by the filename.
 - You cannot post anything or change any spend. Your propose_* tools write a draft that a person reads and approves. Never tell anyone something has been posted, paused or changed — say it is waiting for approval.
 - Paid and organic view counts overlap, because a boosted post is counted by both. When you use total views, say the change is meaningful and the absolute number is not a headcount.
+- An ad's image and words cannot be changed once the ad exists — Meta creatives are immutable. When an offer ends or changes, the answer is a NEW ad plus pausing the old one, never "update the existing ad". Never offer to change an ad's picture.
 
 HOW TO WORK:
 - Lead with the answer, then the evidence. Staff are reading this between other jobs.
@@ -185,6 +186,92 @@ async function proposeAdStatus(
   return `Drafted as ${row.id}. "${current.name}" is still ${current.status} until someone approves it at /admin/marketing.`
 }
 
+/**
+ * A new ad inside an existing ad set.
+ *
+ * Existing ad set on purpose. That is where the audience, the placements, the
+ * schedule and the budget live, and all four are decisions with more behind
+ * them than a chat message — inheriting them means a new ad is a creative
+ * decision rather than a media-buying one.
+ */
+async function proposeNewAd(
+  input: {
+    adSetId?: unknown
+    name?: unknown
+    message?: unknown
+    imageUrl?: unknown
+    headline?: unknown
+    linkUrl?: unknown
+    rationale?: unknown
+  },
+  userId: string,
+): Promise<string> {
+  const adSetId = String(input.adSetId ?? '').trim()
+  if (!adSetId) throw new Error('Which ad set? Call list_ad_sets and use the id exactly.')
+
+  const message = typeof input.message === 'string' ? input.message.trim() : ''
+  if (message.length < 10) throw new Error('The ad needs words — at least a sentence.')
+  if (message.length > 2000) throw new Error('That is too long for an ad body.')
+
+  const imageUrl = typeof input.imageUrl === 'string' ? input.imageUrl : ''
+  if (!imageUrl) throw new Error('An ad needs an image. Call list_assets and pick one.')
+  assertOurAsset(imageUrl)
+
+  const name = (typeof input.name === 'string' && input.name.trim()) || message.slice(0, 40)
+  const current = await getAdSet(adSetId)
+
+  const row = await prisma.marketingProposal.create({
+    data: {
+      kind: MarketingActionKind.AD_CREATE,
+      summary: `New ad in "${current.name}": ${name.replace(/\s+/g, ' ').slice(0, 60)}`,
+      rationale: typeof input.rationale === 'string' ? input.rationale : null,
+      payload: {
+        adSetId,
+        adSetName: current.name,
+        name,
+        message,
+        imageUrl,
+        ...(typeof input.headline === 'string' && input.headline ? { headline: input.headline } : {}),
+        ...(typeof input.linkUrl === 'string' && input.linkUrl ? { linkUrl: input.linkUrl } : {}),
+      },
+      before: { adSetName: current.name, status: current.status },
+      proposedByUserId: userId,
+    },
+    select: { id: true },
+  })
+
+  return `Drafted as ${row.id}. Approving it builds the ad PAUSED — Meta's own preview then appears on the card, and turning it on is a second, separate press. Nothing spends until then. Say so rather than implying the ad is running.`
+}
+
+/** Money behind a post that is already working. */
+async function proposeBoost(
+  input: { adSetId?: unknown; postId?: unknown; name?: unknown; rationale?: unknown },
+  userId: string,
+): Promise<string> {
+  const adSetId = String(input.adSetId ?? '').trim()
+  const postId = String(input.postId ?? '').trim()
+  if (!adSetId) throw new Error('Which ad set? Call list_ad_sets and use the id exactly.')
+  if (!postId) throw new Error('Which post? top_posts gives each one as [post <id>].')
+
+  const current = await getAdSet(adSetId)
+  const name =
+    (typeof input.name === 'string' && input.name.trim()) || `Boost ${postId.slice(-8)}`
+
+  const row = await prisma.marketingProposal.create({
+    data: {
+      kind: MarketingActionKind.AD_BOOST,
+      summary: `Boost post ${postId} through "${current.name}"`,
+      rationale: typeof input.rationale === 'string' ? input.rationale : null,
+      payload: { adSetId, adSetName: current.name, postId, name },
+      before: { adSetName: current.name, status: current.status },
+      proposedByUserId: userId,
+    },
+    select: { id: true },
+  })
+
+  return `Drafted as ${row.id}. Boosting keeps the post's existing likes and comments, which a fresh creative would start without. Built PAUSED; someone previews it and turns it on.`
+}
+
 const PROPOSE_TOOLS = [
   {
     name: 'propose_post',
@@ -222,6 +309,39 @@ const PROPOSE_TOOLS = [
     },
   },
   {
+    name: 'propose_new_ad',
+    description:
+      'Draft a NEW ad inside an existing ad set, with an image from the asset folder. NOT created and NOT live — approving builds it paused, and a person previews it and turns it on separately. Use this when an offer changes: a Meta creative cannot be edited once it exists, so a new offer means a new ad, and the old one gets paused.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        adSetId: { type: 'string', description: 'From list_ad_sets. Its audience and budget are inherited.' },
+        name: { type: 'string', description: 'A short internal name, so it is findable later.' },
+        message: { type: 'string', description: 'The ad body, in Lighthouse voice.' },
+        imageUrl: { type: 'string', description: 'A URL from list_assets, exactly as given.' },
+        headline: { type: 'string', description: 'Optional short headline under the image.' },
+        linkUrl: { type: 'string', description: 'Where the button goes. Defaults to the online store.' },
+        rationale: { type: 'string', description: 'Why this ad, now, and how we would know it worked.' },
+      },
+      required: ['adSetId', 'message', 'imageUrl'],
+    },
+  },
+  {
+    name: 'propose_boost',
+    description:
+      'Draft putting ad money behind a post that already exists, keeping its likes and comments. Use top_posts to find one worth boosting — the id is shown as [post <id>]. NOT live; built paused for a person to preview and turn on.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        adSetId: { type: 'string' },
+        postId: { type: 'string', description: 'The [post <id>] from top_posts.' },
+        name: { type: 'string' },
+        rationale: { type: 'string' },
+      },
+      required: ['adSetId', 'postId'],
+    },
+  },
+  {
     name: 'propose_ad_status',
     description:
       'Draft a pause or resume for approval. NOT applied. Call list_ad_sets first for the id.',
@@ -256,6 +376,8 @@ async function runTool(
   if (name === 'propose_post') return proposePost(input, userId)
   if (name === 'propose_ad_budget') return proposeAdBudget(input, userId)
   if (name === 'propose_ad_status') return proposeAdStatus(input, userId)
+  if (name === 'propose_new_ad') return proposeNewAd(input, userId)
+  if (name === 'propose_boost') return proposeBoost(input, userId)
   throw new Error(`No tool called ${name}.`)
 }
 

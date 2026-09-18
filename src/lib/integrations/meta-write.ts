@@ -232,3 +232,201 @@ export async function publishInstagramPost(
     pt,
   )
 }
+
+// ─── Ads ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Where a "shop now" click goes when nothing else is specified.
+ *
+ * Every ad needs a destination, and an ad without one cannot be created at
+ * all. The online store is the right default for a charity whose ads exist to
+ * sell trolleys.
+ */
+const DEFAULT_LINK = 'https://shop.lighthousecare.org.au'
+
+export type AdSummary = {
+  id: string
+  name: string
+  adSetId: string
+  adSetName: string | null
+  /** What Meta says right now: ACTIVE, PAUSED, IN_PROCESS, DISAPPROVED… */
+  effectiveStatus: string
+  /** Why Meta rejected it, where it did. This is what you would open Ads Manager for. */
+  issues: string[]
+  createdAt: string | null
+}
+
+/**
+ * Every ad on the account, with why Meta is unhappy where it is.
+ *
+ * `effective_status` rather than `status`, because they differ in exactly the
+ * case that matters: an ad you set ACTIVE that Meta then rejected still reads
+ * `status: ACTIVE` and `effective_status: DISAPPROVED`. Showing the first
+ * would tell someone their ad is running when it is not.
+ */
+export async function listAds(limit = 50): Promise<AdSummary[]> {
+  const cfg = requireConfig()
+  const res = await graphGet<{
+    data: {
+      id: string
+      name: string
+      adset_id: string
+      adset?: { name?: string }
+      effective_status: string
+      created_time?: string
+      issues_info?: { error_summary?: string; error_message?: string }[]
+    }[]
+  }>(
+    `${cfg.adAccountId}/ads`,
+    {
+      fields: 'id,name,adset_id,adset{name},effective_status,created_time,issues_info',
+      limit: String(limit),
+    },
+    cfg.token,
+  )
+  return (res.data ?? []).map((a) => ({
+    id: a.id,
+    name: a.name,
+    adSetId: a.adset_id,
+    adSetName: a.adset?.name ?? null,
+    effectiveStatus: a.effective_status,
+    issues: (a.issues_info ?? [])
+      .map((i) => i.error_message || i.error_summary || '')
+      .filter(Boolean),
+    createdAt: a.created_time ?? null,
+  }))
+}
+
+/**
+ * Meta's own rendering of an ad, as an embeddable iframe.
+ *
+ * The piece that makes approving from this app rather than Ads Manager a
+ * reasonable thing to do. Without it somebody is agreeing to publish an
+ * advertisement they have not seen, which is not an approval — it is a guess.
+ */
+export async function getAdPreview(
+  adId: string,
+  format = 'MOBILE_FEED_STANDARD',
+): Promise<string | null> {
+  const cfg = requireConfig()
+  const res = await graphGet<{ data: { body: string }[] }>(
+    `${adId}/previews`,
+    { ad_format: format },
+    cfg.token,
+  )
+  return res.data?.[0]?.body ?? null
+}
+
+/** The same, for a creative that has no ad yet. */
+export async function getCreativePreview(
+  creativeId: string,
+  format = 'MOBILE_FEED_STANDARD',
+): Promise<string | null> {
+  const cfg = requireConfig()
+  const res = await graphGet<{ data: { body: string }[] }>(
+    `${creativeId}/previews`,
+    { ad_format: format },
+    cfg.token,
+  )
+  return res.data?.[0]?.body ?? null
+}
+
+/**
+ * A creative from an image and some words.
+ *
+ * `picture` takes the image URL directly, so there is no separate upload step
+ * and the Blob URL the asset folder already serves is enough. The image must
+ * be publicly reachable — Meta fetches it, the same way Instagram does.
+ */
+export async function createAdCreative(input: {
+  name: string
+  message: string
+  imageUrl: string
+  linkUrl?: string
+  headline?: string
+  description?: string
+  callToAction?: string
+}): Promise<{ id: string }> {
+  const cfg = requireConfig()
+  const link = input.linkUrl?.trim() || DEFAULT_LINK
+
+  const spec = {
+    page_id: cfg.pageId,
+    link_data: {
+      link,
+      message: input.message,
+      picture: input.imageUrl,
+      ...(input.headline ? { name: input.headline } : {}),
+      ...(input.description ? { description: input.description } : {}),
+      call_to_action: {
+        type: input.callToAction || 'SHOP_NOW',
+        value: { link },
+      },
+    },
+  }
+
+  return graphPost<{ id: string }>(
+    `${cfg.adAccountId}/adcreatives`,
+    { name: input.name.slice(0, 100), object_story_spec: JSON.stringify(spec) },
+    cfg.token,
+  )
+}
+
+/**
+ * A creative that puts money behind a post which already exists.
+ *
+ * Different from the above in the way that matters: boosting keeps the post's
+ * existing likes, comments and shares, where a new creative starts at zero.
+ * For a post already doing well organically that social proof is most of why
+ * it is worth boosting at all.
+ */
+export async function createBoostCreative(input: {
+  name: string
+  postId: string
+}): Promise<{ id: string }> {
+  const cfg = requireConfig()
+  return graphPost<{ id: string }>(
+    `${cfg.adAccountId}/adcreatives`,
+    {
+      name: input.name.slice(0, 100),
+      object_story_id: input.postId,
+    },
+    cfg.token,
+  )
+}
+
+/**
+ * A new ad in an existing ad set.
+ *
+ * Always created PAUSED, whatever the caller wants. Going live is a separate
+ * approval, after somebody has looked at the preview — the two decisions are
+ * "is this the right advertisement" and "should it start spending now", and
+ * running them together is how the wrong picture ends up in front of twelve
+ * thousand people.
+ */
+export async function createAd(input: {
+  name: string
+  adSetId: string
+  creativeId: string
+}): Promise<{ id: string }> {
+  const cfg = requireConfig()
+  return graphPost<{ id: string }>(
+    `${cfg.adAccountId}/ads`,
+    {
+      name: input.name.slice(0, 100),
+      adset_id: input.adSetId,
+      creative: JSON.stringify({ creative_id: input.creativeId }),
+      status: 'PAUSED',
+    },
+    cfg.token,
+  )
+}
+
+/** Turn one ad on or off. The ad, not the ad set it sits in. */
+export async function setAdStatus(
+  adId: string,
+  status: 'PAUSED' | 'ACTIVE',
+): Promise<{ success: boolean }> {
+  const cfg = requireConfig()
+  return graphPost<{ success: boolean }>(adId, { status }, cfg.token)
+}

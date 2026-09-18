@@ -1,11 +1,14 @@
 'use client'
 
 import * as React from 'react'
-import { Loader2, Check, X, Pencil } from 'lucide-react'
+import { Loader2, Check, X, Pencil, Eye, Play, Pause } from 'lucide-react'
 import {
   approveProposalAction,
   declineProposalAction,
   editDraftCaptionAction,
+  getAdPreviewAction,
+  activateAdAction,
+  pauseAdAction,
 } from '@/lib/actions/marketing.actions'
 
 /**
@@ -18,12 +21,14 @@ import {
 
 export type Proposal = {
   id: string
-  kind: 'ORGANIC_POST' | 'AD_BUDGET' | 'AD_STATUS'
+  kind: 'ORGANIC_POST' | 'AD_BUDGET' | 'AD_STATUS' | 'AD_CREATE' | 'AD_ACTIVATE' | 'AD_BOOST'
   status: 'DRAFT' | 'APPROVED' | 'EXECUTED' | 'FAILED' | 'DECLINED'
   summary: string
   rationale: string | null
   payload: Record<string, unknown>
   before: Record<string, unknown> | null
+  /** What the platform returned. For an ad, this carries its id and whether it is live. */
+  result: Record<string, unknown> | null
   createdAt: string
   executedAt: string | null
   error: string | null
@@ -64,6 +69,41 @@ export function ProposalCard({ p }: { p: Proposal }) {
   const [caption, setCaption] = React.useState(String(p.payload.caption ?? ''))
   const [declineNote, setDeclineNote] = React.useState('')
 
+  // An ad this card created, and whether it is spending. The pair is what turns
+  // a one-shot approval into something you can actually run day to day.
+  const adId = typeof p.result?.adId === 'string' ? p.result.adId : null
+  const isLive = p.result?.live === true
+
+  const [preview, setPreview] = React.useState<string | null>(null)
+  // Seeded from the props rather than switched on inside the effect — setting
+  // state synchronously in an effect cascades renders, and the initial value
+  // is knowable here anyway.
+  const [previewing, setPreviewing] = React.useState(Boolean(adId))
+  const asked = React.useRef(false)
+
+  /**
+   * Meta's own rendering of the ad.
+   *
+   * Loaded as soon as there is an ad to show, rather than behind a button:
+   * this is the thing that replaces opening Ads Manager, and a check you have
+   * to remember to click is one people stop clicking.
+   */
+  React.useEffect(() => {
+    if (!adId || asked.current) return
+    asked.current = true
+    let alive = true
+    void getAdPreviewAction(adId)
+      .then((res) => {
+        if (alive) setPreview(res.success && res.html ? res.html : null)
+      })
+      .finally(() => {
+        if (alive) setPreviewing(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [adId])
+
   const open = p.status === 'DRAFT' || p.status === 'FAILED'
   const isPost = p.kind === 'ORGANIC_POST'
   const platforms = Array.isArray(p.payload.platforms) ? (p.payload.platforms as string[]) : []
@@ -82,8 +122,13 @@ export function ProposalCard({ p }: { p: Proposal }) {
     if (p.kind === 'AD_BUDGET') {
       return `Set ${money(Number(p.payload.dailyBudgetCents ?? 0))}/day`
     }
+    if (p.kind === 'AD_CREATE') return 'Build the ad (paused)'
+    if (p.kind === 'AD_BOOST') return 'Build the boost (paused)'
+    if (p.kind === 'AD_ACTIVATE') return 'Turn the ad on'
     return p.payload.status === 'PAUSED' ? 'Pause this ad set' : 'Resume this ad set'
   }
+
+  const isAdBuild = p.kind === 'AD_CREATE' || p.kind === 'AD_BOOST'
 
   return (
     <li className="rounded-[28px] border border-neutral-200 p-5">
@@ -203,6 +248,101 @@ export function ProposalCard({ p }: { p: Proposal }) {
             <dd className="font-medium text-neutral-700">{String(p.payload.adSetName ?? '—')}</dd>
           </div>
         </dl>
+      )}
+
+      {/* What the ad will actually look like, from Meta. The reason approving
+          here rather than in Ads Manager is a reasonable thing to do. */}
+      {adId && (
+        <div className="mt-5 rounded-2xl border border-neutral-200 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-neutral-400">
+              <Eye className="h-3.5 w-3.5" aria-hidden="true" /> As it will appear
+            </span>
+            <span
+              className={
+                'rounded-full px-2.5 py-0.5 text-xs font-bold ' +
+                (isLive ? 'bg-lime-100 text-lime-800' : 'bg-amber-100 text-amber-800')
+              }
+            >
+              {isLive ? 'live and spending' : 'built, paused'}
+            </span>
+          </div>
+
+          {previewing && (
+            <p className="mt-3 inline-flex items-center gap-2 text-sm text-neutral-400">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Asking Meta for the
+              preview
+            </p>
+          )}
+
+          {preview && (
+            // Meta's iframe, checked server-side to be exactly that before it
+            // reaches here.
+            <div
+              className="mt-3 overflow-x-auto [&>iframe]:max-w-full"
+              dangerouslySetInnerHTML={{ __html: preview }}
+            />
+          )}
+
+          {!previewing && !preview && (
+            <p className="mt-3 text-sm text-neutral-500">
+              Meta would not render a preview for this one. The ad exists either way — id {adId}.
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            {isLive ? (
+              <button
+                disabled={pending}
+                onClick={() => run(() => pauseAdAction(p.id))}
+                className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-700 disabled:opacity-50"
+              >
+                <Pause className="h-4 w-4" aria-hidden="true" /> Pause it
+              </button>
+            ) : (
+              <button
+                disabled={pending}
+                onClick={() => run(() => activateAdAction(p.id))}
+                className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+              >
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Play className="h-4 w-4" aria-hidden="true" />
+                )}
+                Turn it on
+              </button>
+            )}
+            <span className="self-center text-xs text-neutral-400">
+              {isLive
+                ? 'Spending against its ad set budget.'
+                : 'Nothing is spent until you turn it on.'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* The ad being proposed, before it exists. */}
+      {isAdBuild && !adId && (
+        <div className="mt-4 flex flex-wrap gap-4">
+          {typeof p.payload.imageUrl === 'string' && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={p.payload.imageUrl}
+              alt=""
+              className="h-40 w-40 shrink-0 rounded-2xl border border-neutral-200 object-cover"
+            />
+          )}
+          <div className="min-w-[16rem] flex-1">
+            <p className="whitespace-pre-wrap rounded-2xl bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-800">
+              {String(p.payload.message ?? p.payload.caption ?? '')}
+            </p>
+            <p className="mt-2 text-xs text-neutral-400">
+              Goes into the ad set &ldquo;{String(p.payload.adSetName ?? '—')}&rdquo;, inheriting its
+              audience and budget. Meta&rsquo;s preview appears once it is built.
+            </p>
+          </div>
+        </div>
       )}
 
       {p.error && (

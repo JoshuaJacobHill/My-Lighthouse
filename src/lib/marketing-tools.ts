@@ -21,7 +21,7 @@ import {
   getIngestHealth,
   type Period,
 } from '@/lib/business-reports'
-import { listAdSets } from '@/lib/integrations/meta-write'
+import { listAdSets, listAds } from '@/lib/integrations/meta-write'
 
 const PERIODS: Period[] = ['day', 'week', 'month', 'year']
 const asPeriod = (v: unknown): Period =>
@@ -83,6 +83,7 @@ async function topPosts(input: { period?: string; kind?: string }): Promise<Tool
   const top = await getTopSocial(period, new Date(), 10)
 
   const describe = (p: {
+    externalId: string
     platform: string
     views: number
     engagements: number
@@ -107,7 +108,9 @@ async function topPosts(input: { period?: string; kind?: string }): Promise<Tool
         : null,
     ].filter(Boolean)
     const caption = p.caption ? ` — "${p.caption.replace(/\s+/g, ' ').slice(0, 140)}"` : ''
-    return `${p.publishedAt.toISOString().slice(0, 10)}: ${bits.join(', ')}${caption}`
+    // The id is here so a post that is doing well organically can be boosted
+    // by name rather than described back at us.
+    return `[post ${p.externalId}] ${p.publishedAt.toISOString().slice(0, 10)}: ${bits.join(', ')}${caption}`
   }
 
   if (kind === 'paid') {
@@ -203,6 +206,26 @@ async function adSets(): Promise<ToolResult> {
           a.dailyBudgetCents === null ? 'set at campaign level' : money(a.dailyBudgetCents)
         }`,
     ),
+  ].join('\n')
+}
+
+async function liveAds(): Promise<ToolResult> {
+  const ads = await listAds(50)
+  if (ads.length === 0) return 'No ads on the account.'
+  const running = ads.filter((a) => a.effectiveStatus === 'ACTIVE')
+  const stopped = ads.filter((a) => a.effectiveStatus !== 'ACTIVE')
+  const line = (a: (typeof ads)[number]) =>
+    `${a.id} — "${a.name}"${a.adSetName ? ` in "${a.adSetName}"` : ''}: ${a.effectiveStatus}${
+      a.issues.length ? ` — Meta says: ${a.issues.join('; ')}` : ''
+    }`
+  return [
+    `${running.length} running, ${stopped.length} not.`,
+    '',
+    'Running:',
+    ...(running.length ? running.map(line) : ['  none']),
+    '',
+    'Not running (paused, finished, or refused by Meta):',
+    ...(stopped.length ? stopped.slice(0, 20).map(line) : ['  none']),
   ].join('\n')
 }
 
@@ -315,6 +338,13 @@ export const READ_TOOLS: {
       'Live ad sets with their current status and daily budget. Call this before proposing any ad change — you need the real id, and the current value for the before-and-after.',
     input_schema: { type: 'object', properties: {} },
     run: () => adSets(),
+  },
+  {
+    name: 'list_ads',
+    description:
+      'Every ad and whether it is actually running. Use effective_status, not what someone intended — an ad Meta refused still reads as active on the ad set. Carries Meta\u2019s rejection reasons where there are any.',
+    input_schema: { type: 'object', properties: {} },
+    run: () => liveAds(),
   },
   {
     name: 'feed_health',

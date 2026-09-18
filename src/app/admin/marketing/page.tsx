@@ -55,6 +55,7 @@ export default async function MarketingApprovalsPage() {
     rationale: r.rationale,
     payload: (r.payload ?? {}) as Record<string, unknown>,
     before: (r.before ?? null) as Record<string, unknown> | null,
+    result: (r.result ?? null) as Record<string, unknown> | null,
     createdAt: r.createdAt.toISOString(),
     executedAt: r.executedAt?.toISOString() ?? null,
     error: r.error,

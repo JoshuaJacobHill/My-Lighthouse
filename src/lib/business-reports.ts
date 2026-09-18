@@ -215,6 +215,14 @@ export async function getSalesReport(period: Period, now = new Date()): Promise<
 
 export type TopPost = {
   id: string
+  /**
+   * The platform's own id for the post.
+   *
+   * Distinct from `id`, which is our row. Boosting a post needs the platform's
+   * — Meta will not accept ours, and the two are easy to confuse because both
+   * are strings on the same object.
+   */
+  externalId: string
   platform: SocialPlatform
   kind: SocialKind
   caption: string | null
@@ -313,6 +321,7 @@ export async function getTopSocial(
     const views = over?.views ?? r.views
     return {
       id: r.id,
+      externalId: r.externalId,
       platform: r.platform,
       kind: r.kind,
       caption: r.caption,

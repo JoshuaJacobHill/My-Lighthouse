@@ -1974,6 +1974,18 @@ enum MarketingActionKind {
   AD_BUDGET
   /// Pause or resume an ad set.
   AD_STATUS
+  /// Build a new ad inside an existing ad set — new image, new words, the
+  /// targeting and budget inherited from the ad set it joins. Created paused.
+  ///
+  /// New ad rather than edited ad on purpose. A Meta creative cannot be
+  /// changed once it exists, and repointing a live ad at a new one sends it
+  /// back through review and back into the learning phase. Swapping the image
+  /// on a 47x ad would throw that away.
+  AD_CREATE
+  /// Turn a paused ad on, after its preview has been looked at.
+  AD_ACTIVATE
+  /// Put money behind a post that is already doing well organically.
+  AD_BOOST
 }
 
 enum MarketingActionStatus {
