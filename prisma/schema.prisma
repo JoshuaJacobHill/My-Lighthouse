@@ -2023,6 +2023,10 @@ model MarketingProposal {
   /// rather than an assertion. Null where there is nothing being replaced.
   before  Json?
 
+  /// Which conversation produced it, where one did. Nullable because a
+  /// proposal outlives the chat, and because we may later make them by hand.
+  chatId String?
+
   /// Who was in the conversation, who approved it. Both nullable: a proposal
   /// outlives the person's account, and the record is more useful than the FK.
   proposedByUserId String?
@@ -2040,4 +2044,33 @@ model MarketingProposal {
 
   @@index([status, createdAt])
   @@index([kind])
+}
+
+/// A conversation with the marketing assistant.
+///
+/// Kept, where the first version kept nothing. Two reasons, and the second is
+/// the one that matters: it is useful to pick up where you left off, and a
+/// proposal that spent money should be traceable to the conversation that
+/// produced it. "Why did we start running that ad" is a question someone asks
+/// three months later, and the rationale on the proposal is only half the
+/// answer — the other half is what was asked.
+model MarketingChat {
+  id     String  @id @default(cuid())
+  userId String
+  /// First few words of the opening question, for the history list.
+  title  String
+
+  /// The exchange, as [{ role, content, at }]. JSON rather than a row per
+  /// message: it is always read and written whole, never queried into, and a
+  /// second table would earn nothing but a join.
+  messages Json
+
+  /// How many proposals came out of it, so the list can show which
+  /// conversations led somewhere.
+  proposalCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
 }

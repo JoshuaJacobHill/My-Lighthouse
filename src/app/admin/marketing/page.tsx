@@ -4,7 +4,6 @@ import prisma from '@/lib/prisma'
 import { requireCapability } from '@/lib/permissions'
 import { listMarketingAssetsAction } from '@/lib/actions/marketing.actions'
 import { ProposalCard, type Proposal } from './ProposalCard'
-import { AssetManager } from './AssetManager'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Marketing approvals' }
@@ -124,7 +123,22 @@ export default async function MarketingApprovalsPage() {
         </>
       )}
 
-      <AssetManager initial={assets} />
+      <section className="mt-10 flex flex-wrap items-center gap-4 rounded-[28px] bg-neutral-50 p-6">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold text-neutral-900">Media library</h2>
+          <p className="mt-1 text-sm leading-relaxed text-neutral-500">
+            {assets.length === 0
+              ? 'Empty. Until there is an image in it, the assistant can only draft text-only Facebook posts.'
+              : `${assets.length} ${assets.length === 1 ? 'image' : 'images'} the assistant can use in a post or an ad.`}
+          </p>
+        </div>
+        <Link
+          href="/admin/marketing/library"
+          className="inline-flex shrink-0 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-white"
+        >
+          {assets.length === 0 ? 'Add images' : 'Open the library'}
+        </Link>
+      </section>
 
       <p className="mt-10 border-t border-neutral-100 pt-6 text-sm leading-relaxed text-neutral-500">
         Posting and ad changes need permissions the read-only feeds do not:{' '}

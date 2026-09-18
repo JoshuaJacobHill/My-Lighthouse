@@ -2,7 +2,12 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Sparkles, Send, Loader2, Wrench, ChevronDown } from 'lucide-react'
+import { Sparkles, Send, Loader2, Wrench, ChevronDown, History, Plus, ImageIcon } from 'lucide-react'
+import {
+  saveChatAction,
+  listChatsAction,
+  loadChatAction,
+} from '@/lib/actions/marketing.actions'
 
 /**
  * The marketing assistant, on the reports page.
@@ -11,10 +16,14 @@ import { Sparkles, Send, Loader2, Wrench, ChevronDown } from 'lucide-react'
  * box at the top would push them down for the people who just want to see
  * how the week went.
  *
- * The conversation lives here in React state and is not persisted. What
- * persists is anything it proposes, which becomes a row in the approval queue
- * — so the record of what we chose to do outlives the chat about it, which is
- * the right way round.
+ * Conversations are kept. Partly so one can be picked up later, but mostly so
+ * a proposal that spent money is traceable to the exchange that produced it —
+ * "why did we start running that ad" gets asked months afterwards, and the
+ * rationale on the proposal is only half the answer.
+ *
+ * Each person sees their own. Somebody else's half-finished thinking about the
+ * budget is not something a colleague needs in a list; the proposals that came
+ * out of it are already shared, and those are the part that matters.
  */
 
 type Turn = { role: 'user' | 'assistant'; content: string; tools?: string[] }
@@ -31,6 +40,9 @@ const TOOL_LABEL: Record<string, string> = {
   propose_post: 'drafting a post for approval',
   propose_ad_budget: 'drafting a budget change for approval',
   propose_ad_status: 'drafting a pause for approval',
+  propose_new_ad: 'drafting a new ad for approval',
+  propose_boost: 'drafting a boost for approval',
+  list_ads: 'checking which ads are running',
 }
 
 const STARTERS = [
@@ -48,6 +60,14 @@ export function AssistantPanel() {
   const [error, setError] = React.useState('')
   const [proposed, setProposed] = React.useState(false)
   const endRef = React.useRef<HTMLDivElement>(null)
+
+  // The conversation is kept now, so it can be picked up later and so a
+  // proposal that spent money is traceable to the exchange that produced it.
+  const chatId = React.useRef<string | null>(null)
+  const [history, setHistory] = React.useState<
+    { id: string; title: string; updatedAt: string; turns: number }[] | null
+  >(null)
+  const [showHistory, setShowHistory] = React.useState(false)
 
   React.useEffect(() => {
     if (busy || turns.length) endRef.current?.scrollIntoView({ block: 'nearest' })
@@ -122,10 +142,44 @@ export function AssistantPanel() {
     } finally {
       setBusy(false)
       // An answer that produced nothing readable is worse than no bubble.
-      setTurns((t) =>
-        t.filter((turn, i) => i < t.length - 1 || turn.content.trim() || turn.tools?.length),
-      )
+      setTurns((t) => {
+        const kept = t.filter(
+          (turn, i) => i < t.length - 1 || turn.content.trim() || turn.tools?.length,
+        )
+        // Saved after the stream finishes rather than during it, so a
+        // half-written answer never becomes the stored one. Best effort: a
+        // failure here must not cost anyone the reply they just read.
+        void saveChatAction({
+          chatId: chatId.current,
+          messages: kept.map((x) => ({ role: x.role, content: x.content })),
+        }).then((res) => {
+          if (res.success && res.chatId) chatId.current = res.chatId
+        })
+        return kept
+      })
     }
+  }
+
+  async function openHistory() {
+    setShowHistory((v) => !v)
+    if (history === null) setHistory(await listChatsAction())
+  }
+
+  async function resume(id: string) {
+    const chat = await loadChatAction(id)
+    if (!chat) return
+    chatId.current = chat.id
+    setTurns(chat.messages.map((m) => ({ role: m.role, content: m.content })))
+    setShowHistory(false)
+    setProposed(false)
+  }
+
+  function startFresh() {
+    chatId.current = null
+    setTurns([])
+    setProposed(false)
+    setError('')
+    setShowHistory(false)
   }
 
   if (!open) {
@@ -162,12 +216,61 @@ export function AssistantPanel() {
           </p>
         </div>
         <button
+          onClick={() => void openHistory()}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-neutral-500 hover:bg-neutral-100"
+        >
+          <History className="h-4 w-4" aria-hidden="true" /> Past chats
+        </button>
+        {turns.length > 0 && (
+          <button
+            onClick={startFresh}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-neutral-500 hover:bg-neutral-100"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" /> New
+          </button>
+        )}
+        <button
           onClick={() => setOpen(false)}
-          className="rounded-full px-4 py-2 text-sm font-semibold text-neutral-500 hover:bg-neutral-100"
+          className="rounded-full px-3 py-2 text-sm font-semibold text-neutral-500 hover:bg-neutral-100"
         >
           Hide
         </button>
       </div>
+
+      {showHistory && (
+        <div className="mt-4 rounded-2xl border border-neutral-200 p-3">
+          {history === null ? (
+            <p className="p-2 text-sm text-neutral-400">Loading…</p>
+          ) : history.length === 0 ? (
+            <p className="p-2 text-sm text-neutral-500">
+              Nothing yet — conversations are kept from now on.
+            </p>
+          ) : (
+            <ul className="divide-y divide-neutral-100">
+              {history.map((h) => (
+                <li key={h.id}>
+                  <button
+                    onClick={() => void resume(h.id)}
+                    className="w-full rounded-xl px-2 py-2.5 text-left hover:bg-neutral-50"
+                  >
+                    <span className="block truncate text-sm font-medium text-neutral-800">
+                      {h.title}
+                    </span>
+                    <span className="block text-xs text-neutral-400">
+                      {new Intl.DateTimeFormat('en-AU', {
+                        timeZone: 'Australia/Brisbane',
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      }).format(new Date(h.updatedAt))}{' '}
+                      · {h.turns} messages
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {turns.length === 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
@@ -264,6 +367,21 @@ export function AssistantPanel() {
           Ask
         </button>
       </form>
+
+      <div className="mt-4 flex flex-wrap gap-3 border-t border-neutral-100 pt-4">
+        <Link
+          href="/admin/marketing/library"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-900"
+        >
+          <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" /> Media library
+        </Link>
+        <Link
+          href="/admin/marketing"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-900"
+        >
+          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Approval queue
+        </Link>
+      </div>
 
       <p className="mt-3 text-xs leading-relaxed text-neutral-400">
         Figures on this page are sent to the Anthropic API to answer your question. Customer, donor

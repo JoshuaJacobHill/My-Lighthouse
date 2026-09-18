@@ -405,3 +405,103 @@ export async function pauseAdAction(proposalId: string): Promise<Result> {
     return { success: false, error: (e as Error).message }
   }
 }
+
+// ─── Conversations ────────────────────────────────────────────────────────────
+
+/**
+ * Keep the conversation.
+ *
+ * Called at the end of each exchange with the whole thread, which is simpler
+ * than appending and cannot get out of order. Saving is best-effort: a failure
+ * here must never cost somebody the answer they just read, so it is caught and
+ * logged rather than thrown.
+ */
+export async function saveChatAction(input: {
+  chatId?: string | null
+  messages: { role: 'user' | 'assistant'; content: string }[]
+}): Promise<{ success: boolean; chatId?: string }> {
+  const me = await guard()
+  if (!me) return { success: false }
+
+  const messages = input.messages
+    .filter((m) => m.content?.trim())
+    .slice(-40)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 20_000) }))
+  if (messages.length === 0) return { success: false }
+
+  const first = messages.find((m) => m.role === 'user')?.content ?? 'Conversation'
+  const title = first.replace(/\s+/g, ' ').slice(0, 80)
+
+  try {
+    if (input.chatId) {
+      const owned = await prisma.marketingChat.findFirst({
+        where: { id: input.chatId, userId: me.userId },
+        select: { id: true },
+      })
+      if (owned) {
+        await prisma.marketingChat.update({
+          where: { id: owned.id },
+          data: { messages, updatedAt: new Date() },
+        })
+        return { success: true, chatId: owned.id }
+      }
+    }
+    const row = await prisma.marketingChat.create({
+      data: { userId: me.userId, title, messages },
+      select: { id: true },
+    })
+    return { success: true, chatId: row.id }
+  } catch (e) {
+    console.error('[marketing] could not save the conversation', e)
+    return { success: false }
+  }
+}
+
+/**
+ * Past conversations.
+ *
+ * Yours, not everyone's. Somebody else's half-finished thinking about the ad
+ * budget is not something a colleague needs in a list — the proposals that
+ * came out of it are already shared, and those are the part that matters.
+ */
+export async function listChatsAction(): Promise<
+  { id: string; title: string; updatedAt: string; turns: number }[]
+> {
+  const me = await guard()
+  if (!me) return []
+  const rows = await prisma.marketingChat.findMany({
+    where: { userId: me.userId },
+    orderBy: { updatedAt: 'desc' },
+    take: 30,
+    select: { id: true, title: true, updatedAt: true, messages: true },
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    updatedAt: r.updatedAt.toISOString(),
+    turns: Array.isArray(r.messages) ? r.messages.length : 0,
+  }))
+}
+
+export async function loadChatAction(
+  chatId: string,
+): Promise<{ id: string; messages: { role: 'user' | 'assistant'; content: string }[] } | null> {
+  const me = await guard()
+  if (!me) return null
+  const row = await prisma.marketingChat.findFirst({
+    where: { id: chatId, userId: me.userId },
+    select: { id: true, messages: true },
+  })
+  if (!row) return null
+  const messages = Array.isArray(row.messages)
+    ? (row.messages as { role: 'user' | 'assistant'; content: string }[])
+    : []
+  return { id: row.id, messages }
+}
+
+export async function deleteChatAction(chatId: string): Promise<Result> {
+  const me = await guard()
+  if (!me) return { success: false, error: 'Not allowed.' }
+  await prisma.marketingChat.deleteMany({ where: { id: chatId, userId: me.userId } })
+  return { success: true }
+}
