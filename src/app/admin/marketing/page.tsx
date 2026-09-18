@@ -134,7 +134,11 @@ export default async function MarketingApprovalsPage() {
         and <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs">ads_management</code> on
         the Meta system user. Until those are granted, approving a card fails with Meta&rsquo;s own
         message naming the missing one, and the card can be tried again afterwards. Budget changes
-        are capped at $500/day whatever anyone types.
+        are capped at $500/day whatever anyone types.{' '}
+        <Link href="/admin/meta-scopes" className="font-semibold text-orange-600 underline">
+          Check what the token can do
+        </Link>
+        .
       </p>
     </div>
   )
