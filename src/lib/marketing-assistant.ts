@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { READ_TOOLS } from '@/lib/marketing-tools'
 import { getAdSet, MAX_DAILY_BUDGET_CENTS } from '@/lib/integrations/meta-write'
 import { MarketingActionKind } from '@prisma/client'
+import { isPublishableMedia } from '@/lib/media-library'
 
 /**
  * The marketing assistant.
@@ -51,26 +52,23 @@ VOICE: Australian English. Warm, plain, practical — a colleague, not a consult
 // ─── Tools that propose ───────────────────────────────────────────────────────
 
 /**
- * Our Blob store, so a proposal cannot carry an arbitrary URL off the internet.
+ * Only an image from our own library may be published.
  *
- * Exported for its test. This is the check that stands between "Claude picked
- * an image from our folder" and "Claude published a URL it was handed", and a
- * regression here would be invisible until something wrong was public.
+ * Exported for its test. This is the check between "the assistant picked
+ * something from the library" and "the assistant published a URL it was
+ * handed", and a regression is invisible until something wrong is public.
+ *
+ * The rule itself lives in `media-library.ts`, with the list of what is in the
+ * library and what is deliberately not — volunteers' own avatars, in
+ * particular, which are not stock for an advertisement.
  */
 export function assertOurAsset(url: string): void {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
+  if (!/^https?:\/\//.test(url)) {
     throw new Error('That is not a URL. Use one exactly as list_assets gave it to you.')
   }
-  const ok =
-    parsed.protocol === 'https:' &&
-    parsed.hostname.endsWith('.blob.vercel-storage.com') &&
-    parsed.pathname.includes('/marketing-assets/')
-  if (!ok) {
+  if (!isPublishableMedia(url)) {
     throw new Error(
-      'Images must come from the asset folder. Call list_assets and use one of those URLs exactly.',
+      'Images must come from the media library. Call list_assets and use one of those URLs exactly.',
     )
   }
 }

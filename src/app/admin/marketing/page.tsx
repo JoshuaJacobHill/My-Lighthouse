@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ChevronLeft, Sparkles } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { requireCapability } from '@/lib/permissions'
-import { listMarketingAssetsAction } from '@/lib/actions/marketing.actions'
+import { listMedia } from '@/lib/media-library'
 import { ProposalCard, type Proposal } from './ProposalCard'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +24,7 @@ export default async function MarketingApprovalsPage() {
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 60,
     }),
-    listMarketingAssetsAction(),
+    listMedia(12),
   ])
 
   // Names, resolved in one query rather than a relation — a proposal outlives
@@ -133,7 +133,7 @@ export default async function MarketingApprovalsPage() {
           </p>
         </div>
         <Link
-          href="/admin/marketing/library"
+          href="/admin/media"
           className="inline-flex shrink-0 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-white"
         >
           {assets.length === 0 ? 'Add images' : 'Open the library'}

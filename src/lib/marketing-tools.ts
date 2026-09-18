@@ -22,6 +22,7 @@ import {
   type Period,
 } from '@/lib/business-reports'
 import { listAdSets, listAds } from '@/lib/integrations/meta-write'
+import { listMedia } from '@/lib/media-library'
 
 const PERIODS: Period[] = ['day', 'week', 'month', 'year']
 const asPeriod = (v: unknown): Period =>
@@ -254,14 +255,13 @@ async function feedHealth(): Promise<ToolResult> {
  * looked at an image it has not seen.
  */
 async function listMarketingAssets(): Promise<ToolResult> {
-  const { list } = await import('@vercel/blob')
-  const res = await list({ prefix: 'marketing-assets/', limit: 100 })
-  if (res.blobs.length === 0) {
-    return 'The asset folder is empty. Someone needs to upload images before a post can carry one.'
+  const media = await listMedia(80)
+  if (media.length === 0) {
+    return 'The media library is empty. Someone needs to add images before a post or an ad can carry one.'
   }
   return [
-    'Available images. You can see the names, not the pictures — do not describe what is in one:',
-    ...res.blobs.map((b) => `${b.pathname.replace('marketing-assets/', '')} — ${b.url}`),
+    'Images in the library, newest first. You can see the names, not the pictures — do not describe what is in one:',
+    ...media.map((m) => `[${m.label}] ${m.name} — ${m.url}`),
   ].join('\n')
 }
 
@@ -356,7 +356,7 @@ export const READ_TOOLS: {
   {
     name: 'list_assets',
     description:
-      'Images available for a post, by filename and URL. You cannot see the images themselves, only their names.',
+      'Every image in the media library — event photos, story photos, anything the team has uploaded — by name and URL. You cannot see the pictures themselves, only their names, so never describe what is in one.',
     input_schema: { type: 'object', properties: {} },
     run: () => listMarketingAssets(),
   },

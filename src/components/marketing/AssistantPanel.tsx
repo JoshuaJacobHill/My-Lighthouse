@@ -370,7 +370,7 @@ export function AssistantPanel() {
 
       <div className="mt-4 flex flex-wrap gap-3 border-t border-neutral-100 pt-4">
         <Link
-          href="/admin/marketing/library"
+          href="/admin/media"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-900"
         >
           <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" /> Media library

@@ -1,6 +1,6 @@
 'use server'
 
-import { put, list, del } from '@vercel/blob'
+import { del } from '@vercel/blob'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
@@ -17,6 +17,7 @@ import {
   getAdPreview,
 } from '@/lib/integrations/meta-write'
 import { MarketingActionKind, MarketingActionStatus } from '@prisma/client'
+import { listMedia, isPublishableMedia, type MediaItem } from '@/lib/media-library'
 
 /**
  * Approving and running what the assistant proposed.
@@ -250,65 +251,36 @@ export async function editDraftCaptionAction(id: string, caption: string): Promi
   return { success: true, id }
 }
 
-// ─── The asset folder ─────────────────────────────────────────────────────────
-
-const ASSET_MAX_BYTES = 8 * 1024 * 1024
-const ASSET_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+// ─── The media library ────────────────────────────────────────────────────────
 
 /**
- * Add an image the assistant can offer for a post.
+ * Uploading is `uploadImageAction` in `upload.actions.ts` — the path events,
+ * stories and fundraisers already use. Components call it directly.
  *
- * Instagram fetches the image from a public URL itself rather than accepting an
- * upload, which is why these live in Blob storage and not in the database.
+ * Not re-exported here, and not reimplemented: that path sniffs the file's
+ * magic bytes rather than trusting the browser's content type, and refuses SVG
+ * because SVG can carry script. A second uploader meant those protections
+ * applied to event photos but not to the images going into advertisements,
+ * which is the wrong way round.
  */
-export async function uploadMarketingAssetAction(formData: FormData): Promise<Result> {
+
+/** Remove an image from the library. */
+export async function deleteMediaAction(url: string): Promise<Result> {
   const me = await guard()
   if (!me) return { success: false, error: 'Not allowed.' }
-
-  const file = formData.get('file')
-  if (!(file instanceof File)) return { success: false, error: 'No file came through.' }
-  if (!ASSET_TYPES.includes(file.type)) {
-    return { success: false, error: 'PNG, JPEG or WebP only — Instagram will not take anything else.' }
-  }
-  if (file.size > ASSET_MAX_BYTES) {
-    return { success: false, error: 'That is over 8MB. Please resize it first.' }
-  }
-
-  // The name is kept, because the name is all Claude gets to go on when it
-  // suggests one. "hamper-pack-loganholme.jpg" is useful; a random id is not.
-  const safe = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-80)
-  const blob = await put(`marketing-assets/${safe}`, file, {
-    access: 'public',
-    addRandomSuffix: true,
-    contentType: file.type,
-  })
-  refresh()
-  return { success: true, id: blob.url }
-}
-
-export async function deleteMarketingAssetAction(url: string): Promise<Result> {
-  const me = await guard()
-  if (!me) return { success: false, error: 'Not allowed.' }
-  if (!url.includes('/marketing-assets/')) {
-    return { success: false, error: 'That is not an asset.' }
+  if (!isPublishableMedia(url)) {
+    return { success: false, error: 'That is not a library image.' }
   }
   await del(url)
   refresh()
   return { success: true }
 }
 
-/** Assets for the picker and the queue thumbnails. */
-export async function listMarketingAssetsAction(): Promise<
-  { url: string; name: string; size: number }[]
-> {
+/** The library, for the picker and the page. */
+export async function listMediaAction(): Promise<MediaItem[]> {
   const me = await guard()
   if (!me) return []
-  const res = await list({ prefix: 'marketing-assets/', limit: 100 })
-  return res.blobs.map((b) => ({
-    url: b.url,
-    name: b.pathname.replace('marketing-assets/', ''),
-    size: b.size,
-  }))
+  return listMedia()
 }
 
 // ─── Seeing it, and turning it on ─────────────────────────────────────────────

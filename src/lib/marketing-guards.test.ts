@@ -13,40 +13,50 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // test.
 vi.mock('@/lib/prisma', () => ({ default: {} }))
 vi.mock('@/lib/marketing-tools', () => ({ READ_TOOLS: [] }))
+// media-library imports @vercel/blob for listing; the rule under test is pure.
+vi.mock('@vercel/blob', () => ({ list: async () => ({ blobs: [] }), del: async () => {} }))
 
 const { assertOurAsset } = await import('@/lib/marketing-assistant')
 
 describe('assertOurAsset', () => {
-  const ours = 'https://abc123.public.blob.vercel-storage.com/marketing-assets/hamper-x1y2.jpg'
+  const host = 'https://abc123.public.blob.vercel-storage.com'
 
-  it('accepts a URL from our own asset folder', () => {
-    expect(() => assertOurAsset(ours)).not.toThrow()
+  it('accepts an image from any content folder in the library', () => {
+    for (const folder of ['media', 'events', 'stories', 'fundraisers', 'marketing-assets']) {
+      expect(() => assertOurAsset(`${host}/${folder}/photo-x1y2.jpg`)).not.toThrow()
+    }
   })
 
   it('refuses an image from anywhere else on the internet', () => {
-    // The case that matters: a caption the model wrote referencing a URL it
-    // read somewhere, rather than one list_assets handed it.
-    expect(() => assertOurAsset('https://example.com/nice-photo.jpg')).toThrow(/asset folder/)
+    expect(() => assertOurAsset('https://example.com/nice-photo.jpg')).toThrow(/media library/)
   })
 
-  it('refuses our blob host outside the asset folder', () => {
-    // Partner logos and volunteer avatars live in the same store. A post must
-    // not be able to reach into them.
-    expect(() =>
-      assertOurAsset('https://abc123.public.blob.vercel-storage.com/partner-logos/someone.png'),
-    ).toThrow(/asset folder/)
+  it("refuses a volunteer's avatar", () => {
+    // The case this exists for. Somebody's profile photo is not stock for an
+    // advertisement, and the library deliberately does not contain it.
+    expect(() => assertOurAsset(`${host}/avatars/cmt8826a6000a04jpfl8bxm4i.jpg`)).toThrow(
+      /media library/,
+    )
+  })
+
+  it('refuses a partner logo', () => {
+    expect(() => assertOurAsset(`${host}/partner-logos/fulton-hogan.png`)).toThrow(/media library/)
+  })
+
+  it('refuses our blob host with no folder at all', () => {
+    expect(() => assertOurAsset(`${host}/loose-file.jpg`)).toThrow(/media library/)
   })
 
   it('refuses a lookalike hostname', () => {
     expect(() =>
-      assertOurAsset('https://blob.vercel-storage.com.evil.test/marketing-assets/x.jpg'),
-    ).toThrow(/asset folder/)
+      assertOurAsset('https://blob.vercel-storage.com.evil.test/media/x.jpg'),
+    ).toThrow(/media library/)
   })
 
   it('refuses plain http', () => {
-    expect(() =>
-      assertOurAsset('http://abc.public.blob.vercel-storage.com/marketing-assets/x.jpg'),
-    ).toThrow(/asset folder/)
+    expect(() => assertOurAsset('http://abc.public.blob.vercel-storage.com/media/x.jpg')).toThrow(
+      /media library/,
+    )
   })
 
   it('refuses something that is not a URL at all', () => {
