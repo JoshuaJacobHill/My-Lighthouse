@@ -24,11 +24,11 @@ export function AssetManager({
   const [error, setError] = React.useState('')
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  async function upload(files: FileList) {
+  async function upload(files: File[]) {
     setError('')
     setPending(true)
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const fd = new FormData()
         fd.append('file', file)
         const res = await uploadMarketingAssetAction(fd)
@@ -38,6 +38,11 @@ export function AssetManager({
         }
         setAssets((a) => [{ url: res.id!, name: file.name, size: file.size }, ...a])
       }
+    } catch (e) {
+      // Without this a server-side throw is an unhandled rejection: the spinner
+      // stops and the page says nothing, which is the least useful failure
+      // there is.
+      setError((e as Error).message || 'The upload failed part way through.')
     } finally {
       setPending(false)
     }
@@ -74,9 +79,15 @@ export function AssetManager({
           multiple
           className="hidden"
           onChange={(e) => {
-            const files = e.target.files
+            // Copied out of the input BEFORE it is reset. `e.target.files` is a
+            // live FileList, and clearing `value` empties that same object — so
+            // holding the reference and reading it afterwards finds nothing,
+            // and the upload silently never happens. Array.from takes a copy;
+            // the File objects in it survive the reset.
+            const files = Array.from(e.target.files ?? [])
+            // Reset so choosing the same file twice still fires a change.
             e.target.value = ''
-            if (files?.length) void upload(files)
+            if (files.length) void upload(files)
           }}
         />
       </div>

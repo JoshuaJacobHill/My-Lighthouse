@@ -52,7 +52,8 @@ async function guard(): Promise<{ userId: string } | null> {
 
 function refresh() {
   revalidatePath('/admin/marketing')
-  revalidatePath('/businesses')
+  revalidatePath('/admin/marketing/library')
+  revalidatePath('/dashboard/business')
 }
 
 // ─── Running one proposal ─────────────────────────────────────────────────────
