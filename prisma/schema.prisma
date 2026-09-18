@@ -1952,3 +1952,80 @@ model AdDayStat {
   @@unique([platform, externalId, day])
   @@index([day])
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// MARKETING ASSISTANT
+//
+// Claude can read the sales and marketing figures and say what it makes of
+// them. What it cannot do is act. Anything that would post publicly or spend
+// money becomes a row below, which a person reads and approves, and only then
+// does it run.
+//
+// That gate is the feature, not a safety blanket around it. A post in
+// Lighthouse's name and an ad budget are both hard to unwind, and the cost of
+// being wrong is reputational rather than technical.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// What a proposal would do if approved.
+enum MarketingActionKind {
+  /// Publish a post to Facebook or Instagram.
+  ORGANIC_POST
+  /// Change an ad set's daily budget.
+  AD_BUDGET
+  /// Pause or resume an ad set.
+  AD_STATUS
+}
+
+enum MarketingActionStatus {
+  /// Claude proposed it. Visible to us, invisible to the world.
+  DRAFT
+  /// A person approved it; the executor has not run yet.
+  APPROVED
+  /// Done, and `result` holds what the platform said.
+  EXECUTED
+  /// The platform refused. `error` says why; it can be approved again.
+  FAILED
+  /// A person said no. Kept, because a declined suggestion is a useful record
+  /// of what we chose not to do.
+  DECLINED
+}
+
+/// One thing Claude thinks we should do, waiting on a person.
+model MarketingProposal {
+  id     String                @id @default(cuid())
+  kind   MarketingActionKind
+  status MarketingActionStatus @default(DRAFT)
+
+  /// One line for the queue, written for a person skimming it.
+  summary String
+  /// Why it is worth doing, in Claude's words. Shown beside the action, so
+  /// whoever approves it is approving the reasoning too, not just the change.
+  rationale String? @db.Text
+
+  /// The exact change, shape depending on `kind`:
+  ///   ORGANIC_POST  { platforms: ["INSTAGRAM"], caption, imageUrl? }
+  ///   AD_BUDGET     { adSetId, adSetName, dailyBudgetCents }
+  ///   AD_STATUS     { adSetId, adSetName, status: "PAUSED" | "ACTIVE" }
+  payload Json
+  /// The same fields as they are now, so the queue can show a before and after
+  /// rather than an assertion. Null where there is nothing being replaced.
+  before  Json?
+
+  /// Who was in the conversation, who approved it. Both nullable: a proposal
+  /// outlives the person's account, and the record is more useful than the FK.
+  proposedByUserId String?
+  approvedByUserId String?
+  approvedAt       DateTime?
+  executedAt       DateTime?
+
+  /// What the platform returned, kept verbatim. A post id here is the only
+  /// durable link between a row in this table and a thing on the internet.
+  result Json?
+  error  String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([kind])
+}

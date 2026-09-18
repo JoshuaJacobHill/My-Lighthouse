@@ -16,6 +16,8 @@ import { TopOrganic } from './TopOrganic'
 import { TopPaid } from './TopPaid'
 import type { FeedName } from '@/lib/actions/feeds.actions'
 import { PeriodTabs } from './PeriodTabs'
+import { AssistantPanel } from '@/components/marketing/AssistantPanel'
+import prisma from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Sales & marketing' }
@@ -98,12 +100,16 @@ export default async function BusinessReportPage({
   // weeks can no longer happen silently.
   const openingGrain: Grain = period === 'day' ? 'day' : period === 'week' ? 'week' : 'month'
 
-  const [sales, social, health, exposure, trend] = await Promise.all([
+  const [sales, social, health, exposure, trend, waitingOnUs] = await Promise.all([
     getSalesReport(period),
     getTopSocial(period),
     getIngestHealth(),
     getExposure(period),
     getDailyTrend(365),
+    // Anything the assistant has suggested and nobody has decided on. Counted
+    // here so the queue is visible from the page the suggestions came from —
+    // a queue you have to remember to visit is a queue that fills up.
+    prisma.marketingProposal.count({ where: { status: { in: ['DRAFT', 'FAILED'] } } }),
   ])
 
   const hasSales = sales.stores.length > 0
@@ -119,6 +125,22 @@ export default async function BusinessReportPage({
         <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
           Sales &amp; marketing
         </h1>
+
+        {/* Collapsed until asked for. The page's job is the figures, and a chat
+            box above them would push the week's numbers below the fold for
+            everyone who came here to read them. */}
+        <div className="mt-7">
+          <AssistantPanel />
+          {waitingOnUs > 0 && (
+            <Link
+              href="/admin/marketing"
+              className="mt-3 flex items-center gap-2 rounded-2xl bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-900 transition-colors hover:bg-orange-100"
+            >
+              {waitingOnUs} {waitingOnUs === 1 ? 'suggestion' : 'suggestions'} waiting for approval
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          )}
+        </div>
         {/* Did takings and reach move together? The question the two halves of
             this page exist to answer, and which no single figure can — so it
             leads rather than trailing the detail it summarises.
@@ -126,7 +148,7 @@ export default async function BusinessReportPage({
             Above the period tabs, deliberately: it carries its own
             Days/Weeks/Months control and the tabs do not affect it. Sitting
             underneath them implied a relationship that was not there. */}
-        <div className="mt-7 rounded-[28px] border border-neutral-200 p-5">
+        <div className="rounded-[28px] border border-neutral-200 p-5">
           <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-400">
             Sales and views
           </h2>
