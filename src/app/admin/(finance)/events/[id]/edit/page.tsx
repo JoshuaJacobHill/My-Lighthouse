@@ -55,6 +55,7 @@ export default async function EditEventPage({
     fundId: event.fundId ?? '',
     isPublished: event.isPublished,
     churchOnly: event.churchOnly,
+    signedInOnly: event.signedInOnly,
     imageUrl: event.imageUrl ?? '',
     allowVolunteers: event.allowVolunteers,
     volunteerCapacity: event.volunteerCapacity != null ? String(event.volunteerCapacity) : '',

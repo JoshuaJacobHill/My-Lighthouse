@@ -69,6 +69,7 @@ any record on a public route.**
 | Flag | On | Means |
 |---|---|---|
 | `isPublished` | Story, Event | Visible in the portal at all. NOT the same as public. |
+| `signedInOnly` | Event | Private: signed-in supporters only. An anonymous visitor gets a page asking them to sign in or create an account, with the event's name — because these are usually links emailed to supporters, and a 404 would look broken to them. |
 | `churchOnly` | Story, Event | Church members only. An anonymous visitor gets a **404**, not a login prompt — it does not reveal that the thing exists. |
 | `staffOnly` | Story | Staff and trainees only. |
 | `isActive` | Fundraiser, Fund | Still accepting gifts. |
