@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/reload-instructions.py 2>/dev/null || python3 ./lighthouse-care-volunteers/scripts/reload-instructions.py 2>/dev/null || true",
+            "statusMessage": "Re-reading the project instructions",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

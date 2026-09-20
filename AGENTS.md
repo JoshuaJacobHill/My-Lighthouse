@@ -32,6 +32,11 @@ starting cold should read the one that matches the work:
 | **`docs/DATA.md`** | The schema: money in two representations, Brisbane dates, migrations, the RLS lockdown, how to query production without psql. |
 | **`docs/PROJECT_STATUS.md`** | Current progress, open tasks, handover. |
 
+These files are re-read automatically after a compaction, by the PostCompact
+hook in `.claude/settings.json` (`scripts/reload-instructions.py`). If you are
+reading them because a summary handed them to you: they are authoritative,
+prefer them over anything recalled from the summarised conversation.
+
 Probe before you build. Every integration assumption taken from documentation
 has been wrong at least once; the fix each time came from printing what the API
 actually returned.
