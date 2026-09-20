@@ -36,6 +36,8 @@ POINTERS = [
     ("docs/INTEGRATIONS.md", "Stripe, Gap/EMC, Meta, Mailchimp, TikTok, Blob — and their gotchas"),
     ("docs/DATA.md", "schema, money in two representations, Brisbane dates, migrations, RLS"),
     ("docs/PROJECT_STATUS.md", "current progress, open tasks, handover"),
+    ("docs/features/", "one file per area — WIDGETS, GIVING, EVENTS, STORIES, "
+                       "DASHBOARD, REPORTS, MEDIA, FITNESS, KIOSK, ADMIN"),
 ]
 
 

@@ -31,6 +31,22 @@ starting cold should read the one that matches the work:
 | **`docs/INTEGRATIONS.md`** | Stripe, Gap/EMC, Meta, Mailchimp, TikTok, Anthropic, Blob, email — and the specific ways each one has misled us. |
 | **`docs/DATA.md`** | The schema: money in two representations, Brisbane dates, migrations, the RLS lockdown, how to query production without psql. |
 | **`docs/PROJECT_STATUS.md`** | Current progress, open tasks, handover. |
+| **`docs/features/`** | One file per area — how it works, who sees it, and the traps. Read the one you are touching. |
+
+Feature docs, in `docs/features/`:
+
+| File | Covers |
+|---|---|
+| `WIDGETS.md` | **Read before building any interactive panel or chart.** The pattern the fitness and sales trackers share, so new ones match. |
+| `GIVING.md` | Appeals (`Fund`) vs fundraisers, donations, recurring, tithes, the two Stripe accounts |
+| `EVENTS.md` | Events, ticketing, sponsors, volunteer sign-up, check-in |
+| `STORIES.md` | News and good news, the audience flags, why there is no public story page |
+| `DASHBOARD.md` | How `/dashboard` assembles itself from a person's connections |
+| `REPORTS.md` | Sales and marketing, the data feeds, the marketing assistant |
+| `MEDIA.md` | The one media library and the one upload path |
+| `FITNESS.md` | The staff steps challenge, and how phones push to it |
+| `KIOSK.md` | The shop iPad: volunteer and guest sign-in |
+| `ADMIN.md` | Settings, email templates, notifications, the finance route group |
 
 These files are re-read automatically after a compaction, by the PostCompact
 hook in `.claude/settings.json` (`scripts/reload-instructions.py`). If you are
