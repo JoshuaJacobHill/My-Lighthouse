@@ -77,15 +77,39 @@ any record on a public route.**
 A published story is visible to signed-in users at `/dashboard/news` and has no
 public page. Treating the two as the same is how private content leaks.
 
-## Where each person lands
+## Where login sends people
+
+**Almost everyone lands on `/dashboard`** — the one portal, which adapts to
+whether they give, volunteer, both, or neither. There is no "send a donor to
+the donor app, a volunteer to the volunteer app" routing, and there must not be:
+most people are more than one of those things, and a login that picks a lane
+for them picks wrong.
+
+```
+admin roles  → /admin      a different application, not an audience
+KIOSK        → /kiosk      a device screen, not a person
+everyone else → /dashboard
+```
+
+The two exceptions are not audiences. `/admin` is the back office and `/kiosk`
+is an iPad bolted to a bench.
+
+## Route groups, and who can reach them
+
+These are **feature areas reached from the dashboard**, not destinations people
+are routed to. `/volunteer` is "Your volunteering" — shifts, roster,
+availability, induction — the way `/give` is giving. A volunteer who also
+donates uses both, from the same dashboard.
 
 | Route group | Who |
 |---|---|
 | `(public)` | Anyone. Partners, contact, privacy, terms. |
 | `(signup)` | Anyone. `/volunteer/apply`. Shows the portal shell when signed in and a slim app bar when not. |
 | `/events/[slug]`, `/fundraisers/[slug]`, `/donate` | Anyone — subject to `churchOnly` and the `DONOR_PORTAL_ENABLED` flag. |
-| `/dashboard` | Any signed-in supporter. Giving, news, notifications, account. |
-| `/volunteer` | Signed-in volunteers. Shifts, roster, availability, induction. |
+| `/funds/[slug]` | Anyone, subject to the fund being active. One appeal's own page. |
+| `/dashboard` | Any signed-in supporter. Giving, news, notifications, account, tasks, tithes, fitness, business. |
+| `/volunteer` | Signed-in volunteers. Shifts, roster, availability, induction, attendance. |
+| `/give` | Signed-in giving flows — `again`, `resume`, `tithe`. |
 | `/admin` | `isAdminRole()` only, then per-capability. |
 | `/kiosk` | The `KIOSK` role, on the shop iPad. |
 
