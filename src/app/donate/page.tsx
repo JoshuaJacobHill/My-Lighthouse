@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
+import { shareMetadata } from '@/lib/share-metadata'
 import { getSession } from '@/lib/auth'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { resolveAccount } from '@/lib/stripe-accounts'
@@ -7,9 +8,56 @@ import { DonateForm } from './DonateForm'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = {
-  title: 'Donate — Lighthouse Care',
-  description: 'Support families doing it tough across South East Queensland.',
+/**
+ * A link to /donate is usually a link to one appeal.
+ *
+ * `?fund=christmas-appeal` and `?fundraiser=some-slug` are how those are
+ * shared, so the preview follows the query string — otherwise every appeal we
+ * post previews identically and the picture tells the reader nothing about
+ * what they are being asked to give to.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ fund?: string; fundraiser?: string }>
+}) {
+  const { fund: fundSlug, fundraiser: fundraiserSlug } = await searchParams
+
+  if (fundraiserSlug) {
+    const fr = await prisma.fundraiser.findFirst({
+      where: { slug: fundraiserSlug, isActive: true },
+      select: { title: true, story: true, imageUrl: true },
+    })
+    if (fr) {
+      return shareMetadata({
+        title: `Give to ${fr.title}`,
+        description: fr.story,
+        imageUrl: fr.imageUrl,
+        path: `/donate?fundraiser=${fundraiserSlug}`,
+      })
+    }
+  }
+
+  if (fundSlug) {
+    const fund = await prisma.fund.findFirst({
+      where: { slug: fundSlug, isActive: true },
+      select: { name: true, tagline: true, description: true, imageUrl: true },
+    })
+    if (fund) {
+      return shareMetadata({
+        title: `Give to ${fund.name}`,
+        description: fund.tagline || fund.description,
+        imageUrl: fund.imageUrl,
+        path: `/donate?fund=${fundSlug}`,
+      })
+    }
+  }
+
+  return shareMetadata({
+    title: 'Donate',
+    description: 'Support families doing it tough across South East Queensland.',
+    path: '/donate',
+  })
 }
 
 export default async function DonatePage({

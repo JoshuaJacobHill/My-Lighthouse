@@ -1,12 +1,18 @@
+import { shareMetadata, shareImageSetting } from '@/lib/share-metadata'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ContactForm } from './ContactForm'
 
-export const metadata: Metadata = {
-  title: 'Contact us | Lighthouse Care',
-  description:
-    'Get in touch with Lighthouse Care about volunteering, partnerships, donations or our stores.',
+export async function generateMetadata() {
+  return shareMetadata({
+    title: 'Contact Lighthouse Care',
+    description:
+      'Questions about a trolley, a donation, volunteering or working together — get in touch and a person will come back to you.',
+    imageUrl: await shareImageSetting('contact'),
+    path: '/contact',
+  })
 }
+
 
 export default function ContactPage() {
   return (

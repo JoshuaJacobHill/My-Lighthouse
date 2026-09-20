@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import QRCode from 'qrcode'
 import { Heart } from 'lucide-react'
 import prisma from '@/lib/prisma'
+import { shareMetadata } from '@/lib/share-metadata'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { ORG } from '@/lib/org'
 import { FundraiserShare } from '@/components/FundraiserShare'
@@ -20,8 +21,19 @@ function maskDonorName(name: string | null): string {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const fr = await prisma.fundraiser.findFirst({ where: { slug, isActive: true }, select: { title: true } })
-  return { title: fr ? `${fr.title} — Lighthouse Care` : 'Fundraiser — Lighthouse Care' }
+  const fr = await prisma.fundraiser.findFirst({
+    where: { slug, isActive: true },
+    select: { title: true, story: true, imageUrl: true },
+  })
+  if (!fr) return { title: 'Fundraiser — Lighthouse Care' }
+
+  return shareMetadata({
+    title: fr.title,
+    description: fr.story,
+    imageUrl: fr.imageUrl,
+    path: `/fundraisers/${slug}`,
+    type: 'article',
+  })
 }
 
 const aud2 = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 })

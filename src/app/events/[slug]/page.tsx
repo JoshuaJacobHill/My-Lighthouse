@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { CalendarDays, MapPin, Heart, ArrowRight, ImageIcon } from 'lucide-react'
 import prisma from '@/lib/prisma'
+import { shareMetadata } from '@/lib/share-metadata'
 import { getSession } from '@/lib/auth'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { getEventAvailability } from '@/lib/tickets'
@@ -21,9 +22,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const event = await prisma.event.findFirst({
     where: { slug, isPublished: true },
-    select: { title: true },
+    select: { title: true, description: true, imageUrl: true },
   })
-  return { title: event ? `${event.title} — Lighthouse Care` : 'Event — Lighthouse Care' }
+  if (!event) return { title: 'Event — Lighthouse Care' }
+
+  return shareMetadata({
+    title: event.title,
+    description: event.description,
+    imageUrl: event.imageUrl,
+    path: `/events/${slug}`,
+    type: 'article',
+  })
 }
 
 export default async function EventPage({

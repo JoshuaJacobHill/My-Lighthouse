@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ExternalLink, Heart } from 'lucide-react'
 import { getPublicPartner } from '@/lib/organisations'
+import { shareMetadata } from '@/lib/share-metadata'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,14 +27,21 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
-  const partner = await getPublicPartner((await params).slug)
+  const { slug } = await params
+  const partner = await getPublicPartner(slug)
   if (!partner) return { title: 'Partner | Lighthouse Care' }
-  return {
-    title: `${partner.name} | Lighthouse Care partners`,
+
+  return shareMetadata({
+    title: `${partner.name} supports Lighthouse Care`,
     description:
-      partner.about?.slice(0, 160) ??
-      `How ${partner.name} supports food relief across South East Queensland.`,
-  }
+      partner.about ??
+      `How ${partner.name} helps get food to families doing it tough across South East Queensland.`,
+    // Their own logo. A partner page previewing with our banner tells a reader
+    // nothing about whose page it is, which is the point of sharing it.
+    imageUrl: partner.logoUrl,
+    path: `/partners/${slug}`,
+    type: 'article',
+  })
 }
 
 export default async function PartnerPage({ params }: { params: Promise<{ slug: string }> }) {

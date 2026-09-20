@@ -1,14 +1,16 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { shareMetadata } from '@/lib/share-metadata'
 import { listPublicPartners } from '@/lib/organisations'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  title: 'Our partners | Lighthouse Care',
+export const metadata: Metadata = shareMetadata({
+  title: 'Our partners',
   description:
     'The businesses, clubs and schools backing food relief across South East Queensland.',
-}
+  path: '/partners',
+})
 
 export default async function PartnersPage() {
   const partners = await listPublicPartners()
