@@ -31,6 +31,34 @@ between them matters:
 | A **record but no password** — past giving, or a row we created | **Email a setup link.** Nothing on screen | That history is only ever attached to somebody who controls the inbox |
 | **Nothing** | Let them finish signing up on the spot | Nothing to protect |
 
+### Use the shared helper, do not rewrite it
+
+`src/lib/account-check.ts`. Every sign-up flow calls it — volunteers, corporate
+partners, Santa's Little Helpers shoppers, whatever comes next.
+
+```ts
+import { lookupEmail, assertEmailFree } from '@/lib/account-check'
+
+const found = await lookupEmail(email)
+//   'account'  -> tell them on screen to sign in
+//   'history'  -> email a setup link, say nothing else on screen
+//   'new'      -> let them sign up here
+
+// Immediately before the write, every time:
+const taken = await assertEmailFree(email)
+if (taken) return { success: false, error: taken }
+```
+
+Ten tests in `account-check.test.ts` cover it, including the one that matters
+most: `assertEmailFree` must refuse a row **with no password**, because that row
+is somebody's giving history.
+
+**A hook watches for this.** `scripts/signup-guard.py` runs after every write
+and, when a file creates a user or hashes a password without using this helper,
+hands the rules back as context. It informs rather than blocks — a seed script
+or an admin invite is a legitimate exception, and a hook that refuses to let you
+save is a hook somebody turns off.
+
 Two things about this that are easy to get wrong:
 
 **Check in both places.** Step one checks; step two — the actual account

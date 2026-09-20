@@ -10,6 +10,7 @@ import { sendAccountSetupEmail } from '@/lib/donation-emails'
 import { sendEmail } from '@/lib/email'
 import { wrapEmailHtml } from '@/lib/email-html'
 import { rateLimit } from '@/lib/rate-limit'
+import { lookupEmail, assertEmailFree } from '@/lib/account-check'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.lighthousecare.org.au'
 const ORANGE = '#f97316'
@@ -47,25 +48,22 @@ export async function checkSignupEmailAction(
   }
 
   try {
-    const [user, giftCount] = await Promise.all([
-      prisma.user.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
-        select: { id: true, name: true, passwordHash: true, isActive: true },
-      }),
-      prisma.donation.count({ where: { donorEmail: { equals: email, mode: 'insensitive' } } }),
-    ])
+    // The shared rule, in `account-check.ts`. Any new sign-up flow — volunteers,
+    // corporate partners, Santa's Little Helpers shoppers — calls this rather
+    // than writing its own version of it.
+    const found = await lookupEmail(email)
 
     // Already set up → tell them on screen so they can just sign in. Sending an
     // email here would leave them waiting for something they don't need.
-    if (user?.passwordHash && user.isActive) {
+    if (found.kind === 'account') {
       return { success: true, mode: 'existing_account' }
     }
 
     // Has history (giving, or a record we created for them) → email a setup link
     // so that data is only ever attached to someone who controls the inbox.
-    if (user || giftCount > 0) {
+    if (found.kind === 'history') {
       const token = await createAccountSetupToken(email)
-      await sendAccountSetupEmail({ to: email, name: user?.name ?? null, token })
+      await sendAccountSetupEmail({ to: email, name: found.name, token })
       return { success: true, mode: 'link_sent' }
     }
 
@@ -109,18 +107,13 @@ export async function createAccountAction(
   }
 
   try {
-    // Re-check at write time — the email may have gained a record since step one.
-    const existing = await prisma.user.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
-      select: { id: true, passwordHash: true },
-    })
-    // SECURITY: step one routes any known email to an emailed link, so reaching
-    // here with an existing record means the UI was bypassed (server actions are
-    // directly callable). Refuse regardless of whether a password is set —
+    // SECURITY: re-checked at write time, not instead of step one but as well
+    // as it. Step one routes any known email to an emailed link, so reaching
+    // here with an existing record means the UI was bypassed — server actions
+    // are directly callable. Refuses whether or not a password is set,
     // otherwise a passwordless donor row could be claimed by anyone.
-    if (existing) {
-      return { success: false, error: 'This email has already been used. Please sign in, or reset your password.' }
-    }
+    const taken = await assertEmailFree(email)
+    if (taken) return { success: false, error: taken }
 
     // Only ever creates. Claiming an existing row is refused above, so there is
     // no update path here that could take one over.
