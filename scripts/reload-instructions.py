@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ALWAYS = [Path("AGENTS.md"), Path("docs/PURPOSE.md")]
 
 POINTERS = [
+    ("docs/SECURITY.md", "always/never rules for accounts, forms and public routes"),
     ("docs/USERS.md", "roles, capabilities, the per-person switches, audience flags"),
     ("docs/INTEGRATIONS.md", "Stripe, Gap/EMC, Meta, Mailchimp, TikTok, Blob — and their gotchas"),
     ("docs/DATA.md", "schema, money in two representations, Brisbane dates, migrations, RLS"),

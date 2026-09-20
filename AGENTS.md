@@ -27,6 +27,7 @@ starting cold should read the one that matches the work:
 | File | When |
 |---|---|
 | **`docs/PURPOSE.md`** | First. Purpose, the audiences, the roadmap, and the rules for deciding things against it. |
+| **`docs/SECURITY.md`** | Before anything touching an account, a form, or a public route. What we always do, never do, and the known gaps. |
 | **`docs/USERS.md`** | Anything deciding what a person can see or do. Roles, capabilities, the two per-person switches, and the audience flags on content. |
 | **`docs/INTEGRATIONS.md`** | Stripe, Gap/EMC, Meta, Mailchimp, TikTok, Anthropic, Blob, email — and the specific ways each one has misled us. |
 | **`docs/DATA.md`** | The schema: money in two representations, Brisbane dates, migrations, the RLS lockdown, how to query production without psql. |
@@ -69,6 +70,7 @@ actually returned.
 - **Ask for a capability, never a role.** `can(user, 'care.giving')`, not `user.role === 'ADMIN'`. The map is in `src/lib/permissions-core.ts`; `permissions.ts` has the server guards. See `docs/USERS.md`.
 - **One upload path, one media library.** All images go through `uploadImageAction` (`src/lib/actions/upload.actions.ts`) — it sniffs magic bytes and refuses SVG. Never write a second uploader. `avatars/` and `partner-logos/` are outside the library on purpose.
 - **Nothing in a chat or automation path may publish or spend.** `src/lib/integrations/meta-write.ts` is imported only by `marketing.actions.ts`, behind a human approval. Proposals end at a DRAFT row.
+- **Check the email before creating an account.** An email that already has a live account goes to sign-in; one with history but no password gets an emailed setup link; only a genuinely new address signs up on the spot. Check again in the action that creates the account — never trust that the first step ran. Applies to every form that captures an email, not just sign-up. Proving control of an inbox is what unlocks data; typing an address is not.
 - **A public route is a decision, not a side effect.** `isPublished` means published *to the portal*, not to the world. Check `churchOnly` / `staffOnly` before exposing any record, and ask before adding a public page.
 - **Vercel Hobby**: functions die at **60 seconds**, crons are **daily only** (a `*/10` schedule invalidates the whole deployment). Long jobs must be resumable.
 - **Widen, don't parallel.** Before building something for one audience, check whether a narrower version already exists for another and broaden that instead. Two upload paths and two media libraries got built here before anyone noticed. Name things after the domain, never the audience.
