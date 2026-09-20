@@ -6,7 +6,21 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Project conventions (permanent)
 
-For current progress, open tasks, and handover, read **`docs/PROJECT_STATUS.md`**.
+## Read these first
+
+This file is the short list of laws. The detail lives in `docs/`, and a session
+starting cold should read the one that matches the work:
+
+| File | When |
+|---|---|
+| **`docs/USERS.md`** | Anything deciding what a person can see or do. Roles, capabilities, the two per-person switches, and the audience flags on content. |
+| **`docs/INTEGRATIONS.md`** | Stripe, Gap/EMC, Meta, Mailchimp, TikTok, Anthropic, Blob, email — and the specific ways each one has misled us. |
+| **`docs/DATA.md`** | The schema: money in two representations, Brisbane dates, migrations, the RLS lockdown, how to query production without psql. |
+| **`docs/PROJECT_STATUS.md`** | Current progress, open tasks, handover. |
+
+Probe before you build. Every integration assumption taken from documentation
+has been wrong at least once; the fix each time came from printing what the API
+actually returned.
 
 - **Deploy** = commit to `main` + push → Vercel auto-deploys. Prod = `my.lighthousecare.org.au` (Vercel + Supabase). Only commit/push when the user asks.
 - **Never `git add` a `.env*` file.** Check staged files for `.env` before every commit. Secrets live in Vercel env, not the repo.
@@ -17,3 +31,9 @@ For current progress, open tasks, and handover, read **`docs/PROJECT_STATUS.md`*
 - **Permissions**: donor/finance data is gated by `User.canViewDonations` (`src/lib/permissions.ts`) + the `admin/(finance)` route group. Don't leak donation data to volunteer-only admins.
 - **Voice**: Australian English; warm, dignified, hopeful; brand orange `#f97316`. Never pity language ("the needy"); use "families doing it tough".
 - **Design**: new UI = white canvas, `rounded-[28px]` cards, two-weight headings, pill buttons, orange + black. Portal pages inside `PortalShell` use `-m-4 lg:-m-6 min-h-full bg-white`.
+- **Ask for a capability, never a role.** `can(user, 'care.giving')`, not `user.role === 'ADMIN'`. The map is in `src/lib/permissions-core.ts`; `permissions.ts` has the server guards. See `docs/USERS.md`.
+- **One upload path, one media library.** All images go through `uploadImageAction` (`src/lib/actions/upload.actions.ts`) — it sniffs magic bytes and refuses SVG. Never write a second uploader. `avatars/` and `partner-logos/` are outside the library on purpose.
+- **Nothing in a chat or automation path may publish or spend.** `src/lib/integrations/meta-write.ts` is imported only by `marketing.actions.ts`, behind a human approval. Proposals end at a DRAFT row.
+- **A public route is a decision, not a side effect.** `isPublished` means published *to the portal*, not to the world. Check `churchOnly` / `staffOnly` before exposing any record, and ask before adding a public page.
+- **Vercel Hobby**: functions die at **60 seconds**, crons are **daily only** (a `*/10` schedule invalidates the whole deployment). Long jobs must be resumable.
+- **`npx` will offer a newer major version** when the local one is missing — it has served a Prisma 8 release candidate against this Prisma 7 project. Use `./scripts/push-schema.sh` or `./node_modules/.bin/…`; never accept an unexpected install prompt.
