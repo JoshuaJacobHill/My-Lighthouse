@@ -9,7 +9,6 @@ import { Loader2, AlertCircle, Heart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { loginAction } from '@/lib/actions/auth.actions'
-import { safeNext } from '@/lib/safe-next'
 
 function GoodbyeBanner() {
   const searchParams = useSearchParams()
@@ -30,37 +29,12 @@ function GoodbyeBanner() {
   )
 }
 
-/**
- * Where to go after signing in.
- *
- * `?next=` is set by pages that turned somebody away — a private event, for
- * instance — so they land back where they were headed instead of on the
- * dashboard wondering what happened. Validated by `safeNext`, because an
- * unchecked value here is an open redirect on the one page where somebody has
- * just typed a password.
- *
- * Admins and the kiosk keep the destination `loginAction` chose for them: an
- * admin signing in belongs in the admin area, whatever link brought them.
- */
-function useNextDestination(): string | null {
-  const params = useSearchParams()
-  return safeNext(params.get('next'))
-}
-
-/**
- * The form itself, separate from the default export purely so it can sit
- * inside a Suspense boundary. `useSearchParams` requires one — without it the
- * build fails at prerender with "should be wrapped in a suspense boundary",
- * which `tsc` does not catch.
- */
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
-
-  const next = useNextDestination()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -76,10 +50,7 @@ function LoginForm() {
         setError(result.error)
       }
       if (result.redirectTo) {
-        // Only for ordinary supporters — an admin or kiosk sign-in keeps the
-        // destination the action picked.
-        const wanted = result.redirectTo === '/dashboard' ? next : null
-        router.push(wanted ?? result.redirectTo)
+        router.push(result.redirectTo)
       }
     })
   }
@@ -159,13 +130,5 @@ function LoginForm() {
         </Link>
       </p>
     </div>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
   )
 }

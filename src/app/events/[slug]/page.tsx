@@ -15,7 +15,6 @@ import { SmartImage } from '@/components/ui/SmartImage'
 import { EventSponsorStrip } from '@/components/events/EventSponsorStrip'
 import { SPONSOR_TIER_ORDER, SPONSOR_TIER_HEADING } from '@/lib/sponsor-tiers'
 import { PortalShell } from '@/components/layout/PortalShell'
-import { SignInToView } from './SignInToView'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,21 +22,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const event = await prisma.event.findFirst({
     where: { slug, isPublished: true },
-    select: { title: true, description: true, imageUrl: true, signedInOnly: true },
+    select: { title: true, description: true, imageUrl: true },
   })
   if (!event) return { title: 'Event — Lighthouse Care' }
-
-  // A private event's title is not a secret — it is in the link somebody was
-  // emailed. Its description, venue and photo are, and `generateMetadata` runs
-  // for anyone, scrapers included. So the preview gets the name and nothing
-  // else; the page behind it still asks them to sign in.
-  if (event.signedInOnly) {
-    return shareMetadata({
-      title: event.title,
-      description: 'Sign in to your My Lighthouse account to see this event.',
-      path: `/events/${slug}`,
-    })
-  }
 
   return shareMetadata({
     title: event.title,
@@ -83,13 +70,6 @@ export default async function EventPage({
 
   // Church-only events are hidden from everyone but church members.
   if (event.churchOnly && !viewer?.isChurchMember) notFound()
-
-  // Private events ask, rather than hide. A 404 would make a link emailed to
-  // supporters look broken to the very people it was sent to — so they get a
-  // page that says what to do, and `?next=` brings them back here afterwards.
-  if (event.signedInOnly && !session) {
-    return <SignInToView title={event.title} slug={slug} />
-  }
 
   // Availability is deliberately uncached — a stale count could oversell.
   const [availability, volunteerCount, sponsors] = await Promise.all([

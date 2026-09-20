@@ -32,7 +32,6 @@ export interface EventFormValues {
   fundId: string
   isPublished: boolean
   churchOnly: boolean
-  signedInOnly: boolean
   allowVolunteers: boolean
   volunteerCapacity: string
   allowDonations: boolean
@@ -56,7 +55,6 @@ export function EventForm({
   const [imageUrl, setImageUrl] = React.useState(event?.imageUrl ?? '')
   const [isPublished, setIsPublished] = React.useState(event?.isPublished ?? false)
   const [churchOnly, setChurchOnly] = React.useState(event?.churchOnly ?? false)
-  const [signedInOnly, setSignedInOnly] = React.useState(event?.signedInOnly ?? false)
   const [allowVolunteers, setAllowVolunteers] = React.useState(event?.allowVolunteers ?? false)
   const [allowDonations, setAllowDonations] = React.useState(event?.allowDonations ?? false)
   const [allowSponsors, setAllowSponsors] = React.useState(event?.allowSponsors ?? false)
@@ -92,7 +90,6 @@ export function EventForm({
       fundId: (fd.get('fundId') as string) ?? '',
       isPublished,
       churchOnly,
-      signedInOnly,
       allowVolunteers,
       volunteerCapacity: (fd.get('volunteerCapacity') as string) ?? '',
       allowDonations,
@@ -177,14 +174,8 @@ export function EventForm({
           onCheckedChange={(v) => setIsPublished(v === true)}
         />
         <Checkbox
-          label="Private — signed-in supporters only"
-          description="Anyone with the link sees the event name and a prompt to sign in or create an account. The details, photo and tickets stay hidden until they do."
-          checked={signedInOnly}
-          onCheckedChange={(v) => setSignedInOnly(v === true)}
-        />
-        <Checkbox
           label="Church only"
-          description="Stricter than private: only church members can view it, and everyone else gets a not-found page rather than a prompt — so the event is not known to exist."
+          description="Only church members can view this event."
           checked={churchOnly}
           onCheckedChange={(v) => setChurchOnly(v === true)}
         />

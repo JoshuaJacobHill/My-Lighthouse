@@ -287,14 +287,6 @@ const ticketTypeInputSchema = z.object({
 
 export const eventSchema = z.object({
   churchOnly: z.boolean().optional().default(false),
-  /**
-   * Private: signed-in supporters only.
-   *
-   * Distinct from `churchOnly`, which is stricter. A private event shows its
-   * name and a prompt to sign in; a church-only one 404s, so its existence
-   * stays unknown. See the field comment in schema.prisma.
-   */
-  signedInOnly: z.boolean().optional().default(false),
   title: z.string().trim().min(1, 'Event title is required').max(200),
   slug: z
     .string()

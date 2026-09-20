@@ -28,7 +28,6 @@ export const getCachedEvent = unstable_cache(
         endsAt: true,
         capacity: true,
         churchOnly: true,
-        signedInOnly: true,
         allowVolunteers: true,
         volunteerCapacity: true,
         allowDonations: true,

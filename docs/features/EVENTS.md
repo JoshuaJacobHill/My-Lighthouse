@@ -15,7 +15,6 @@ page actually offers:
 | Switch | Effect |
 |---|---|
 | `isPublished` | Visible at all. **Not** the same as public — see below. |
-| `signedInOnly` | **Private.** Signed-in supporters only. |
 | `churchOnly` | Church members only. Anonymous visitors get a **404**. |
 | `allowVolunteers` | Adds volunteer sign-up, capped by `volunteerCapacity` |
 | `allowDonations` | Adds a give option, into `fundId` |
@@ -27,31 +26,6 @@ actually run.
 
 Around it: `TicketType` (name, `price`, `quantityAvailable`, `maxPerOrder`,
 sales window), `TicketOrder` → `Ticket`, `EventVolunteer`, `EventSponsor`.
-
-## Three levels of visibility, and how each refuses
-
-| | Who can read it | What a stranger gets |
-|---|---|---|
-| Public | Anyone | The event |
-| `signedInOnly` | Any signed-in supporter | **A page saying to sign in or create an account** — with the event's name, and `?next=` so they come back to it |
-| `churchOnly` | Church members | **A 404** |
-
-The difference between the last two is deliberate and worth keeping.
-
-A **private** event is usually a link emailed to supporters. A 404 there would
-make the link look broken to exactly the people it was sent to, so the page
-asks instead. That means a private event's **name is not secret** — it is in
-the link. Its description, photo, venue and tickets are: `generateMetadata`
-returns the title and a generic line for a private event, so a scraper or a
-group chat preview gets no more than the name.
-
-A **church-only** event 404s because its existence is not public information.
-If something must not be known to exist, that is the flag — or leave it
-unpublished.
-
-`SignInToView` renders the prompt. `safeNext` validates the return path,
-because an unchecked `?next=` is an open redirect on the one page where
-somebody has just typed a password.
 
 ## Buying tickets
 
