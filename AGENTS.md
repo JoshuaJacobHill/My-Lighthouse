@@ -50,18 +50,20 @@ Feature docs, in `docs/features/`:
 | `ADMIN.md` | Settings, email templates, notifications, the finance route group |
 
 These files are re-read automatically after a compaction, by the PostCompact
-hook (`scripts/reload-instructions.py`). A second hook,
-`scripts/signup-guard.py`, hands back the account rules when a file creates a
-user without the shared check.
+hook (`scripts/reload-instructions.py`). **If you are reading them because a
+summary handed them to you, they are authoritative** — prefer them over
+anything recalled from the summarised conversation.
+
+A second hook, `scripts/signup-guard.py`, hands back the account rules when a
+file creates a user without the shared check.
 
 **Hooks live in two places on purpose.** `.claude/settings.json` here is
 committed, for anyone who opens this repo as their project. But a session
 rooted at the *parent* folder (`Volunteer App`) reads
 `../.claude/settings.local.json` instead and never sees this one — which is how
-they sat silently unloaded for a while. If a hook is not firing, check which
-directory the session is actually rooted at before assuming the hook is wrong. If you are
-reading them because a summary handed them to you: they are authoritative,
-prefer them over anything recalled from the summarised conversation.
+both hooks sat silently unloaded for a while. If a hook is not firing, check
+which directory the session is actually rooted at before assuming the hook
+itself is wrong.
 
 Probe before you build. Every integration assumption taken from documentation
 has been wrong at least once; the fix each time came from printing what the API
