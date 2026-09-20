@@ -45,6 +45,39 @@ than a new table.
 `partners` · `media` · `marketing` · `meta-scopes` · `ig-backfill` ·
 and the `(finance)` group: `transactions`, `fundraisers`, `stories`, `events`.
 
+## The sidebar
+
+`AdminSidebar` groups those pages by **domain**, not audience — six top-level
+entries instead of a flat list that had reached seventeen:
+
+| Group | Holds |
+|---|---|
+| **Dashboard** | `/admin` |
+| **People** | users, roster, on-site, attendance, feedback, reports, teams |
+| **Giving** | funds, fundraisers, events, partners, transactions, migrations |
+| **Communications** | stories, emails, notifications, marketing, media |
+| **Tasks & Checklists** | tasks (no group — one page) |
+| **Settings** | settings, meta-scopes, ig-backfill |
+
+A group is rendered only when the admin can open at least one page inside it,
+so a `CHURCH_MANAGER` sees four entries where a `SUPER_ADMIN` sees six. The
+collapsed rail stays a flat column of icons, because grouping needs the labels.
+
+**Grouping is presentation only.** Every page keeps its own
+`requireCapability()`, and the `(finance)` route group is untouched — route
+groups do not affect URLs, so a finance page can sit under "Giving" in the nav
+while still living in `(finance)` on disk.
+
+Two things this fixed rather than merely rearranged:
+
+- `partners`, `media`, `marketing`, `notifications`, `meta-scopes` and
+  `ig-backfill` were in no nav at all, reachable only by deep link from another
+  page. They have a home now.
+- `getCapabilities()` did not return `business.reports`, so any nav item gated
+  on it would have been invisible to everyone including `SUPER_ADMIN`. It is in
+  the list now. **A capability granted by a switch rather than a role still has
+  to be added there** — `can()` handling it is not enough.
+
 The **`(finance)` route group** is the giving side and is gated by
 `care.giving` — which a plain `ADMIN` only holds with `canViewDonations`
 ticked. Do not move a finance page out of that group.

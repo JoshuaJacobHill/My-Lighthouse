@@ -44,6 +44,10 @@ export async function getCapabilities(): Promise<Capability[]> {
     'church.teams',
     'system.settings',
     'system.users',
+    // Granted by the canViewBusinessReports switch rather than a role. It was
+    // missing here, which left the marketing and media nav items hidden from
+    // everyone — including SUPER_ADMIN — because the sidebar never saw it.
+    'business.reports',
   ]
   return all.filter((c) => can(user, c))
 }

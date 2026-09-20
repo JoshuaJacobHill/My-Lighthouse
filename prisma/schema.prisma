@@ -1146,6 +1146,22 @@ model Event {
   isPublished       Boolean   @default(false)
   // When true, only church members see this event.
   churchOnly        Boolean   @default(false)
+  /// Signed-in supporters only — not the general public.
+  ///
+  /// The middle rung of three. `isPublished` decides whether the event exists
+  /// for anybody at all; this decides whether a stranger may read it;
+  /// `churchOnly` narrows it again to church members.
+  ///
+  /// Behaves differently from `churchOnly` on purpose. A church-only event
+  /// 404s for everyone else, because its existence is not public information.
+  /// A private one **sends people to sign in and then back to it**, because
+  /// the point is usually a link emailed to supporters — a 404 would make that
+  /// link look broken to the very people it was sent to.
+  ///
+  /// So: a private event's existence and title are not secret. Its
+  /// description, image, venue, tickets and sponsors are. If something must
+  /// not be known to exist, use `churchOnly` or leave it unpublished.
+  signedInOnly      Boolean   @default(false)
   // Optional per-event sections (e.g. the Good Food Festival).
   allowVolunteers   Boolean   @default(false)
   volunteerCapacity Int?

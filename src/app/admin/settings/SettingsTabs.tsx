@@ -300,6 +300,36 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
             helpText="Send an inactivity check-in email after this many days without a shift."
           />
 
+          {/* The wording of every email lives in the templates, not in code.
+              Linking out rather than moving them keeps /admin/emails at the URL
+              the notification emails themselves already point at. */}
+          <div className="rounded-xl border border-gray-200 p-4">
+            <p className="text-sm font-medium text-gray-800">Email templates</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              The words in every email we send — volunteer and donor. Settings above decide how they go out;
+              the templates decide what they say.
+            </p>
+            <a
+              href="/admin/emails"
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:underline"
+            >
+              Edit the templates
+            </a>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4">
+            <p className="text-sm font-medium text-gray-800">Notifications</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Everything sent through the portal rather than by email, and who received it.
+            </p>
+            <a
+              href="/admin/notifications"
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:underline"
+            >
+              View notifications
+            </a>
+          </div>
+
           <SaveBar saving={saving} error={saveError} success={saveSuccess} onSave={handleSave} />
         </div>
       )}
