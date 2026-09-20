@@ -67,6 +67,37 @@ if (!apply) {
   process.exit(0)
 }
 
+// A one-time migration, and re-running it is not free.
+//
+// It derives every column from the old booleans, which is right exactly once.
+// Afterwards the picker can set audiences no boolean carries — donors,
+// volunteers, partners, or a church event switched from "not found" to "sign
+// in" — and a second run would reset those to whatever the booleans still say,
+// silently and with no error to notice.
+const [{ touched }] = await q(`
+  SELECT (
+    (SELECT count(*) FROM "Event"
+      WHERE array_length("audienceKinds", 1) > 0 OR "audienceGate" = 'HIDE' OR NOT "audiencePublic")
+    +
+    (SELECT count(*) FROM "Story"
+      WHERE array_length("audienceKinds", 1) > 0 OR "audienceGate" = 'HIDE')
+  )::int AS touched
+`)
+
+if (touched > 0 && !process.argv.includes('--force')) {
+  console.log(`
+${touched} row(s) already carry an audience, so this has run before.
+
+Running it again rebuilds every rule from the old booleans. Anything chosen
+in the admin picker that no boolean can express — donors, volunteers,
+partners, or a church event set to ask rather than hide — would be reset
+without a word.
+
+If that is genuinely what you want, add --force.`)
+  await client.end()
+  process.exit(1)
+}
+
 await client.query('BEGIN')
 try {
   const ev = await client.query(`
