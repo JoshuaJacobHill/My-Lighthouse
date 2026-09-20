@@ -8,11 +8,25 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Read these first
 
+**`docs/PURPOSE.md` before anything else**, on any session that will make a
+design decision. It is what the app is *for*; the rest is how it works, and
+knowing the mechanism without the purpose produces reasonable-looking choices
+that are wrong for where this is going.
+
+The one idea, so it is never lost: **one account per person, and what someone
+sees is a property of how they are connected to Lighthouse.** People move
+between groups — a church member becomes a volunteer, a donor joins the staff —
+and access must follow by ticking something, never by making a second account.
+The five-year intent is to replace the admin subscriptions and be the single
+place staff, volunteers, customers, supporters, partners and church members all
+deal with Lighthouse.
+
 This file is the short list of laws. The detail lives in `docs/`, and a session
 starting cold should read the one that matches the work:
 
 | File | When |
 |---|---|
+| **`docs/PURPOSE.md`** | First. Purpose, the audiences, the roadmap, and the rules for deciding things against it. |
 | **`docs/USERS.md`** | Anything deciding what a person can see or do. Roles, capabilities, the two per-person switches, and the audience flags on content. |
 | **`docs/INTEGRATIONS.md`** | Stripe, Gap/EMC, Meta, Mailchimp, TikTok, Anthropic, Blob, email — and the specific ways each one has misled us. |
 | **`docs/DATA.md`** | The schema: money in two representations, Brisbane dates, migrations, the RLS lockdown, how to query production without psql. |
@@ -36,4 +50,6 @@ actually returned.
 - **Nothing in a chat or automation path may publish or spend.** `src/lib/integrations/meta-write.ts` is imported only by `marketing.actions.ts`, behind a human approval. Proposals end at a DRAFT row.
 - **A public route is a decision, not a side effect.** `isPublished` means published *to the portal*, not to the world. Check `churchOnly` / `staffOnly` before exposing any record, and ask before adding a public page.
 - **Vercel Hobby**: functions die at **60 seconds**, crons are **daily only** (a `*/10` schedule invalidates the whole deployment). Long jobs must be resumable.
+- **Widen, don't parallel.** Before building something for one audience, check whether a narrower version already exists for another and broaden that instead. Two upload paths and two media libraries got built here before anyone noticed. Name things after the domain, never the audience.
+- **Anything that will replace a subscription gets an interface first.** MyFoodLink, Gap, Xero and Planning Center are all eventual replacements. Integrate behind our own shape (`src/lib/integrations/gap.ts` is the pattern) so a swap is a new adapter, not a rewrite of everything reading from it.
 - **`npx` will offer a newer major version** when the local one is missing — it has served a Prisma 8 release candidate against this Prisma 7 project. Use `./scripts/push-schema.sh` or `./node_modules/.bin/…`; never accept an unexpected install prompt.
