@@ -5,6 +5,7 @@ import { periodKey, periodLabel, isOverdue, periodHeading } from '@/lib/checklis
 import { TaskList, type TaskRow, type ChecklistRow } from './TaskList'
 import { CreateTask } from './CreateTask'
 import { commentsForTasks } from '@/lib/story-comments'
+import { viewerFromSession } from '@/lib/comments'
 import { getChecklistMonth } from '@/lib/checklist-leaderboard'
 import { ChecklistLeaderboard } from './ChecklistLeaderboard'
 import { isAdminRole } from '@/lib/permissions-core'
@@ -145,13 +146,7 @@ export default async function StaffTasksPage() {
 
   const commentsByTask = await commentsForTasks(
     taskRows.map((t) => t.id),
-    {
-      id: me.id,
-      role: me.role,
-      isStaff: me.isStaff,
-      isTrainee: me.isTrainee,
-      isChurchMember: me.isChurchMember,
-    },
+    viewerFromSession(session),
   )
 
   const outstanding =

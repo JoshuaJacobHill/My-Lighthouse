@@ -10,6 +10,9 @@
 import prisma from '@/lib/prisma'
 import { notify } from '@/lib/notifications'
 import { isAdminRole } from '@/lib/permissions-core'
+import { canSee, ruleFromRow } from '@/lib/audience-core'
+import { notificationAudienceFor } from '@/lib/audience'
+import { audienceUserWhere } from '@/lib/notifications'
 
 export type Viewer = {
   id: string
@@ -17,6 +20,41 @@ export type Viewer = {
   isStaff: boolean
   isTrainee: boolean
   isChurchMember: boolean
+  isVolunteer: boolean
+  hasGiven: boolean
+  isPartner: boolean
+}
+
+/**
+ * A viewer from the session, which already carries every connection.
+ *
+ * One builder rather than the same object literal in four places — when the
+ * audience rules learned about donors and partners, four call sites would
+ * otherwise each have needed remembering, and the one that was forgotten would
+ * have quietly under-filtered.
+ */
+export function viewerFromSession(session: {
+  userId: string
+  role: string
+  user: {
+    isStaff: boolean
+    isTrainee: boolean
+    isChurchMember: boolean
+    hasVolunteerProfile: boolean
+    donationCount: number
+    isPartner: boolean
+  }
+}): Viewer {
+  return {
+    id: session.userId,
+    role: session.role,
+    isStaff: session.user.isStaff,
+    isTrainee: session.user.isTrainee,
+    isChurchMember: session.user.isChurchMember,
+    isVolunteer: session.user.hasVolunteerProfile,
+    hasGiven: session.user.donationCount > 0,
+    isPartner: session.user.isPartner,
+  }
 }
 
 export type CommentView = {
@@ -31,15 +69,36 @@ export type CommentView = {
   mentions: { userId: string; name: string }[]
 }
 
-/** Mirrors the news page's filter: staff-only needs staff, church-only needs church. */
+/**
+ * Mirrors the news page's filter, so commenting is never possible on something
+ * that would not have been listed.
+ *
+ * Both the old flags and the audience rule, while the two run side by side.
+ * `ruleFromRow` falls back to the flags for a row the backfill has not reached,
+ * so an unmigrated story stays exactly as restricted as it was.
+ */
 export function canSeeStory(
   viewer: Viewer,
-  story: { staffOnly: boolean; churchOnly: boolean; isPublished: boolean },
+  story: {
+    staffOnly: boolean
+    churchOnly: boolean
+    isPublished: boolean
+    audienceKinds?: string[]
+    audienceMatch?: string
+    audienceGate?: string
+  },
 ): boolean {
   if (!story.isPublished && !isAdminRole(viewer.role)) return false
   if (story.staffOnly && !(viewer.isStaff || viewer.isTrainee)) return false
   if (story.churchOnly && !viewer.isChurchMember) return false
-  return true
+  return canSee(ruleFromRow(story, { canBePublic: false }), {
+    isChurchMember: viewer.isChurchMember,
+    isStaff: viewer.isStaff,
+    isTrainee: viewer.isTrainee,
+    isVolunteer: viewer.isVolunteer,
+    hasGiven: viewer.hasGiven,
+    isPartner: viewer.isPartner,
+  })
 }
 
 /** The tasks area is staff-only, so seeing a task is the same test. */
@@ -128,13 +187,20 @@ export async function taggableUsers(
   } else {
     const story = await prisma.story.findUnique({
       where: { id: target.storyId! },
-      select: { staffOnly: true, churchOnly: true },
+      select: {
+        staffOnly: true,
+        churchOnly: true,
+        audienceKinds: true,
+        audienceMatch: true,
+        audienceGate: true,
+      },
     })
     if (!story) return []
-    const AND: Record<string, unknown>[] = []
-    if (story.staffOnly) AND.push({ OR: [{ isStaff: true }, { isTrainee: true }] })
-    if (story.churchOnly) AND.push({ isChurchMember: true })
-    where = { where: { isActive: true, ...(AND.length ? { AND } : {}) } }
+    // Offering somebody as a mention is telling the author that person can read
+    // it, so this resolves through the same audience machinery the notification
+    // fan-out uses rather than restating the rule a third time.
+    const rule = ruleFromRow(story, { canBePublic: false })
+    where = { where: { isActive: true, AND: [audienceUserWhere(notificationAudienceFor(rule))] } }
   }
 
   const users = await prisma.user.findMany({

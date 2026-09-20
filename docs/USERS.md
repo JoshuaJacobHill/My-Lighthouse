@@ -69,10 +69,40 @@ any record on a public route.**
 | Flag | On | Means |
 |---|---|---|
 | `isPublished` | Story, Event | Visible in the portal at all. NOT the same as public. |
-| `signedInOnly` | Event | Private: signed-in supporters only. An anonymous visitor gets a page asking them to sign in or create an account, with the event's name — because these are usually links emailed to supporters, and a 404 would look broken to them. |
-| `churchOnly` | Story, Event | Church members only. An anonymous visitor gets a **404**, not a login prompt — it does not reveal that the thing exists. |
-| `staffOnly` | Story | Staff and trainees only. |
+| `audienceKinds` | Story, Event | **Who it is for**, as a list. See below. |
 | `isActive` | Fundraiser, Fund | Still accepting gifts. |
+
+### The audience rule
+
+`churchOnly`, `staffOnly` and `signedInOnly` grew one at a time and have been
+replaced by one rule both models share. **Read it through
+`src/lib/audience-core.ts` — never by testing the columns by hand.**
+
+| Column | Means |
+|---|---|
+| `audienceKinds` | `church`, `staff`, `volunteers`, `donors`, `partners`. Empty = any signed-in supporter. |
+| `audienceMatch` | `ANY` (in one of them) or `ALL` (in all at once). The picker only produces `ANY`; `ALL` exists to preserve stories that carried church *and* staff, which meant both. |
+| `audienceGate` | What somebody outside it gets: `ASK` (sign-in prompt) or `HIDE` (404). |
+| `audiencePublic` | Readable by somebody not signed in. **Event only** — Story has no such column, because there is no public story page. |
+
+Two axes, on purpose. The list says *who*; the gate says whether a stranger may
+know the thing exists. A church-only event `HIDE`s because its existence is not
+public; a private one `ASK`s because it is usually a link emailed to supporters
+and a 404 would look broken to the people it was sent to.
+
+The audiences are the ones the database can answer from how somebody is
+connected. **Shoppers and Santa's Little Helpers are deliberately absent** —
+both are real audiences with nothing behind them yet, and a tickbox that
+silently matches nobody reads as a promise the app cannot keep.
+
+Asked in two places, which must agree: `canSee()` for one item, and
+`storyAudienceWhere()` / `eventAudienceWhere()` for a list. `audience.test.ts`
+runs every viewer against every rule and demands the same answer from both,
+because two expressions of one rule is exactly where content leaks.
+
+**The old booleans are still written and still filtered on.** Until the backfill
+is confirmed everywhere, every read applies both — a row the backfill has not
+reached defaults to "everyone", and that error points at leaking.
 
 `isPublished` means "published to the portal", not "published to the world".
 A published story is visible to signed-in users at `/dashboard/news` and has no

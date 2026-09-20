@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ImageUpload } from '@/components/admin/ImageUpload'
 import { createStoryAction, updateStoryAction } from '@/lib/actions/story.actions'
+import { AudiencePicker } from '@/components/admin/AudiencePicker'
+import { SIGNED_IN_RULE, type AudienceRule } from '@/lib/audience-core'
 import type { StoryInput } from '@/lib/validations'
 
 export interface StoryFormValues {
@@ -18,8 +20,7 @@ export interface StoryFormValues {
   imageUrl: string | null
   externalUrl: string | null
   isPublished: boolean
-  churchOnly: boolean
-  staffOnly: boolean
+  audience: AudienceRule
   sortOrder: number
 }
 
@@ -30,6 +31,9 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
   const [error, setError] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [imageUrl, setImageUrl] = React.useState(story?.imageUrl ?? '')
+  // A story with nobody chosen is for any signed-in supporter; there is no
+  // public story page, so the picker never offers one.
+  const [audience, setAudience] = React.useState<AudienceRule>(story?.audience ?? SIGNED_IN_RULE)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -44,8 +48,7 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
       imageUrl,
       externalUrl: String(fd.get('externalUrl') ?? ''),
       isPublished: fd.get('isPublished') === 'on',
-      churchOnly: fd.get('churchOnly') === 'on',
-      staffOnly: fd.get('staffOnly') === 'on',
+      audience,
       sortOrder: String(fd.get('sortOrder') ?? '0'),
     }
     const res = story ? await updateStoryAction(story.id, input) : await createStoryAction(input)
@@ -119,25 +122,7 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
         <span className="text-sm font-medium text-gray-700">Published (visible on the dashboard)</span>
       </label>
 
-      <label className="flex items-center gap-2.5">
-        <input
-          type="checkbox"
-          name="churchOnly"
-          defaultChecked={story?.churchOnly ?? false}
-          className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-        />
-        <span className="text-sm font-medium text-gray-700">Church only (only church members see this)</span>
-      </label>
-
-      <label className="flex items-center gap-2.5">
-        <input
-          type="checkbox"
-          name="staffOnly"
-          defaultChecked={story?.staffOnly ?? false}
-          className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-        />
-        <span className="text-sm font-medium text-gray-700">Staff only (only staff &amp; trainees see this)</span>
-      </label>
+      <AudiencePicker value={audience} onChange={setAudience} canBePublic={false} />
 
       <div className="flex items-center gap-3 pt-2">
         <Button type="submit" disabled={saving}>

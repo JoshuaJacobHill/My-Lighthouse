@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { AudiencePicker } from '@/components/admin/AudiencePicker'
+import { PUBLIC_RULE, type AudienceRule } from '@/lib/audience-core'
 import { ImageUpload } from '@/components/admin/ImageUpload'
 import { createEventAction, updateEventAction } from '@/lib/actions/event.actions'
 import type { EventInput } from '@/lib/validations'
@@ -31,8 +33,7 @@ export interface EventFormValues {
   capacity: string
   fundId: string
   isPublished: boolean
-  churchOnly: boolean
-  signedInOnly: boolean
+  audience: AudienceRule
   allowVolunteers: boolean
   volunteerCapacity: string
   allowDonations: boolean
@@ -55,8 +56,7 @@ export function EventForm({
   const [error, setError] = React.useState<string | null>(null)
   const [imageUrl, setImageUrl] = React.useState(event?.imageUrl ?? '')
   const [isPublished, setIsPublished] = React.useState(event?.isPublished ?? false)
-  const [churchOnly, setChurchOnly] = React.useState(event?.churchOnly ?? false)
-  const [signedInOnly, setSignedInOnly] = React.useState(event?.signedInOnly ?? false)
+  const [audience, setAudience] = React.useState<AudienceRule>(event?.audience ?? PUBLIC_RULE)
   const [allowVolunteers, setAllowVolunteers] = React.useState(event?.allowVolunteers ?? false)
   const [allowDonations, setAllowDonations] = React.useState(event?.allowDonations ?? false)
   const [allowSponsors, setAllowSponsors] = React.useState(event?.allowSponsors ?? false)
@@ -91,8 +91,7 @@ export function EventForm({
       capacity: (fd.get('capacity') as string) ?? '',
       fundId: (fd.get('fundId') as string) ?? '',
       isPublished,
-      churchOnly,
-      signedInOnly,
+      audience,
       allowVolunteers,
       volunteerCapacity: (fd.get('volunteerCapacity') as string) ?? '',
       allowDonations,
@@ -176,18 +175,7 @@ export function EventForm({
           checked={isPublished}
           onCheckedChange={(v) => setIsPublished(v === true)}
         />
-        <Checkbox
-          label="Private — signed-in supporters only"
-          description="Anyone with the link sees the event name and a prompt to sign in or create an account. The details, photo and tickets stay hidden until they do."
-          checked={signedInOnly}
-          onCheckedChange={(v) => setSignedInOnly(v === true)}
-        />
-        <Checkbox
-          label="Church only"
-          description="Stricter than private: only church members can view it, and everyone else gets a not-found page rather than a prompt — so the event is not known to exist."
-          checked={churchOnly}
-          onCheckedChange={(v) => setChurchOnly(v === true)}
-        />
+        <AudiencePicker value={audience} onChange={setAudience} canBePublic />
 
         <div className="border-t border-gray-100 pt-4">
           <p className="mb-3 text-sm font-semibold text-gray-900">Event sections</p>

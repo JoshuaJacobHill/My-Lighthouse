@@ -8,6 +8,8 @@ import { isDonorPortalEnabled } from '@/lib/features'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
 import { commentsForStories } from '@/lib/story-comments'
+import { viewerFromSession } from '@/lib/comments'
+import { connectionsFrom, storyAudienceWhere, eventAudienceWhere } from '@/lib/audience'
 import { getCurrentChallenge } from '@/lib/fitness-data'
 import { StatusBadge } from '@/components/volunteer/StatusBadge'
 import { ChallengeBanner } from '@/components/dashboard/ChallengeBanner'
@@ -36,9 +38,15 @@ export default async function DonorHomePage() {
       volunteerProfile: {
         select: { status: true, _count: { select: { attendanceRecords: true } } },
       },
+      // For the audience rules: a partner is somebody with a live membership of
+      // an organisation, a donor is somebody who has given.
+      orgMemberships: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
+      _count: { select: { donations: true } },
     },
   })
   if (!user) redirect('/login')
+
+  const audienceOf = connectionsFrom(user)
 
   await claimDonationsForUser(session.userId, user.email, user.emailVerified)
 
@@ -60,8 +68,12 @@ export default async function DonorHomePage() {
     prisma.story.findMany({
       where: {
         isPublished: true,
+        // Both filters, until the backfill is confirmed everywhere. A row the
+        // backfill has not reached defaults to "everyone", and that error
+        // points at leaking rather than hiding — so the old flags stay on.
         ...(user.isChurchMember ? {} : { churchOnly: false }),
         ...(isStaffOrTrainee ? {} : { staffOnly: false }),
+        AND: [storyAudienceWhere(audienceOf)],
       },
       orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
       take: 6,
@@ -72,6 +84,8 @@ export default async function DonorHomePage() {
         isPublished: true,
         OR: [{ startsAt: { gte: new Date() } }, { startsAt: null }],
         ...(user.isChurchMember ? {} : { churchOnly: false }),
+        // In AND rather than spread, because the dates above already use OR.
+        AND: [eventAudienceWhere(audienceOf)],
       },
       orderBy: { startsAt: 'asc' },
       take: 4,
@@ -199,13 +213,7 @@ export default async function DonorHomePage() {
         </section>
   )
 
-  const viewer = {
-    id: session.userId,
-    role: session.role,
-    isStaff: user.isStaff,
-    isTrainee: user.isTrainee,
-    isChurchMember: user.isChurchMember,
-  }
+  const viewer = viewerFromSession(session)
   const commentsByStory = await commentsForStories(stories.map((s) => s.id), viewer)
 
   return (

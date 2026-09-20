@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DAYS_OF_WEEK, LOCATIONS } from '@/lib/constants'
+import { AUDIENCE_KINDS } from '@/lib/audience-core'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,22 @@ export type LoginInput = z.infer<typeof loginSchema>
 // Spread readonly tuples into mutable tuples for zod enum
 const DAYS_ENUM = [...DAYS_OF_WEEK] as [string, ...string[]]
 const LOCATIONS_ENUM = [...LOCATIONS] as [string, ...string[]]
+
+/**
+ * Who may see a story or an event, as the picker submits it.
+ *
+ * Optional while the old checkboxes are still on some forms: a payload without
+ * it leaves the row's existing rule alone rather than silently resetting it to
+ * "everyone". `public` is ignored for stories, which have no public page.
+ */
+const AUDIENCE_ENUM = [...AUDIENCE_KINDS] as [string, ...string[]]
+
+export const audienceRuleSchema = z.object({
+  public: z.boolean().optional().default(false),
+  kinds: z.array(z.enum(AUDIENCE_ENUM)).max(AUDIENCE_KINDS.length).optional().default([]),
+  match: z.enum(['ANY', 'ALL']).optional().default('ANY'),
+  gate: z.enum(['ASK', 'HIDE']).optional().default('ASK'),
+})
 
 // ─── Volunteer signup ─────────────────────────────────────────────────────────
 
@@ -255,6 +272,7 @@ export const storySchema = z.object({
   isPublished: z.boolean().optional().default(false),
   churchOnly: z.boolean().optional().default(false),
   staffOnly: z.boolean().optional().default(false),
+  audience: audienceRuleSchema.optional(),
   sortOrder: z
     .union([z.string(), z.number()])
     .optional()
@@ -295,6 +313,7 @@ export const eventSchema = z.object({
    * stays unknown. See the field comment in schema.prisma.
    */
   signedInOnly: z.boolean().optional().default(false),
+  audience: audienceRuleSchema.optional(),
   title: z.string().trim().min(1, 'Event title is required').max(200),
   slug: z
     .string()

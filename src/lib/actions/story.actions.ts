@@ -6,6 +6,8 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { storySchema, type StoryInput } from '@/lib/validations'
 import { can, isAdminRole, type PermissionUser } from '@/lib/permissions-core'
+import { ruleFromInput, storyAudienceColumns, type AudienceRule } from '@/lib/audience-core'
+import { notificationAudienceFor } from '@/lib/audience'
 
 interface ActionResult {
   success: boolean
@@ -24,10 +26,16 @@ async function requireAdminSession() {
 
 /**
  * Stories are the one thing both sides of the house write, so a story's
- * audience decides who may touch it: `churchOnly` stories belong to the church
- * manager, everything else to the Care side. Enforced here rather than only in
- * the form, because the audience arrives from the client and a church manager
- * could otherwise untick the box and publish to every volunteer.
+ * audience decides who may touch it: a story aimed at church members belongs to
+ * the church manager, everything else to the Care side. Enforced here rather
+ * than only in the form, because the audience arrives from the client and a
+ * church manager could otherwise drop the audience and publish to every
+ * volunteer.
+ *
+ * Still inferred from the audience rather than stated outright. Naming an owner
+ * would be better — editing rights would stop moving as a side effect of
+ * changing who may read something — but that needs a control on the form and a
+ * decision about who owns a story aimed at several audiences at once.
  */
 async function requireStoryAudience(churchOnly: boolean): Promise<void> {
   const me = await currentPermissionUser()
@@ -80,22 +88,15 @@ function revalidate() {
 /**
  * Tell people a story has gone live.
  *
- * The audience comes from the story's own visibility flags, so a staff-only
- * story never reaches volunteers. Only fired the first time it publishes —
- * editing a typo should not tell 400 people to read it again.
+ * The audience comes from the story's own audience rule, so a staff-only story
+ * never reaches volunteers. Only fired the first time it publishes — editing a
+ * typo should not tell 400 people to read it again.
  */
-async function announceStory(
-  story: { title: string; slug: string; churchOnly: boolean; staffOnly: boolean },
-  senderId?: string,
-) {
-  // Mirror exactly who can see it. The news page hides a staff-only story from
-  // non-staff and a church-only story from non-members, so a story carrying
-  // both flags needs both — notifying either group alone would tell people
-  // about something they cannot open.
-  const audience: Audience =
-    story.staffOnly || story.churchOnly
-      ? { kind: 'flags', staff: story.staffOnly || undefined, church: story.churchOnly || undefined }
-      : { kind: 'everyone' }
+async function announceStory(story: { title: string; slug: string; rule: AudienceRule }, senderId?: string) {
+  // Mirror exactly who can read it. Notifying somebody about a story they will
+  // be refused is the failure this guards against, which is why it is derived
+  // from the same rule the news page filters on rather than restated here.
+  const audience: Audience = notificationAudienceFor(story.rule)
 
   await notify({
     audience,
@@ -125,7 +126,7 @@ export async function createStoryAction(input: StoryInput): Promise<ActionResult
   const data = parsed.data
 
   try {
-    await requireStoryAudience(data.churchOnly ?? false)
+    await requireStoryAudience(ruleFromInput(data, { canBePublic: false }).kinds.includes('church'))
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
@@ -141,16 +142,19 @@ export async function createStoryAction(input: StoryInput): Promise<ActionResult
         imageUrl: data.imageUrl ?? null,
         externalUrl: data.externalUrl ?? null,
         isPublished: data.isPublished ?? false,
-        churchOnly: data.churchOnly ?? false,
-        staffOnly: data.staffOnly ?? false,
+        // The rule, plus the old booleans kept in step until every reader moves.
+        ...storyAudienceColumns(ruleFromInput(data, { canBePublic: false })),
         publishedAt: data.isPublished ? new Date() : null,
         sortOrder: data.sortOrder ?? 0,
       },
-      select: { id: true, title: true, slug: true, churchOnly: true, staffOnly: true },
+      select: { id: true, title: true, slug: true },
     })
     revalidate()
     if (data.isPublished ?? false) {
-      await announceStory(story, session?.userId)
+      await announceStory(
+        { title: story.title, slug: story.slug, rule: ruleFromInput(data, { canBePublic: false }) },
+        session?.userId,
+      )
     }
     return { success: true, storyId: story.id }
   } catch (err) {
@@ -184,7 +188,7 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
     // to the audience you're moving it to.
     try {
       await requireStoryAudience(existing.churchOnly)
-      await requireStoryAudience(data.churchOnly ?? false)
+      await requireStoryAudience(ruleFromInput(data, { canBePublic: false }).kinds.includes('church'))
     } catch (err) {
       return { success: false, error: (err as Error).message }
     }
@@ -200,8 +204,7 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
         imageUrl: data.imageUrl ?? null,
         externalUrl: data.externalUrl ?? null,
         isPublished: data.isPublished ?? false,
-        churchOnly: data.churchOnly ?? false,
-        staffOnly: data.staffOnly ?? false,
+        ...storyAudienceColumns(ruleFromInput(data, { canBePublic: false })),
         // Stamp publishedAt the first time it goes live; keep it thereafter.
         publishedAt: data.isPublished ? existing.publishedAt ?? new Date() : null,
         sortOrder: data.sortOrder ?? 0,
@@ -211,12 +214,7 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
     const goingLive = (data.isPublished ?? false) && !existing.isPublished
     if (goingLive) {
       await announceStory(
-        {
-          title: data.title,
-          slug,
-          churchOnly: data.churchOnly ?? false,
-          staffOnly: data.staffOnly ?? false,
-        },
+        { title: data.title, slug, rule: ruleFromInput(data, { canBePublic: false }) },
         session?.userId,
       )
     }

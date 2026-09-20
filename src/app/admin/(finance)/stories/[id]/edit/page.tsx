@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
+import { ruleFromRow } from '@/lib/audience-core'
 import { StoryForm } from '@/components/admin/StoryForm'
 import { requireAnyCapability } from '@/lib/permissions'
 
@@ -41,8 +42,7 @@ export default async function EditStoryPage({ params }: { params: Promise<{ id: 
           imageUrl: story.imageUrl,
           externalUrl: story.externalUrl,
           isPublished: story.isPublished,
-          churchOnly: story.churchOnly,
-          staffOnly: story.staffOnly,
+          audience: ruleFromRow(story, { canBePublic: false }),
           sortOrder: story.sortOrder,
         }}
       />

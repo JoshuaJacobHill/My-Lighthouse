@@ -70,6 +70,8 @@ export const getSession = cache(async function getSession(): Promise<{
     /** Status of the volunteer profile, when there is one. */
     volunteerStatus: string | null
     donationCount: number
+    /** A live membership of a partner organisation. */
+    isPartner: boolean
     imageUrl: string | null
   }
 } | null> {
@@ -94,6 +96,10 @@ export const getSession = cache(async function getSession(): Promise<{
             // Only ever used as a "has this person ever given?" flag. Counted
             // here, on an indexed column, to save the layout a round trip.
             _count: { select: { donations: true } },
+            // Same reasoning: the audience rules ask whether somebody is at a
+            // partner organisation, and a join here costs less than a second
+            // query on every page that filters content.
+            orgMemberships: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
           },
         },
       },
@@ -128,6 +134,7 @@ export const getSession = cache(async function getSession(): Promise<{
         hasVolunteerProfile: Boolean(session.user.volunteerProfile),
         volunteerStatus: session.user.volunteerProfile?.status ?? null,
         donationCount: session.user._count.donations,
+        isPartner: session.user.orgMemberships.length > 0,
         imageUrl: session.user.imageUrl,
       },
     }

@@ -3,6 +3,7 @@ import { Plus, Pencil, Users } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { describeAudienceRule, ruleFromRow } from '@/lib/audience-core'
 import { formatDateTime } from '@/lib/utils'
 import { requireCapability } from '@/lib/permissions'
 
@@ -20,6 +21,12 @@ export default async function EventsPage() {
       startsAt: true,
       venue: true,
       isPublished: true,
+      churchOnly: true,
+      signedInOnly: true,
+      audienceKinds: true,
+      audienceMatch: true,
+      audienceGate: true,
+      audiencePublic: true,
       _count: { select: { ticketTypes: true, orders: true } },
     },
   })
@@ -70,6 +77,14 @@ export default async function EventsPage() {
                       ) : (
                         <Badge variant="INACTIVE">Draft</Badge>
                       )}
+                      {/* Who can see it, once published — the audience itself,
+                          not a guess from one flag. "Everyone" is the common
+                          case and says nothing, so it is left unlabelled. */}
+                      {(() => {
+                        const rule = ruleFromRow(ev, { canBePublic: true })
+                        if (rule.public && rule.kinds.length === 0) return null
+                        return <Badge variant="outline">{describeAudienceRule(rule)}</Badge>
+                      })()}
                     </div>
                     {ev.venue && <p className="mt-0.5 text-xs text-gray-400">{ev.venue}</p>}
                   </td>

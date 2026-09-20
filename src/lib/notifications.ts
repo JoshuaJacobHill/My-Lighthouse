@@ -35,6 +35,13 @@ export type Audience =
   | { kind: 'flags'; staff?: boolean; church?: boolean }
   | { kind: 'volunteers'; status?: string }
   | { kind: 'donors' }
+  | { kind: 'partners' }
+  /**
+   * Any one of several, so a story or event published to a list of audiences
+   * notifies exactly the people who can open it. Added when content visibility
+   * became a list rather than a pair of booleans — see `audience-core.ts`.
+   */
+  | { kind: 'any'; of: Audience[] }
   | { kind: 'team'; teamId: string }
   | { kind: 'roles'; roles: string[] }
 
@@ -63,6 +70,10 @@ export function describeAudience(a: Audience): string {
       return a.status ? `Volunteers (${a.status.toLowerCase()})` : 'Volunteers'
     case 'donors':
       return 'Supporters who have given'
+    case 'partners':
+      return 'People from a partner organisation'
+    case 'any':
+      return a.of.length === 0 ? 'Everyone' : a.of.map(describeAudience).join(' or ')
     case 'team':
       return 'A serving team'
     case 'roles':
@@ -87,6 +98,12 @@ export function audienceCapability(a: Audience): Capability | null {
       return 'care.people'
     case 'donors':
       return 'care.giving'
+    case 'any': {
+      // The narrowest thing in the list decides. Sending to "church members or
+      // donors" is still sending to church members.
+      const needed = a.of.map(audienceCapability).find((c) => c != null)
+      return needed ?? null
+    }
     case 'roles':
       return 'system.users'
     default:
@@ -94,8 +111,13 @@ export function audienceCapability(a: Audience): Capability | null {
   }
 }
 
-/** Turn an audience rule into a `where` for User. Inactive people never match. */
-function audienceWhere(a: Audience): Prisma.UserWhereInput {
+/**
+ * Turn an audience rule into a `where` for User. Inactive people never match.
+ *
+ * Exported because content visibility resolves through it too — who may be
+ * @-mentioned on a story is the same question as who the story notifies.
+ */
+export function audienceUserWhere(a: Audience): Prisma.UserWhereInput {
   const active: Prisma.UserWhereInput = { isActive: true }
   switch (a.kind) {
     case 'everyone':
@@ -123,6 +145,12 @@ function audienceWhere(a: Audience): Prisma.UserWhereInput {
       }
     case 'donors':
       return { ...active, donations: { some: {} } }
+    case 'partners':
+      return { ...active, orgMemberships: { some: { status: 'ACTIVE' } } }
+    case 'any':
+      // An empty list is "no audience named", which for content means everyone
+      // signed in — not nobody.
+      return a.of.length === 0 ? active : { ...active, OR: a.of.map(audienceUserWhere) }
     case 'team':
       return { ...active, teamInterests: { some: { teamId: a.teamId } } }
     case 'roles':
@@ -133,7 +161,7 @@ function audienceWhere(a: Audience): Prisma.UserWhereInput {
 /** Everyone an audience resolves to, right now. */
 export async function resolveAudience(a: Audience): Promise<string[]> {
   const users = await prisma.user.findMany({
-    where: audienceWhere(a),
+    where: audienceUserWhere(a),
     select: { id: true },
   })
   return users.map((u) => u.id)

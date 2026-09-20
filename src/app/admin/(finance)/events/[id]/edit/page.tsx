@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
+import { ruleFromRow } from '@/lib/audience-core'
 import { EventForm, type EventFormValues } from '@/components/admin/EventForm'
 import { EventSponsorsManager } from '@/components/admin/EventSponsorsManager'
 import { requireCapability } from '@/lib/permissions'
@@ -54,8 +55,7 @@ export default async function EditEventPage({
     capacity: event.capacity != null ? String(event.capacity) : '',
     fundId: event.fundId ?? '',
     isPublished: event.isPublished,
-    churchOnly: event.churchOnly,
-    signedInOnly: event.signedInOnly,
+    audience: ruleFromRow(event, { canBePublic: true }),
     imageUrl: event.imageUrl ?? '',
     allowVolunteers: event.allowVolunteers,
     volunteerCapacity: event.volunteerCapacity != null ? String(event.volunteerCapacity) : '',

@@ -16,6 +16,8 @@ import { EventSponsorStrip } from '@/components/events/EventSponsorStrip'
 import { SPONSOR_TIER_ORDER, SPONSOR_TIER_HEADING } from '@/lib/sponsor-tiers'
 import { PortalShell } from '@/components/layout/PortalShell'
 import { SignInToView } from './SignInToView'
+import { canSee, ruleFromRow } from '@/lib/audience-core'
+import { connectionsFrom } from '@/lib/audience'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,15 +25,33 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const event = await prisma.event.findFirst({
     where: { slug, isPublished: true },
-    select: { title: true, description: true, imageUrl: true, signedInOnly: true },
+    select: {
+      title: true,
+      description: true,
+      imageUrl: true,
+      churchOnly: true,
+      signedInOnly: true,
+      audienceKinds: true,
+      audienceMatch: true,
+      audienceGate: true,
+      audiencePublic: true,
+    },
   })
   if (!event) return { title: 'Event — Lighthouse Care' }
 
+  const rule = ruleFromRow(event, { canBePublic: true })
+
+  // `generateMetadata` runs for anyone, scrapers included, so it has to refuse
+  // in the same shape the page does.
+  //
   // A private event's title is not a secret — it is in the link somebody was
-  // emailed. Its description, venue and photo are, and `generateMetadata` runs
-  // for anyone, scrapers included. So the preview gets the name and nothing
-  // else; the page behind it still asks them to sign in.
-  if (event.signedInOnly) {
+  // emailed — so the preview gets the name and a generic line, and the page
+  // behind it asks them to sign in. A hidden one gives nothing at all: the page
+  // 404s precisely so its existence stays unknown, and a link preview naming it
+  // would undo that. Until now a church-only event returned its full
+  // description and photo here while 404ing the page.
+  if (!rule.public) {
+    if (rule.gate === 'HIDE') return { title: 'Event — Lighthouse Care' }
     return shareMetadata({
       title: event.title,
       description: 'Sign in to your My Lighthouse account to see this event.',
@@ -75,20 +95,34 @@ export default async function EventPage({
           name: true,
           email: true,
           isChurchMember: true,
+          isStaff: true,
+          isTrainee: true,
           volunteerProfile: { select: { id: true } },
+          orgMemberships: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
           _count: { select: { donations: true } },
         },
       })
     : null
 
-  // Church-only events are hidden from everyone but church members.
+  // The old flags first, still, while both run side by side. They can only ever
+  // refuse somebody the rule would also refuse, so keeping them cannot widen
+  // anything — and on a row the backfill has not reached they are the truth.
   if (event.churchOnly && !viewer?.isChurchMember) notFound()
+  if (event.signedInOnly && !session) return <SignInToView title={event.title} slug={slug} />
 
-  // Private events ask, rather than hide. A 404 would make a link emailed to
-  // supporters look broken to the very people it was sent to — so they get a
-  // page that says what to do, and `?next=` brings them back here afterwards.
-  if (event.signedInOnly && !session) {
-    return <SignInToView title={event.title} slug={slug} />
+  // One rule, two refusals. Asking admits the event exists; hiding does not,
+  // and which of those is right is the editorial decision behind the audience.
+  //
+  // A 404 for somebody who is already signed in but outside the audience, even
+  // when the rule says ASK: they have nothing left to do, and "sign in" to
+  // somebody who just did reads as a broken page.
+  const rule = ruleFromRow(event, { canBePublic: true })
+  const audienceOf = viewer ? connectionsFrom(viewer) : null
+  if (!canSee(rule, audienceOf)) {
+    if (!audienceOf && rule.gate === 'ASK') {
+      return <SignInToView title={event.title} slug={slug} />
+    }
+    notFound()
   }
 
   // Availability is deliberately uncached — a stale count could oversell.

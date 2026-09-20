@@ -743,22 +743,28 @@ model Fund {
 // ─── Story / Good News (admin-managed content for the donor dashboard) ────────
 
 model Story {
-  id          String    @id @default(cuid())
-  title       String
-  slug        String    @unique
-  category    String    @default("Good news") // Good news / Story / Update
-  excerpt     String?   @db.Text
-  imageUrl    String?
-  externalUrl String? // link to the full article (e.g. the WordPress blog)
-  isPublished Boolean   @default(false)
+  id            String        @id @default(cuid())
+  title         String
+  slug          String        @unique
+  category      String        @default("Good news") // Good news / Story / Update
+  excerpt       String?       @db.Text
+  imageUrl      String?
+  externalUrl   String? // link to the full article (e.g. the WordPress blog)
+  isPublished   Boolean       @default(false)
   // When true, only church members see this story.
-  churchOnly  Boolean   @default(false)
+  churchOnly    Boolean       @default(false)
   // Staff-only update — visible to staff/trainees, hidden from everyone else.
-  staffOnly   Boolean   @default(false)
-  publishedAt DateTime?
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  staffOnly     Boolean       @default(false)
+  /// Who may see this, by how they are connected to Lighthouse. Empty means
+  /// any signed-in supporter. Read through `src/lib/audience-core.ts` rather
+  /// than testing the array by hand.
+  audienceKinds String[]
+  audienceMatch AudienceMatch @default(ANY)
+  audienceGate  AudienceGate  @default(ASK)
+  publishedAt   DateTime?
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   comments Comment[]
 
@@ -1133,19 +1139,19 @@ model OrgPost {
 // ─── Event ticketing ──────────────────────────────────────────────────────────
 
 model Event {
-  id                String    @id @default(cuid())
+  id                String        @id @default(cuid())
   title             String
-  slug              String    @unique
-  description       String    @db.Text
+  slug              String        @unique
+  description       String        @db.Text
   imageUrl          String?
   venue             String?
   startsAt          DateTime? // null = date To Be Advised (e.g. collecting sponsors early)
   endsAt            DateTime?
   fundId            String?
   capacity          Int?
-  isPublished       Boolean   @default(false)
+  isPublished       Boolean       @default(false)
   // When true, only church members see this event.
-  churchOnly        Boolean   @default(false)
+  churchOnly        Boolean       @default(false)
   /// Signed-in supporters only — not the general public.
   ///
   /// The middle rung of three. `isPublished` decides whether the event exists
@@ -1161,14 +1167,23 @@ model Event {
   /// So: a private event's existence and title are not secret. Its
   /// description, image, venue, tickets and sponsors are. If something must
   /// not be known to exist, use `churchOnly` or leave it unpublished.
-  signedInOnly      Boolean   @default(false)
+  signedInOnly      Boolean       @default(false)
+  /// Visible to people who are not signed in. Events only — there is no
+  /// public story page, and adding one is a decision, not a side effect.
+  audiencePublic    Boolean       @default(true)
+  /// Who may see this, by how they are connected to Lighthouse. Empty means
+  /// any signed-in supporter. Read through `src/lib/audience-core.ts` rather
+  /// than testing the array by hand.
+  audienceKinds     String[]
+  audienceMatch     AudienceMatch @default(ANY)
+  audienceGate      AudienceGate  @default(ASK)
   // Optional per-event sections (e.g. the Good Food Festival).
-  allowVolunteers   Boolean   @default(false)
+  allowVolunteers   Boolean       @default(false)
   volunteerCapacity Int?
-  allowDonations    Boolean   @default(false)
-  allowSponsors     Boolean   @default(false)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  allowDonations    Boolean       @default(false)
+  allowSponsors     Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   fund        Fund?            @relation(fields: [fundId], references: [id], onDelete: SetNull)
   ticketTypes TicketType[]
@@ -1178,6 +1193,27 @@ model Event {
 
   @@index([fundId])
   @@index([isPublished])
+}
+
+/// Whether a piece of content's audience list means "any of these" or "all of
+/// these at once". ANY is what the picker produces. ALL exists only to preserve
+/// rows that carried both `churchOnly` and `staffOnly`, which together meant
+/// church members who are *also* staff — migrating those to ANY would have
+/// widened them to every church member and every staff member.
+enum AudienceMatch {
+  ANY
+  ALL
+}
+
+/// What somebody outside the audience gets.
+///
+/// ASK admits the thing exists and asks them to sign in — right for a link
+/// emailed to supporters, where a 404 looks broken to the people it was sent to.
+/// HIDE 404s, so its existence stays unknown. Keep them distinct: "who is this
+/// for" and "may a stranger know it exists" are separate decisions.
+enum AudienceGate {
+  ASK
+  HIDE
 }
 
 enum SponsorTier {
@@ -2025,7 +2061,7 @@ model MarketingProposal {
   status MarketingActionStatus @default(DRAFT)
 
   /// One line for the queue, written for a person skimming it.
-  summary String
+  summary   String
   /// Why it is worth doing, in Claude's words. Shown beside the action, so
   /// whoever approves it is approving the reasoning too, not just the change.
   rationale String? @db.Text
@@ -2071,7 +2107,7 @@ model MarketingProposal {
 /// three months later, and the rationale on the proposal is only half the
 /// answer — the other half is what was asked.
 model MarketingChat {
-  id     String  @id @default(cuid())
+  id     String @id @default(cuid())
   userId String
   /// First few words of the opening question, for the history list.
   title  String

@@ -10,6 +10,7 @@ import {
   canSeeTask,
   notifyOnComment,
   taggableUsers,
+  viewerFromSession,
   type Viewer,
 } from '@/lib/comments'
 
@@ -25,13 +26,7 @@ const schema = z.object({
 async function viewer(): Promise<Viewer | null> {
   const session = await getSession()
   if (!session) return null
-  return {
-    id: session.userId,
-    role: session.role,
-    isStaff: session.user.isStaff,
-    isTrainee: session.user.isTrainee,
-    isChurchMember: session.user.isChurchMember,
-  }
+  return viewerFromSession(session)
 }
 
 /** Post a comment on a story or a task. */

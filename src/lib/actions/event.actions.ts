@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth'
 import { eventSchema, type EventInput } from '@/lib/validations'
 import { normaliseWebsiteUrl } from '@/lib/sponsor-tiers'
 import { EVENTS_TAG } from '@/lib/event-data'
+import { eventAudienceColumns, ruleFromInput } from '@/lib/audience-core'
 import { isAdminRole } from '@/lib/permissions-core'
 import { assertCapability } from '@/lib/permissions'
 
@@ -84,8 +85,8 @@ export async function createEventAction(input: EventInput): Promise<ActionResult
         capacity: data.capacity ?? null,
         fundId: data.fundId ?? null,
         isPublished: data.isPublished ?? false,
-        churchOnly: data.churchOnly ?? false,
-        signedInOnly: data.signedInOnly ?? false,
+        // The rule, plus the old booleans kept in step until every reader moves.
+        ...eventAudienceColumns(ruleFromInput(data, { canBePublic: true })),
         imageUrl: data.imageUrl ?? null,
         allowVolunteers: data.allowVolunteers ?? false,
         volunteerCapacity: data.volunteerCapacity ?? null,
@@ -103,6 +104,10 @@ export async function createEventAction(input: EventInput): Promise<ActionResult
       },
       select: { id: true },
     })
+    // Every other event action busts this tag; create did not. A visitor who
+    // reached the URL before the event existed has a cached miss, and without
+    // this the new event 404s for them until the 5-minute window lapses.
+    updateTag(EVENTS_TAG)
     return { success: true, eventId: event.id }
   } catch (err) {
     console.error('createEventAction failed', err)
@@ -158,8 +163,8 @@ export async function updateEventAction(
           capacity: data.capacity ?? null,
           fundId: data.fundId ?? null,
           isPublished: data.isPublished ?? false,
-          churchOnly: data.churchOnly ?? false,
-          signedInOnly: data.signedInOnly ?? false,
+          // The rule, plus the old booleans kept in step until every reader moves.
+          ...eventAudienceColumns(ruleFromInput(data, { canBePublic: true })),
         imageUrl: data.imageUrl ?? null,
         allowVolunteers: data.allowVolunteers ?? false,
         volunteerCapacity: data.volunteerCapacity ?? null,

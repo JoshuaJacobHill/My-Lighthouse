@@ -4,6 +4,8 @@ import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
 import { commentsForStories } from '@/lib/story-comments'
+import { viewerFromSession } from '@/lib/comments'
+import { connectionsFromSession, storyAudienceWhere } from '@/lib/audience'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'News & updates' }
@@ -27,8 +29,11 @@ export default async function NewsPage() {
   const stories = await prisma.story.findMany({
     where: {
       isPublished: true,
+      // Old flags and new rule together while the backfill settles; see the
+      // dashboard, which must filter identically or the two pages disagree.
       ...(user.isChurchMember ? {} : { churchOnly: false }),
       ...(isStaffOrTrainee ? {} : { staffOnly: false }),
+      AND: [storyAudienceWhere(connectionsFromSession(user))],
     },
     orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
     take: 60,
@@ -44,13 +49,7 @@ export default async function NewsPage() {
     },
   })
 
-  const viewer = {
-    id: session.userId,
-    role: session.role,
-    isStaff: user.isStaff,
-    isTrainee: user.isTrainee,
-    isChurchMember: user.isChurchMember,
-  }
+  const viewer = viewerFromSession(session)
   const commentsByStory = await commentsForStories(stories.map((s) => s.id), viewer)
 
   return (

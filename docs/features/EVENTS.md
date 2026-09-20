@@ -15,11 +15,14 @@ page actually offers:
 | Switch | Effect |
 |---|---|
 | `isPublished` | Visible at all. **Not** the same as public — see below. |
-| `signedInOnly` | **Private.** Signed-in supporters only. |
-| `churchOnly` | Church members only. Anonymous visitors get a **404**. |
+| `audienceKinds` + `audienceGate` + `audiencePublic` | Who may read it, and what everybody else gets. |
 | `allowVolunteers` | Adds volunteer sign-up, capped by `volunteerCapacity` |
 | `allowDonations` | Adds a give option, into `fundId` |
 | `allowSponsors` | Adds the sponsor flow |
+
+`signedInOnly` and `churchOnly` are still written and still checked, but the
+audience rule is the thing to read — full description in `docs/USERS.md`, code
+in `src/lib/audience-core.ts`.
 
 **`startsAt` is nullable on purpose** — an event can exist with the date "to be
 advised" while sponsors are being collected, which is how the Festival is
@@ -32,11 +35,22 @@ sales window), `TicketOrder` → `Ticket`, `EventVolunteer`, `EventSponsor`.
 
 | | Who can read it | What a stranger gets |
 |---|---|---|
-| Public | Anyone | The event |
-| `signedInOnly` | Any signed-in supporter | **A page saying to sign in or create an account** — with the event's name, and `?next=` so they come back to it |
-| `churchOnly` | Church members | **A 404** |
+| `audiencePublic` | Anyone | The event |
+| No audiences listed | Any signed-in supporter | Depends on `audienceGate` |
+| `audienceKinds: [church]` and so on | People in that audience | Depends on `audienceGate` |
 
-The difference between the last two is deliberate and worth keeping.
+`audienceGate` decides the refusal, and it is a separate decision from the
+audience:
+
+- **`ASK`** — a page saying to sign in or create an account, with the event's
+  name and `?next=` so they come back to it.
+- **`HIDE`** — a 404.
+
+Somebody **already signed in** who is outside the audience always gets the 404,
+whatever the gate says. "Sign in" to a person who just did reads as a broken
+page, and they have nothing left to do.
+
+The difference between the two gates is deliberate and worth keeping.
 
 A **private** event is usually a link emailed to supporters. A 404 there would
 make the link look broken to exactly the people it was sent to, so the page
@@ -45,9 +59,12 @@ the link. Its description, photo, venue and tickets are: `generateMetadata`
 returns the title and a generic line for a private event, so a scraper or a
 group chat preview gets no more than the name.
 
-A **church-only** event 404s because its existence is not public information.
-If something must not be known to exist, that is the flag — or leave it
-unpublished.
+A **hidden** event 404s because its existence is not public information. If
+something must not be known to exist, that is the gate — or leave it
+unpublished. `generateMetadata` refuses in the same shape the page does: a
+hidden event returns the generic fallback title and nothing else, because a link
+preview naming it would undo the 404. (Until the audience work it returned the
+full description and photo for a church-only event while 404ing the page.)
 
 `SignInToView` renders the prompt. `safeNext` validates the return path,
 because an unchecked `?next=` is an open redirect on the one page where
@@ -82,17 +99,19 @@ kiosk but a different table; attendees are not volunteers.
 
 | | |
 |---|---|
-| **The public** | Published, non-church events. Preview image comes from the event's own `imageUrl`. |
-| **Church members** | Also `churchOnly` events — on the dashboard and on the public page. |
+| **The public** | Published events with `audiencePublic`. Preview image comes from the event's own `imageUrl`. |
+| **Church members** | Also events whose audience includes `church` — on the dashboard and on the public page. |
 | **Signed-in supporters** | The event inside the portal shell, with nav; anonymous visitors get the standalone public page. Same route, different chrome. |
 | **Admins** | `care.giving` — events sit in the finance route group because they take money. |
 
 ## Things worth knowing before changing it
 
-- **`isPublished` means published to the portal, not to the world.** Check
-  `churchOnly` before exposing anything on a public route. GENERALZ is
-  published *and* church-only, and correctly 404s for strangers — a 404 rather
-  than a login prompt, so it does not reveal the event exists.
+- **`isPublished` means published to the portal, not to the world.** Check the
+  audience before exposing anything on a public route. GENERALZ is published
+  *and* church-only, and correctly 404s for strangers — a 404 rather than a
+  login prompt, so it does not reveal the event exists. **It is also the usual
+  answer to "why does this event 404 for me?"**: there is no admin bypass, so a
+  church-only event 404s for a SUPER_ADMIN who is not a church member.
 - The page runs one query for the event (cached, identical for everyone) and one
   for the session, **in parallel** — every database round-trip crosses
   Sydney→Tokyo, so two sequential reads are two crossings.
