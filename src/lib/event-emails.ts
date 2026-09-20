@@ -69,3 +69,72 @@ export async function sendTicketConfirmationEmailForOrder(orderId: string): Prom
     templateType: 'TICKET_CONFIRMATION',
   })
 }
+
+/**
+ * Invite a ticket buyer to finish setting up an account.
+ *
+ * Buying a ticket is often somebody's first contact with us, and until now it
+ * left them with an e-ticket and nothing else — no way to see what they had
+ * booked, change it, or find next year's event. This closes that.
+ *
+ * Reuses the donor "set up your account" path rather than inventing a second
+ * one: the same token table, the same editable DONOR_ACCOUNT_SETUP template,
+ * the same /account/setup page. A ticket buyer and a first-time donor are the
+ * same situation — somebody who gave us money and an email address but has no
+ * password.
+ *
+ * Deliberately NOT sent when:
+ *
+ *   The order already belongs to an account. They have one; the tickets are
+ *   already on it.
+ *
+ *   A verified account exists on that email. Same reason, and a "finish
+ *   setting up" email to someone who finished months ago reads as a phish.
+ *
+ *   One was sent for this email in the last fortnight. Stripe retries
+ *   webhooks, and somebody buying tickets to two events in a week should not
+ *   get two of these.
+ *
+ * No account is created here. The token is keyed to the email and the record
+ * appears only when they choose to set a password — buying a ticket is not
+ * consent to being given a login.
+ *
+ * Best effort, like the ticket email above: a failure here must never affect
+ * whether somebody got the thing they paid for.
+ */
+export async function inviteTicketPurchaserToAccount(orderId: string): Promise<void> {
+  try {
+    const order = await prisma.ticketOrder.findUnique({
+      where: { id: orderId },
+      select: { userId: true, purchaserEmail: true, purchaserName: true },
+    })
+    if (!order?.purchaserEmail) return
+    if (order.userId) return
+
+    const email = order.purchaserEmail.trim().toLowerCase()
+
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { emailVerified: true },
+    })
+    if (existing?.emailVerified) return
+
+    const fortnightAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+    const alreadyAsked = await prisma.emailLog.count({
+      where: {
+        to: { equals: email, mode: 'insensitive' },
+        templateType: 'DONOR_ACCOUNT_SETUP',
+        createdAt: { gt: fortnightAgo },
+      },
+    })
+    if (alreadyAsked > 0) return
+
+    const { createAccountSetupToken } = await import('@/lib/account-setup')
+    const { sendAccountSetupEmail } = await import('@/lib/donation-emails')
+
+    const token = await createAccountSetupToken(email)
+    await sendAccountSetupEmail({ to: email, name: order.purchaserName, token })
+  } catch (err) {
+    console.error('inviteTicketPurchaserToAccount failed', err)
+  }
+}

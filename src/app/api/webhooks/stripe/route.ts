@@ -13,7 +13,10 @@ import {
 } from '@/lib/donation-emails'
 import { createAccountSetupToken } from '@/lib/account-setup'
 import { createOrderWithTickets, type Selection } from '@/lib/tickets'
-import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
+import {
+  sendTicketConfirmationEmailForOrder,
+  inviteTicketPurchaserToAccount,
+} from '@/lib/event-emails'
 
 // Never cached; must read the raw body for signature verification.
 export const dynamic = 'force-dynamic'
@@ -392,6 +395,9 @@ async function recordTicketOrder(session: Stripe.Checkout.Session): Promise<void
 
   try {
     await sendTicketConfirmationEmailForOrder(orderId)
+    // Their tickets first, then the invitation to set up an account — in that
+    // order, because the tickets are what they paid for.
+    await inviteTicketPurchaserToAccount(orderId)
   } catch (err) {
     console.error('Ticket confirmation email failed', err)
   }
