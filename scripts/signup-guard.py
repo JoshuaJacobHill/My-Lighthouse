@@ -36,8 +36,15 @@ RISKY = (
 )
 
 # Already doing the right thing.
+#
+# Matched on an actual import or call, never a bare mention of the module name.
+# A first version matched the string "account-check" anywhere, and a comment
+# reading "does NOT use account-check" silenced it — a false negative found by
+# the probe written to test the hook, which is the best possible way to find
+# one.
 GUARDED = (
-    re.compile(r"account-check"),
+    re.compile(r"""from\s+['"][^'"]*account-check['"]"""),
+    re.compile(r"""require\(\s*['"][^'"]*account-check['"]"""),
     re.compile(r"\bassertEmailFree\s*\("),
     re.compile(r"\blookupEmail\s*\("),
 )
