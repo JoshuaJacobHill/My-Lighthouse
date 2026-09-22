@@ -22,6 +22,7 @@ const {
   flagsFromRule,
   describeAudienceRule,
   ruleFromRow,
+  isChurchOwned,
   PUBLIC_RULE,
   SIGNED_IN_RULE,
 } = await import('@/lib/audience-core')
@@ -280,5 +281,23 @@ describe('the list filter agrees with the single-item check', () => {
     // Not "the unrestricted ones" — nothing. There is no public story page.
     const where = storyAudienceWhere(null)
     expect(where).toEqual({ id: { in: [] } })
+  })
+})
+
+describe('isChurchOwned', () => {
+  it('reads the audience once a story has one', () => {
+    expect(isChurchOwned({ audienceKinds: ['church'], churchOnly: false })).toBe(true)
+    expect(isChurchOwned({ audienceKinds: ['staff'], churchOnly: true })).toBe(false)
+  })
+
+  it('falls back to the old flag for a story with no audience set', () => {
+    expect(isChurchOwned({ audienceKinds: [], churchOnly: true })).toBe(true)
+    expect(isChurchOwned({ audienceKinds: [], churchOnly: false })).toBe(false)
+  })
+
+  it('treats a story aimed at church and others as the church manager\'s', () => {
+    // Editing rights follow the narrower claim: if the church is in the
+    // audience, a care manager must not be able to rewrite it.
+    expect(isChurchOwned({ audienceKinds: ['church', 'donors'] })).toBe(true)
   })
 })

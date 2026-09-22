@@ -341,3 +341,20 @@ export function storyAudienceColumns(rule: AudienceRule) {
     staffOnly: flags.staffOnly,
   }
 }
+
+/**
+ * Whose story is this to edit?
+ *
+ * Still inferred from the audience rather than stated outright: a story aimed
+ * at church members belongs to the church manager, everything else to the Care
+ * side. An explicit owner would be better — editing rights would stop moving as
+ * a side effect of changing who may read something — but that needs a control
+ * on the form and a decision about a story aimed at several audiences at once.
+ *
+ * One function so the list, the edit guard and the save action cannot disagree
+ * about it, which they could while each tested the boolean itself.
+ */
+export function isChurchOwned(row: { audienceKinds?: string[] | null; churchOnly?: boolean }): boolean {
+  const kinds = row.audienceKinds ?? []
+  return kinds.length > 0 ? kinds.includes('church') : row.churchOnly === true
+}

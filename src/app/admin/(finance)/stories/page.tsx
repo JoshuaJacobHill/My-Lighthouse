@@ -16,7 +16,12 @@ export default async function StoriesPage() {
   const seesCare = me.held.includes('care.stories')
   const seesChurch = me.held.includes('church.stories')
   const stories = await prisma.story.findMany({
-    where: seesCare && seesChurch ? {} : { churchOnly: seesChurch },
+    where:
+      seesCare && seesChurch
+        ? {}
+        : seesChurch
+          ? { audienceKinds: { has: 'church' } }
+          : { NOT: { audienceKinds: { has: 'church' } } },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
   })
 

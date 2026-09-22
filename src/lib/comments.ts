@@ -72,25 +72,20 @@ export type CommentView = {
 /**
  * Mirrors the news page's filter, so commenting is never possible on something
  * that would not have been listed.
- *
- * Both the old flags and the audience rule, while the two run side by side.
- * `ruleFromRow` falls back to the flags for a row the backfill has not reached,
- * so an unmigrated story stays exactly as restricted as it was.
  */
 export function canSeeStory(
   viewer: Viewer,
   story: {
-    staffOnly: boolean
-    churchOnly: boolean
     isPublished: boolean
     audienceKinds?: string[]
     audienceMatch?: string
     audienceGate?: string
+    /** Only read as the fallback for a row saved before the audience columns. */
+    staffOnly?: boolean
+    churchOnly?: boolean
   },
 ): boolean {
   if (!story.isPublished && !isAdminRole(viewer.role)) return false
-  if (story.staffOnly && !(viewer.isStaff || viewer.isTrainee)) return false
-  if (story.churchOnly && !viewer.isChurchMember) return false
   return isListedFor(ruleFromRow(story, { canBePublic: false }), {
     isChurchMember: viewer.isChurchMember,
     isStaff: viewer.isStaff,

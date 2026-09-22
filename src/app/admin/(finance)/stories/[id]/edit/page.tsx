@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
-import { ruleFromRow } from '@/lib/audience-core'
+import { isChurchOwned, ruleFromRow } from '@/lib/audience-core'
 import { StoryForm } from '@/components/admin/StoryForm'
 import { requireAnyCapability } from '@/lib/permissions'
 
@@ -18,7 +18,7 @@ export default async function EditStoryPage({ params }: { params: Promise<{ id: 
   // Someone with a direct link to a story from the other side of the house
   // shouldn't get the edit form; the save action refuses too, but there's no
   // reason to show them the content first.
-  if (story && !me.held.includes(story.churchOnly ? 'church.stories' : 'care.stories')) {
+  if (story && !me.held.includes(isChurchOwned(story) ? 'church.stories' : 'care.stories')) {
     redirect('/admin/stories')
   }
   if (!story) notFound()

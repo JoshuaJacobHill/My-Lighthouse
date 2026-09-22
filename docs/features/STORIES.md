@@ -18,8 +18,8 @@ administrative.
 | `audienceKinds` | Who it is for: any of `church`, `staff`, `volunteers`, `donors`, `partners`. Empty = any signed-in supporter. |
 | `audienceMatch` | `ANY`, or `ALL` for the church-*and*-staff stories that predate the picker. |
 
-`churchOnly` and `staffOnly` are still written, and still filtered on, while the
-backfill settles — but the rule is the thing to read. Full description in
+`churchOnly` and `staffOnly` are still written, but nothing reads them — the
+rule is the only thing deciding visibility. Full description in
 `docs/USERS.md`; the code is `src/lib/audience-core.ts`.
 
 **A story has no `audiencePublic` column, and that is deliberate.** Events have
@@ -38,10 +38,7 @@ must filter **identically**, or the two pages disagree about one story:
 ```ts
 where: {
   isPublished: true,
-  // The old flags, still applied until the backfill is confirmed…
-  ...(user.isChurchMember ? {} : { churchOnly: false }),
-  ...(isStaffOrTrainee   ? {} : { staffOnly: false }),
-  // …and the rule. In AND, so it cannot collide with an OR above it.
+  // In AND, so it cannot collide with an OR beside it.
   AND: [storyAudienceWhere(connectionsFromSession(user))],
 }
 ```

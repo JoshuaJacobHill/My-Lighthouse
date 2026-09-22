@@ -112,9 +112,17 @@ and `storyAudienceWhere()` / `eventAudienceWhere()` for a list.
 answer from both, because two expressions of one rule is exactly where content
 leaks.
 
-**The old booleans are still written and still filtered on.** Until the backfill
-is confirmed everywhere, every read applies both — a row the backfill has not
-reached defaults to "everyone", and that error points at leaking.
+**Nothing reads the old booleans any more.** `churchOnly`, `staffOnly` and
+`signedInOnly` are still *written* alongside the rule, because a column that
+stays accurate costs nothing and any reader missed in the cutover keeps working
+rather than silently going stale. They are no longer consulted by any filter,
+page or guard.
+
+`isChurchOwned()` is the one exception worth knowing: it decides **who may edit
+a story**, not who may read it, and it reads the audience with the old flag as a
+fallback for rows saved before the columns existed. Still inferred rather than
+stated — an explicit owner would be better, and would need a control on the
+form.
 
 `isPublished` means "published to the portal", not "published to the world".
 A published story is visible to signed-in users at `/dashboard/news` and has no

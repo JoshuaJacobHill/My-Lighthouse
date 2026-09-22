@@ -7,7 +7,7 @@ import { getSession } from '@/lib/auth'
 import { isDonorPortalEnabled } from '@/lib/features'
 import { getEventAvailability } from '@/lib/tickets'
 import { getCachedEvent, getCachedEventSponsors, getCachedEventVolunteerCount } from '@/lib/event-data'
-import { formatEventWhen } from '@/lib/utils'
+import { eventDateParts } from '@/lib/utils'
 import { RegistrationForm, type TicketTypeOption } from './RegistrationForm'
 import { EventVolunteerSignup } from '@/components/events/EventVolunteerSignup'
 import { Markdown } from '@/components/ui/Markdown'
@@ -111,14 +111,6 @@ export default async function EventPage({
   const rule = ruleFromRow(event, { canBePublic: true })
   const audienceOf = viewer ? connectionsFrom(viewer) : null
 
-  // The old flags still refuse first, while both run side by side — but only
-  // where the rule would refuse too, so a row switched to "anyone with the
-  // link" is not dragged back by a boolean the picker can no longer set.
-  if (rule.gate !== 'SHOW') {
-    if (event.churchOnly && !viewer?.isChurchMember) notFound()
-    if (event.signedInOnly && !session) return <SignInToView title={event.title} slug={slug} />
-  }
-
   if (!canOpen(rule, audienceOf)) {
     // Asking somebody who has already signed in is a dead end — they have
     // nothing left to do, and the prompt reads as a broken page.
@@ -154,6 +146,10 @@ export default async function EventPage({
 
   const soldOut = overallRemaining === 0 || options.every((o) => o.max === 0)
 
+  // Same formatter the checkout line uses, so the two never disagree about
+  // which day somebody is buying a ticket for.
+  const when = eventDateParts(event.startsAt, event.endsAt)
+
   const canDonate = event.allowDonations && event.fund
   const sponsorHref = `/events/${slug}/sponsor`
 
@@ -178,7 +174,10 @@ export default async function EventPage({
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
                 <CalendarDays className="h-5 w-5" />
               </span>
-              <p className="text-sm font-semibold text-gray-900">{formatEventWhen(event.startsAt, event.endsAt)}</p>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{when.date}</p>
+                {when.time && <p className="text-sm text-gray-500">{when.time}</p>}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">

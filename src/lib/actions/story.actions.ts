@@ -6,7 +6,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { storySchema, type StoryInput } from '@/lib/validations'
 import { can, isAdminRole, type PermissionUser } from '@/lib/permissions-core'
-import { ruleFromInput, storyAudienceColumns, type AudienceRule } from '@/lib/audience-core'
+import { isChurchOwned, ruleFromInput, storyAudienceColumns, type AudienceRule } from '@/lib/audience-core'
 import { notificationAudienceFor } from '@/lib/audience'
 
 interface ActionResult {
@@ -180,14 +180,14 @@ export async function updateStoryAction(storyId: string, input: StoryInput): Pro
   try {
     const existing = await prisma.story.findUnique({
       where: { id: storyId },
-      select: { id: true, publishedAt: true, isPublished: true, churchOnly: true },
+      select: { id: true, publishedAt: true, isPublished: true, audienceKinds: true, churchOnly: true },
     })
     if (!existing) return { success: false, error: 'Story not found' }
 
     // Both ends: you must own the story as it stands, and be allowed to publish
     // to the audience you're moving it to.
     try {
-      await requireStoryAudience(existing.churchOnly)
+      await requireStoryAudience(isChurchOwned(existing))
       await requireStoryAudience(ruleFromInput(data, { canBePublic: false }).kinds.includes('church'))
     } catch (err) {
       return { success: false, error: (err as Error).message }
@@ -238,7 +238,7 @@ export async function deleteStoryAction(storyId: string): Promise<ActionResult> 
     })
     if (!existing) return { success: false, error: 'Story not found' }
     try {
-      await requireStoryAudience(existing.churchOnly)
+      await requireStoryAudience(isChurchOwned(existing))
     } catch (err) {
       return { success: false, error: (err as Error).message }
     }

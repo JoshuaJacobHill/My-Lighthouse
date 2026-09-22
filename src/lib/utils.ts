@@ -214,14 +214,12 @@ export function getTimePeriodConfig(settings: Record<string, string>): TimePerio
  * Dates read as a person says them rather than as dd/MM/yyyy: a range inside
  * one month collapses to "16–17 October 2026", which is how the poster says it.
  */
-export function eventSummaryLines(
+export function eventDateParts(
   start?: Date | string | null,
-  end?: Date | string | null,
-  venue?: string | null,
-  address?: string | null,
-  ticketType?: string | null
-): string[] {
-  const lines: string[] = []
+  end?: Date | string | null
+): { date: string; time: string | null } {
+  if (!start) return { date: 'Date to be advised', time: null }
+
   const day = (d: Date | string) =>
     new Intl.DateTimeFormat('en-AU', { timeZone: BRISBANE_TZ, day: 'numeric' }).format(toDate(d))
   const monthYear = (d: Date | string) =>
@@ -232,21 +230,30 @@ export function eventSummaryLines(
     }).format(toDate(d))
   const full = (d: Date | string) => `${day(d)} ${monthYear(d)}`
 
-  if (start) {
-    if (end && monthYear(start) !== monthYear(end)) {
-      lines.push(`Date: ${full(start)} – ${full(end)}`)
-    } else if (end && day(start) !== day(end)) {
-      lines.push(`Date: ${day(start)}–${day(end)} ${monthYear(start)}`)
-    } else {
-      lines.push(`Date: ${full(start)}`)
-    }
+  const date =
+    end && monthYear(start) !== monthYear(end)
+      ? `${full(start)} – ${full(end)}`
+      : end && day(start) !== day(end)
+        ? `${day(start)}–${day(end)} ${monthYear(start)}`
+        : full(start)
 
-    const from = formatTime(start)
-    const to = end ? formatTime(end) : ''
-    lines.push(`Time: ${to && to !== from ? `${from} – ${to}` : from}`)
-  } else {
-    lines.push('Date: to be advised')
-  }
+  const from = formatTime(start)
+  const to = end ? formatTime(end) : ''
+  return { date, time: to && to !== from ? `${from} – ${to}` : from }
+}
+
+export function eventSummaryLines(
+  start?: Date | string | null,
+  end?: Date | string | null,
+  venue?: string | null,
+  address?: string | null,
+  ticketType?: string | null
+): string[] {
+  const lines: string[] = []
+  const { date, time } = eventDateParts(start, end)
+
+  lines.push(start ? `Date: ${date}` : 'Date: to be advised')
+  if (time) lines.push(`Time: ${time}`)
 
   if (venue) lines.push(`Location: ${venue}`)
   if (address) lines.push(`Address: ${address}`)

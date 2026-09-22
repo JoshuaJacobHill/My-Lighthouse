@@ -68,11 +68,6 @@ export default async function DonorHomePage() {
     prisma.story.findMany({
       where: {
         isPublished: true,
-        // Both filters, until the backfill is confirmed everywhere. A row the
-        // backfill has not reached defaults to "everyone", and that error
-        // points at leaking rather than hiding — so the old flags stay on.
-        ...(user.isChurchMember ? {} : { churchOnly: false }),
-        ...(isStaffOrTrainee ? {} : { staffOnly: false }),
         AND: [storyAudienceWhere(audienceOf)],
       },
       orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
@@ -83,7 +78,6 @@ export default async function DonorHomePage() {
       where: {
         isPublished: true,
         OR: [{ startsAt: { gte: new Date() } }, { startsAt: null }],
-        ...(user.isChurchMember ? {} : { churchOnly: false }),
         // In AND rather than spread, because the dates above already use OR.
         AND: [eventAudienceWhere(audienceOf)],
       },

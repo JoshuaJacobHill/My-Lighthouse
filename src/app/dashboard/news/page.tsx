@@ -29,10 +29,8 @@ export default async function NewsPage() {
   const stories = await prisma.story.findMany({
     where: {
       isPublished: true,
-      // Old flags and new rule together while the backfill settles; see the
-      // dashboard, which must filter identically or the two pages disagree.
-      ...(user.isChurchMember ? {} : { churchOnly: false }),
-      ...(isStaffOrTrainee ? {} : { staffOnly: false }),
+      // Must match the dashboard's filter exactly, or the two pages disagree
+      // about one story.
       AND: [storyAudienceWhere(connectionsFromSession(user))],
     },
     orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }],
