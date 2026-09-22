@@ -1,5 +1,5 @@
 /**
- * Turning a ten-million-step goal into something a person can act on today.
+ * Turning the collective goal into something a person can act on today.
  *
  * The collective number is good for a rallying cry and useless as guidance —
  * nobody knows what to do with "8,240,000 to go". What people can act on is

@@ -1,9 +1,17 @@
 # The fitness challenge
 
-A collective, staff-only challenge — "10 million steps in September". Everyone's
-steps add to one shared total rather than competing individually, which is the
-whole design: the goal is a team pulling together, not a leaderboard with
+A collective, staff-only challenge — a shared step target for the month.
+Everyone's steps add to one total rather than competing individually, which is
+the whole design: the goal is a team pulling together, not a leaderboard with
 winners and losers.
+
+**The goal is a column, not a constant.** `FitnessChallenge.goal` moves without
+a deploy, and everything on the page derives from it — milestones are fractions
+of it, the pace maths divides by it, and the prose runs through `goalPhrase()`.
+There is no admin screen for it yet, so changing it is
+`scripts/migrate/set-challenge-goal.mjs`. The **name** does not derive from
+anything: if it says the old number, change it in the same run or the heading
+contradicts the bar underneath it.
 
 `/dashboard/fitness`
 

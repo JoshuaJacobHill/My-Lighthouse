@@ -30,3 +30,19 @@ export function buildMilestones(total: number, goal: number): Milestone[] {
     reached: goal > 0 && total >= Math.round(goal * fraction),
   }))
 }
+
+/**
+ * The goal as prose, for the copy that talks about it.
+ *
+ * The number lives on the challenge row so it can change without a deploy, and
+ * the sentences around it have to follow — otherwise the banner says 5M while
+ * the paragraph underneath still promises ten million, which is exactly what
+ * happened when the goal moved.
+ */
+export function goalPhrase(goal: number): string {
+  if (goal >= 1_000_000) {
+    const millions = goal / 1_000_000
+    return `${Number.isInteger(millions) ? millions : millions.toFixed(1)} million`
+  }
+  return goal.toLocaleString('en-AU')
+}

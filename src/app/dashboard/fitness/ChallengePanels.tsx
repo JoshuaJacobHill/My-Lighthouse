@@ -47,7 +47,7 @@ export function TotalSteps({
 
   const card = (
     <section className={`p-5 sm:p-6 ${done ? 'text-white' : 'rounded-[28px] border border-neutral-200'}`}>
-      {done && <GoalReachedBadge />}
+      {done && <GoalReachedBadge goal={goal} />}
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className={`text-lg font-bold tracking-tight ${done ? 'text-white' : 'text-neutral-950'}`}>
           Everyone, this month

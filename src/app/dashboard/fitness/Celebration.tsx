@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Check, Lock, PartyPopper } from 'lucide-react'
-import { LIME, GREEN, type Milestone } from '@/lib/fitness-milestones'
+import { goalPhrase, LIME, GREEN, type Milestone } from '@/lib/fitness-milestones'
 import { Confetti } from '@/components/fitness/Confetti'
 
 /**
@@ -77,14 +77,14 @@ export function GoalReachedShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function GoalReachedBadge() {
+export function GoalReachedBadge({ goal }: { goal: number }) {
   return (
     <p
       className="animate-milestone-pop mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-extrabold text-neutral-900"
       style={{ backgroundColor: LIME }}
     >
       <PartyPopper className="h-4 w-4" aria-hidden="true" />
-      We did it — 10 million steps
+      We did it — {goalPhrase(goal)} steps
     </p>
   )
 }

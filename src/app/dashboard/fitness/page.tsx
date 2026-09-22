@@ -7,6 +7,7 @@ import { LogStepsForm } from './LogStepsForm'
 import { StepsChart } from './StepsChart'
 import { TotalSteps, TipOfTheDay, TodaysTarget } from './ChallengePanels'
 import { getChallengeWeeks } from '@/lib/fitness-weeks'
+import { goalPhrase } from '@/lib/fitness-milestones'
 import { TopFive } from './TopFive'
 import { WeekWinners } from './WeekWinners'
 import { WeekSchedule } from './WeekSchedule'
@@ -117,8 +118,8 @@ export default async function StaffFitnessPage() {
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-orange-600">Staff challenge</p>
         <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight sm:text-4xl">{challenge.name}</h1>
         <p className="mt-2.5 max-w-xl text-neutral-500">
-          Ten million steps between us across September. Walk the long way, take the stairs, get outside at lunch.
-          It all counts.
+          {goalPhrase(challenge.goal)} steps between us across September. Walk the long way, take the stairs,
+          get outside at lunch. It all counts.
         </p>
         {!started && (
           <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-orange-50 px-3.5 py-1.5 text-sm font-semibold text-orange-700">
