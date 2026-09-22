@@ -82,13 +82,15 @@ replaced by one rule both models share. **Read it through
 |---|---|
 | `audienceKinds` | `church`, `staff`, `volunteers`, `donors`, `partners`. Empty = any signed-in supporter. |
 | `audienceMatch` | `ANY` (in one of them) or `ALL` (in all at once). The picker only produces `ANY`; `ALL` exists to preserve stories that carried church *and* staff, which meant both. |
-| `audienceGate` | What somebody outside it gets **when they open the link**: `SHOW` (unlisted — the link works for anyone), `ASK` (sign-in prompt) or `HIDE` (404). |
+| `audienceGate` | What somebody outside it gets **when they open the link**: `SHOW` (the default — the link works for anyone), `ASK` (sign-in prompt; the form's **Private** tick) or `HIDE` (404, no longer settable from the form). |
 | `audiencePublic` | Readable by somebody not signed in. **Event only** — Story has no such column, because there is no public story page. |
 
 **Two axes, on purpose, and conflating them is the mistake this replaced.**
 
-- `audienceKinds` / `audiencePublic` decide **whose dashboard it appears on**.
+- `audienceKinds` decides **whose dashboard it appears on**.
 - `audienceGate` decides **what somebody already holding the link gets**.
+- `audiencePublic` is derived, never asked: listed to somebody not signed in,
+  which is true exactly when the link is open and no audience narrows it.
 
 They are genuinely independent. GENERALZ is listed only for church members and
 its link is open to anybody — promoted to one group, forwarded well beyond it.

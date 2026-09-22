@@ -295,11 +295,16 @@ export function ruleFromInput(
   }
   const a = input.audience
   const kinds = (a.kinds ?? []).filter(isAudienceKind)
+  const gate: AudienceGate = a.gate === 'HIDE' || a.gate === 'SHOW' ? a.gate : 'ASK'
   return {
-    public: opts.canBePublic && a.public === true && kinds.length === 0,
+    // Derived rather than asked. "Public" means listed to somebody who is not
+    // signed in, which is true exactly when the link is open and no audience
+    // narrows it — so the form has one fewer control to get wrong, and the two
+    // can no longer contradict each other.
+    public: opts.canBePublic && gate === 'SHOW' && kinds.length === 0,
     kinds,
     match: a.match === 'ALL' ? 'ALL' : 'ANY',
-    gate: a.gate === 'HIDE' || a.gate === 'SHOW' ? a.gate : 'ASK',
+    gate,
   }
 }
 

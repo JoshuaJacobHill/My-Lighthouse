@@ -39,13 +39,19 @@ decides what somebody who already has the link gets.
 
 | `audienceGate` | Somebody outside the audience, holding the link |
 |---|---|
-| **`SHOW`** | The event. Unlisted, not private — never on their dashboard, but the link works for anyone, signed in or not. |
-| **`ASK`** | A page saying to sign in or create an account, with the event's name and `?next=` so they come back to it. |
+| **`SHOW`** | The event. The default: an event is open unless somebody says otherwise. |
+| **`ASK`** | A page saying to sign in or create an account, with the event's name and `?next=` so they come back to it. This is the admin form's **Private** tick. |
 | **`HIDE`** | A 404, and no link preview. |
 
-`SHOW` is the ordinary case for anything advertised: GENERALZ is a church event
-whose link gets forwarded far beyond the church, and refusing those people makes
-a link we published look broken.
+`SHOW` is the ordinary case: GENERALZ is a church event whose link gets
+forwarded far beyond the church, and refusing those people makes a link we
+published look broken. The audience still keeps it off everyone else's
+dashboard.
+
+**`HIDE` has no control on the form.** It was the old church-only 404, and
+leaving an event unpublished does the same job — one way to say a thing rather
+than two. Rows that already carry it keep working; a row saved from the form
+becomes `ASK` instead, which shows the name rather than nothing.
 
 Under `ASK`, somebody **already signed in** but outside the audience gets the
 404 rather than the prompt — they have nothing left to do, and "sign in" to a
