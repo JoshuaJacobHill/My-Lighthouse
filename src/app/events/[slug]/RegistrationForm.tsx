@@ -24,13 +24,23 @@ export function RegistrationForm({
   eventId,
   eventSlug,
   ticketTypes,
+  initialName,
+  initialEmail,
 }: {
   eventId: string
   eventSlug: string
   ticketTypes: TicketTypeOption[]
+  /** Set when somebody is signed in — their details, not necessarily the attendee's. */
+  initialName?: string
+  initialEmail?: string
 }) {
   const router = useRouter()
   const [qty, setQty] = React.useState<Record<string, number>>({})
+  const [name, setName] = React.useState(initialName ?? '')
+  const [email, setEmail] = React.useState(initialEmail ?? '')
+  // Somebody buying for themselves should not have to retype what we know.
+  // Buying for a mate is common enough that it stays one tap away.
+  const [editingDetails, setEditingDetails] = React.useState(!initialEmail)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   // Set only when paying on this page; the hosted flow redirects instead.
@@ -52,11 +62,10 @@ export function RegistrationForm({
     setError(null)
     setLoading(true)
 
-    const fd = new FormData(e.currentTarget)
     const result = await registerForEventAction({
       eventId,
-      purchaserName: (fd.get('name') as string) ?? '',
-      purchaserEmail: (fd.get('email') as string) ?? '',
+      purchaserName: name,
+      purchaserEmail: email,
       selections: ticketTypes.map((t) => ({ ticketTypeId: t.id, quantity: qty[t.id] ?? 0 })),
     })
 
@@ -163,8 +172,42 @@ export function RegistrationForm({
       </div>
 
       <div className="grid grid-cols-1 gap-4 border-t border-gray-100 pt-5">
-        <Input label="Your name" name="name" required autoComplete="name" />
-        <Input label="Email address" name="email" type="email" required autoComplete="email" hint="We’ll email your tickets here." />
+        {editingDetails ? (
+          <>
+            <Input
+              label="Your name"
+              name="name"
+              required
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Input
+              label="Email address"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              hint="We’ll email your tickets here."
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </>
+        ) : (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-4 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-gray-900">{name}</p>
+              <p className="truncate text-sm text-gray-500">{email}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingDetails(true)}
+              className="shrink-0 text-sm font-semibold text-orange-600 hover:underline"
+            >
+              Edit details
+            </button>
+          </div>
+        )}
       </div>
 
       <Button type="submit" size="lg" className="w-full" disabled={loading || count === 0}>

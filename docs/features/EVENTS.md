@@ -103,8 +103,13 @@ event.
 
 The on-page flow is the only way to control that page's design: Stripe's hosted
 one takes a title, one description string and an image, and lays them out
-itself. See the checkout summary in `src/lib/utils.ts` for what can be said
-within those limits.
+itself.
+
+**Stripe collapses newlines in the description.** Checked on a real session —
+one field per line came back as a single paragraph with "…Family Church Address:
+13-15…" run together. So `eventSummaryLines()` is joined with ` · `, and the
+labels plus the separators are the only structure available. Do not spend time
+trying to make it break lines.
 
 ## Buying tickets
 

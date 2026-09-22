@@ -124,11 +124,11 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
         ? [event.imageUrl]
         : undefined
 
-    // When and where, labelled, not the event description. One field per line,
-    // which Stripe may or may not keep — the API documents the description as a
-    // plain string for "your own rendering purposes" and says nothing about
-    // formatting. The labels carry the structure either way, so it reads as
-    // fields rather than a sentence even if the breaks collapse.
+    // When and where, labelled, not the event description.
+    //
+    // Joined with a separator because **Stripe collapses newlines** — checked on
+    // a real session, where "…Family Church Address: 13-15…" ran together into
+    // one paragraph. The dots are what give the fields edges.
 
     const line_items = selections.map((s) => {
       const tt = typeMap.get(s.ticketTypeId)!
@@ -143,9 +143,13 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
           // Quantity is left to Stripe, which already prints "Qty 2" beside it.
           product_data: {
             name: event.title,
-            description: eventSummaryLines(event.startsAt, event.endsAt, event.venue, event.address, tt.name).join(
-              '\n'
-            ),
+            description: eventSummaryLines(
+              event.startsAt,
+              event.endsAt,
+              event.venue,
+              event.address,
+              tt.name
+            ).join(' · '),
             images,
           },
         },

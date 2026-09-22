@@ -210,7 +210,13 @@ export default async function EventPage({
             <p className="mt-1 text-sm text-gray-500">Thank you for your interest — please check back for future events.</p>
           </div>
         ) : (
-          <RegistrationForm eventId={event.id} eventSlug={slug} ticketTypes={options} />
+          <RegistrationForm
+            eventId={event.id}
+            eventSlug={slug}
+            ticketTypes={options}
+            initialName={viewer?.name ?? undefined}
+            initialEmail={viewer?.email ?? undefined}
+          />
         )}
 
         {/* Volunteer sign-up */}
