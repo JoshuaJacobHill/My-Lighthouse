@@ -8,7 +8,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { createOrderWithTickets, TicketError, type Selection } from '@/lib/tickets'
 import { getSession } from '@/lib/auth'
 import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
-import { formatEventWhen } from '@/lib/utils'
+import { formatEventSummary } from '@/lib/utils'
 
 interface RegisterResult {
   success: boolean
@@ -120,14 +120,11 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
         ? [event.imageUrl]
         : undefined
 
-    // When and where, not the description. Checkout renders plain text, so a
-    // markdown description would arrive with its own hashes and asterisks — and
-    // the useful thing to confirm before paying is that you have the right day
-    // and the right place. `formatEventWhen` is the event page's own formatter,
-    // so the two cannot drift, and it handles Brisbane time and a null date.
-    const description = [formatEventWhen(event.startsAt, event.endsAt), event.venue]
-      .filter(Boolean)
-      .join(' · ')
+    // When and where, labelled, not the event description. Checkout takes one
+    // plain-text string and lays it out itself — no headings, and no promise to
+    // keep a line break — so the labels carry the structure instead. The useful
+    // thing to confirm before paying is the day, the time and the place.
+    const description = formatEventSummary(event.startsAt, event.endsAt, event.venue)
 
     const line_items = selections.map((s) => {
       const tt = typeMap.get(s.ticketTypeId)!

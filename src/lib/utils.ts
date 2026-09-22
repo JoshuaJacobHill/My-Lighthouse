@@ -201,3 +201,52 @@ export function getTimePeriodConfig(settings: Record<string, string>): TimePerio
     },
   ]
 }
+
+/**
+ * An event's when-and-where as labelled parts, for somewhere that gets one
+ * string and renders it as a single line.
+ *
+ * Stripe Checkout is the case. It takes a plain-text description and lays it
+ * out itself — no headings, no line breaks it promises to keep — so the labels
+ * do the work instead: "Date: 16–17 October 2026 · Time: 6:30pm – 5:00pm ·
+ * Location: …". Longer than a bare date, and a person scanning it before paying
+ * can find the bit they wanted.
+ *
+ * Dates read as a person says them rather than as dd/MM/yyyy: a range inside
+ * one month collapses to "16–17 October 2026", which is how the poster says it.
+ */
+export function formatEventSummary(
+  start?: Date | string | null,
+  end?: Date | string | null,
+  venue?: string | null
+): string {
+  const parts: string[] = []
+  const day = (d: Date | string) =>
+    new Intl.DateTimeFormat('en-AU', { timeZone: BRISBANE_TZ, day: 'numeric' }).format(toDate(d))
+  const monthYear = (d: Date | string) =>
+    new Intl.DateTimeFormat('en-AU', {
+      timeZone: BRISBANE_TZ,
+      month: 'long',
+      year: 'numeric',
+    }).format(toDate(d))
+  const full = (d: Date | string) => `${day(d)} ${monthYear(d)}`
+
+  if (start) {
+    if (end && monthYear(start) !== monthYear(end)) {
+      parts.push(`Date: ${full(start)} – ${full(end)}`)
+    } else if (end && day(start) !== day(end)) {
+      parts.push(`Date: ${day(start)}–${day(end)} ${monthYear(start)}`)
+    } else {
+      parts.push(`Date: ${full(start)}`)
+    }
+
+    const from = formatTime(start)
+    const to = end ? formatTime(end) : ''
+    parts.push(`Time: ${to && to !== from ? `${from} – ${to}` : from}`)
+  } else {
+    parts.push('Date: to be advised')
+  }
+
+  if (venue) parts.push(`Location: ${venue}`)
+  return parts.join(' · ')
+}
