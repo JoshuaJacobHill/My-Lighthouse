@@ -155,8 +155,7 @@ export function EventForm({
             label="Street address"
             name="address"
             defaultValue={event?.address}
-            placeholder="17 Magnesium Dr, Crestmead QLD 4132"
-            hint="Shown under the venue name, on the event page and at checkout."
+            placeholder="Venue address"
           />
           <div className="flex flex-col gap-1">
             <label htmlFor="fundId" className="text-sm font-medium text-gray-700">Allocate proceeds to fund</label>

@@ -17,7 +17,7 @@ import {
  * Two questions, because they are genuinely separate and welding them together
  * is what made "church only" also slam the door on the link:
  *
- *   Private       may somebody open the link without signing in
+ *   Private       ticked, the link needs a sign-in; unticked, anybody can open it
  *   The audience  whose dashboard it appears on
  *
  * An event is open by default. Ticking Private requires an account to view it;
@@ -69,19 +69,16 @@ export function AudiencePicker({
   return (
     <div className="space-y-4">
       {showGate && (
-        <div className="rounded-2xl border border-gray-200 p-4">
-          <Checkbox
-            label="Private — only people signed in can view this"
-            description="By default anybody with the link can open the page. Tick this and they are asked to sign in or create an account first; the details, photo and tickets stay hidden until they do."
-            checked={isPrivate}
-            onCheckedChange={(v) =>
-              set({
-                gate: v === true ? 'ASK' : 'SHOW',
-                public: v !== true && value.kinds.length === 0,
-              })
-            }
-          />
-        </div>
+        <Checkbox
+          label="Private"
+          checked={isPrivate}
+          onCheckedChange={(v) =>
+            set({
+              gate: v === true ? 'ASK' : 'SHOW',
+              public: v !== true && value.kinds.length === 0,
+            })
+          }
+        />
       )}
 
       <div className="rounded-2xl border border-gray-200 p-4">
