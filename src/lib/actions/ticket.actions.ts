@@ -7,6 +7,7 @@ import { getStripe, isStripeConfigured, toCents } from '@/lib/stripe'
 import { rateLimit } from '@/lib/rate-limit'
 import { createOrderWithTickets, TicketError, type Selection } from '@/lib/tickets'
 import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
+import { formatEventWhen } from '@/lib/utils'
 
 interface RegisterResult {
   success: boolean
@@ -53,6 +54,10 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
       id: true,
       slug: true,
       title: true,
+      imageUrl: true,
+      startsAt: true,
+      endsAt: true,
+      venue: true,
       isPublished: true,
       ticketTypes: { select: { id: true, name: true, price: true } },
     },
@@ -100,6 +105,23 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
 
   try {
     const base = appUrl()
+    // Stripe fetches these itself, so only a publicly reachable URL is any use.
+    // Some older events still point at signed scontent-*.fbcdn.net links that
+    // expire; those would render as a broken image, which is worse than none.
+    const images =
+      event.imageUrl && /^https:\/\//.test(event.imageUrl) && !event.imageUrl.includes('fbcdn.net')
+        ? [event.imageUrl]
+        : undefined
+
+    // When and where, not the description. Checkout renders plain text, so a
+    // markdown description would arrive with its own hashes and asterisks — and
+    // the useful thing to confirm before paying is that you have the right day
+    // and the right place. `formatEventWhen` is the event page's own formatter,
+    // so the two cannot drift, and it handles Brisbane time and a null date.
+    const description = [formatEventWhen(event.startsAt, event.endsAt), event.venue]
+      .filter(Boolean)
+      .join(' · ')
+
     const line_items = selections.map((s) => {
       const tt = typeMap.get(s.ticketTypeId)!
       return {
@@ -107,7 +129,10 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
         price_data: {
           currency: 'aud',
           unit_amount: toCents(Number(tt.price)),
-          product_data: { name: `${event.title} — ${tt.name}` },
+          // Checkout has no header of its own, so the line item is the only
+          // place the event can appear. With several ticket types this repeats
+          // per row, which reads as a list of the same event rather than wrongly.
+          product_data: { name: `${event.title} — ${tt.name}`, description, images },
         },
       }
     })
