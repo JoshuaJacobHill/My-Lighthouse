@@ -81,6 +81,31 @@ church-only event while 404ing the page.)
 because an unchecked `?next=` is an open redirect on the one page where
 somebody has just typed a password.
 
+## Two ways to pay, one of them switched off
+
+`TICKETS_ON_PAGE_CHECKOUT=true` moves ticket payment onto our own page, using
+the Payment Element the same way `/donate` and the sponsor flow already do. Off
+by default: hosted Checkout works and takes real money, so the replacement waits
+behind a switch until somebody has bought a ticket through it **with a real
+card**.
+
+Both paths are live at once and neither knows about the other:
+
+| | Paid via | Webhook event | Order written by |
+|---|---|---|---|
+| Hosted (default) | Stripe's page | `checkout.session.completed` | `recordTicketOrder` |
+| On-page (flag) | Payment Element | `payment_intent.succeeded` | `recordTicketOrderFromIntent` |
+
+Both end at `createOrderWithTickets`, which is idempotent on the transaction id,
+so nobody can be double-booked. Flipping the flag back is instant and loses
+nothing in flight — a payment already under way still lands through its own
+event.
+
+The on-page flow is the only way to control that page's design: Stripe's hosted
+one takes a title, one description string and an image, and lays them out
+itself. See the checkout summary in `src/lib/utils.ts` for what can be said
+within those limits.
+
 ## Buying tickets
 
 1. `/events/<slug>` — pick types and quantities.

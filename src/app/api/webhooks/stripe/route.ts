@@ -97,6 +97,12 @@ export async function POST(req: NextRequest) {
       const intent = event.data.object as Stripe.PaymentIntent
       if (intent.metadata?.kind === 'donation') {
         await recordDonationFromIntent(intent)
+      } else if (intent.metadata?.kind === 'event_tickets') {
+        // On-page ticket checkout. The hosted flow arrives as a Checkout
+        // Session instead; both end at createOrderWithTickets, which is
+        // idempotent on the transaction id, so a buyer cannot be double-booked
+        // even if both events somehow fired.
+        await recordTicketOrderFromIntent(intent)
       }
     } else if (event.type === 'invoice.payment_succeeded') {
       // Recurring gifts: one invoice per cycle (first + renewals).
@@ -349,6 +355,52 @@ async function finalizeDonation(params: {
     }
   } catch (err) {
     console.error('Account setup email failed', err)
+  }
+}
+
+/**
+ * A ticket order paid on our own page rather than Stripe's.
+ *
+ * Everything the hosted flow read off the Checkout Session is in the intent's
+ * metadata instead, because we put it there — including the buyer's email,
+ * which the hosted page collected itself.
+ */
+async function recordTicketOrderFromIntent(intent: Stripe.PaymentIntent): Promise<void> {
+  if (intent.status !== 'succeeded') return
+
+  const meta = intent.metadata ?? {}
+  const eventId = meta.eventId
+  const purchaserEmail = meta.purchaserEmail || intent.receipt_email || ''
+  if (!eventId || !purchaserEmail) return
+
+  let selections: Selection[] = []
+  try {
+    const raw = JSON.parse(meta.selections ?? '[]') as { t: string; q: number }[]
+    selections = raw.map((s) => ({ ticketTypeId: s.t, quantity: s.q }))
+  } catch {
+    console.error('Could not parse ticket selections from intent metadata')
+    return
+  }
+  if (selections.length === 0) return
+
+  const userId = meta.userId || (await findTicketOwnerByEmail(purchaserEmail))
+
+  const { orderId } = await createOrderWithTickets({
+    eventId,
+    selections,
+    purchaserName: meta.purchaserName || 'Guest',
+    purchaserEmail,
+    amountTotal: (intent.amount_received ?? intent.amount ?? 0) / 100,
+    provider: 'STRIPE',
+    providerTransactionId: intent.id,
+    userId,
+  })
+
+  try {
+    await sendTicketConfirmationEmailForOrder(orderId)
+    await inviteTicketPurchaserToAccount(orderId)
+  } catch (err) {
+    console.error('Ticket confirmation email failed', err)
   }
 }
 

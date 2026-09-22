@@ -7,13 +7,16 @@ import { getStripe, isStripeConfigured, toCents } from '@/lib/stripe'
 import { rateLimit } from '@/lib/rate-limit'
 import { createOrderWithTickets, TicketError, type Selection } from '@/lib/tickets'
 import { getSession } from '@/lib/auth'
+import { isOnPageTicketCheckoutEnabled } from '@/lib/features'
 import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
 import { eventSummaryLines } from '@/lib/utils'
 
 interface RegisterResult {
   success: boolean
   error?: string
-  url?: string // paid: Stripe checkout URL
+  url?: string // paid, hosted: Stripe Checkout URL
+  clientSecret?: string // paid, on-page: pay without leaving the site
+  accountKey?: 'CARE' | 'CHURCH'
   redirectTo?: string // free: confirmation page
 }
 
@@ -158,6 +161,25 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
       // Carried through Stripe so the webhook does not have to guess. Anonymous
       // purchases are matched by verified email instead.
       ...(buyer ? { userId: buyer.userId } : {}),
+    }
+
+    // On our own page, the buyer never leaves: create the intent, hand back the
+    // secret, and let the event page mount the Payment Element. The order is
+    // still written by the webhook, from `payment_intent.succeeded` rather than
+    // `checkout.session.completed` — same function, same idempotency key.
+    if (isOnPageTicketCheckoutEnabled()) {
+      const intent = await getStripe().paymentIntents.create({
+        amount: toCents(total),
+        currency: 'aud',
+        receipt_email: purchaserEmail,
+        description: `Tickets — ${event.title}`,
+        automatic_payment_methods: { enabled: true },
+        metadata: { ...metadata, purchaserEmail },
+      })
+      if (!intent.client_secret) {
+        return { success: false, error: 'Could not start payment. Please try again.' }
+      }
+      return { success: true, clientSecret: intent.client_secret, accountKey: 'CARE' }
     }
 
     const session = await getStripe().checkout.sessions.create({

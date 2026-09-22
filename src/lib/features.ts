@@ -17,6 +17,19 @@ export function isDonorPortalEnabled(): boolean {
   return process.env.DONOR_PORTAL_ENABLED === 'true'
 }
 
+/**
+ * Take ticket payment on our own page instead of Stripe's hosted Checkout.
+ *
+ * Off by default on purpose. Hosted Checkout works and takes real money, so the
+ * replacement stays behind a switch until somebody has bought a ticket through
+ * it with a real card. Both paths are live at once: the webhook handles the
+ * hosted `checkout.session.completed` and the on-page `payment_intent.succeeded`
+ * either way, so flipping this back is instant and loses nothing in flight.
+ */
+export function isOnPageTicketCheckoutEnabled(): boolean {
+  return process.env.TICKETS_ON_PAGE_CHECKOUT === 'true'
+}
+
 function earlyAccessEmails(): string[] {
   return (process.env.DONOR_PORTAL_EARLY_ACCESS_EMAILS ?? '')
     .split(',')

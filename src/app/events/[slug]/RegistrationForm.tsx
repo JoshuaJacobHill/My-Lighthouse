@@ -2,7 +2,10 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus, Check } from 'lucide-react'
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import type { StripeElementsOptions } from '@stripe/stripe-js'
+import { stripePromiseFor } from '@/lib/stripe-public'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { registerForEventAction } from '@/lib/actions/ticket.actions'
@@ -19,15 +22,22 @@ const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' 
 
 export function RegistrationForm({
   eventId,
+  eventSlug,
   ticketTypes,
 }: {
   eventId: string
+  eventSlug: string
   ticketTypes: TicketTypeOption[]
 }) {
   const router = useRouter()
   const [qty, setQty] = React.useState<Record<string, number>>({})
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  // Set only when paying on this page; the hosted flow redirects instead.
+  const [payment, setPayment] = React.useState<{
+    clientSecret: string
+    accountKey: 'CARE' | 'CHURCH'
+  } | null>(null)
 
   function setQuantity(id: string, next: number, max: number) {
     const clamped = Math.max(0, Math.min(next, max))
@@ -50,8 +60,13 @@ export function RegistrationForm({
       selections: ticketTypes.map((t) => ({ ticketTypeId: t.id, quantity: qty[t.id] ?? 0 })),
     })
 
+    if (result.success && result.clientSecret && result.accountKey) {
+      setPayment({ clientSecret: result.clientSecret, accountKey: result.accountKey })
+      setLoading(false)
+      return
+    }
     if (result.success && result.url) {
-      window.location.href = result.url // paid → Stripe
+      window.location.href = result.url // paid → Stripe's hosted page
       return
     }
     if (result.success && result.redirectTo) {
@@ -60,6 +75,38 @@ export function RegistrationForm({
     }
     setLoading(false)
     setError(result.error ?? 'Something went wrong. Please try again.')
+  }
+
+  if (payment) {
+    const stripePromise = stripePromiseFor(payment.accountKey)
+    const options: StripeElementsOptions = {
+      clientSecret: payment.clientSecret,
+      appearance: { theme: 'stripe', variables: { colorPrimary: '#f97316', borderRadius: '12px' } },
+    }
+    return (
+      <div className="space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="font-bold text-gray-900">
+            {count} {count === 1 ? 'ticket' : 'tickets'}
+          </p>
+          <p className="text-lg font-bold tabular-nums text-gray-900">{aud.format(total)}</p>
+        </div>
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+        {stripePromise && (
+          <Elements stripe={stripePromise} options={options}>
+            <PayForm
+              amount={total}
+              returnUrl={`/events/${eventSlug}/registered`}
+              onError={setError}
+            />
+          </Elements>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -130,5 +177,61 @@ export function RegistrationForm({
               : `Pay ${aud.format(total)} · ${count} ${count === 1 ? 'ticket' : 'tickets'}`}
       </Button>
     </form>
+  )
+}
+
+/**
+ * The card step, inside `Elements` so it can reach the mounted PaymentElement.
+ *
+ * `confirmPayment` sends the buyer to `return_url` on success; the tickets
+ * themselves are created by the webhook, not here, so a closed tab still ends
+ * with a paid order and an emailed ticket.
+ */
+function PayForm({
+  amount,
+  returnUrl,
+  onError,
+}: {
+  amount: number
+  returnUrl: string
+  onError: (m: string | null) => void
+}) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [loading, setLoading] = React.useState(false)
+
+  async function pay() {
+    if (!stripe || !elements) return
+    onError(null)
+    setLoading(true)
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: `${window.location.origin}${returnUrl}` },
+    })
+    // Only reached when the payment failed — success navigates away.
+    if (error) {
+      onError(error.message ?? 'Payment could not be completed.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="rounded-2xl border border-gray-200 p-4">
+        <PaymentElement options={{ layout: 'tabs' }} />
+      </div>
+      <button
+        type="button"
+        onClick={pay}
+        disabled={loading || !stripe}
+        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 py-3.5 text-base font-bold text-white hover:bg-orange-600 disabled:opacity-50"
+      >
+        {loading ? 'Processing…' : (
+          <>
+            <Check className="h-5 w-5" /> Pay {aud.format(amount)}
+          </>
+        )}
+      </button>
+    </div>
   )
 }
