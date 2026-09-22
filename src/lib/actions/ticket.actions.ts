@@ -8,7 +8,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { createOrderWithTickets, TicketError, type Selection } from '@/lib/tickets'
 import { getSession } from '@/lib/auth'
 import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
-import { formatEventSummary } from '@/lib/utils'
+import { eventSummaryLines } from '@/lib/utils'
 
 interface RegisterResult {
   success: boolean
@@ -120,11 +120,11 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
         ? [event.imageUrl]
         : undefined
 
-    // When and where, labelled, not the event description. Checkout takes one
-    // plain-text string and lays it out itself — no headings, and no promise to
-    // keep a line break — so the labels carry the structure instead. The useful
-    // thing to confirm before paying is the day, the time and the place.
-    const description = formatEventSummary(event.startsAt, event.endsAt, event.venue)
+    // When and where, labelled, not the event description. One field per line,
+    // which Stripe may or may not keep — the API documents the description as a
+    // plain string for "your own rendering purposes" and says nothing about
+    // formatting. The labels carry the structure either way, so it reads as
+    // fields rather than a sentence even if the breaks collapse.
 
     const line_items = selections.map((s) => {
       const tt = typeMap.get(s.ticketTypeId)!
@@ -136,7 +136,14 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
           // Checkout has no header of its own, so the line item is the only
           // place the event can appear. With several ticket types this repeats
           // per row, which reads as a list of the same event rather than wrongly.
-          product_data: { name: `${event.title} — ${tt.name}`, description, images },
+          // Quantity is left to Stripe, which already prints "Qty 2" beside it.
+          product_data: {
+            name: event.title,
+            description: eventSummaryLines(event.startsAt, event.endsAt, event.venue, tt.name).join(
+              '\n'
+            ),
+            images,
+          },
         },
       }
     })

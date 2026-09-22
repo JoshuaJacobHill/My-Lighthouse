@@ -203,24 +203,24 @@ export function getTimePeriodConfig(settings: Record<string, string>): TimePerio
 }
 
 /**
- * An event's when-and-where as labelled parts, for somewhere that gets one
- * string and renders it as a single line.
+ * An event's when-and-where, as labelled lines.
  *
- * Stripe Checkout is the case. It takes a plain-text description and lays it
- * out itself — no headings, no line breaks it promises to keep — so the labels
- * do the work instead: "Date: 16–17 October 2026 · Time: 6:30pm – 5:00pm ·
- * Location: …". Longer than a bare date, and a person scanning it before paying
- * can find the bit they wanted.
+ * Returned as parts so the caller decides how to join them: Stripe Checkout
+ * takes one plain-text string and lays it out itself, and whether it keeps a
+ * newline is Stripe's business, not something the API documents. So the labels
+ * carry the structure on their own — "Date: 16–17 October 2026" reads as a
+ * labelled field whether it lands on its own line or in a run.
  *
  * Dates read as a person says them rather than as dd/MM/yyyy: a range inside
  * one month collapses to "16–17 October 2026", which is how the poster says it.
  */
-export function formatEventSummary(
+export function eventSummaryLines(
   start?: Date | string | null,
   end?: Date | string | null,
-  venue?: string | null
-): string {
-  const parts: string[] = []
+  venue?: string | null,
+  ticketType?: string | null
+): string[] {
+  const lines: string[] = []
   const day = (d: Date | string) =>
     new Intl.DateTimeFormat('en-AU', { timeZone: BRISBANE_TZ, day: 'numeric' }).format(toDate(d))
   const monthYear = (d: Date | string) =>
@@ -233,20 +233,30 @@ export function formatEventSummary(
 
   if (start) {
     if (end && monthYear(start) !== monthYear(end)) {
-      parts.push(`Date: ${full(start)} – ${full(end)}`)
+      lines.push(`Date: ${full(start)} – ${full(end)}`)
     } else if (end && day(start) !== day(end)) {
-      parts.push(`Date: ${day(start)}–${day(end)} ${monthYear(start)}`)
+      lines.push(`Date: ${day(start)}–${day(end)} ${monthYear(start)}`)
     } else {
-      parts.push(`Date: ${full(start)}`)
+      lines.push(`Date: ${full(start)}`)
     }
 
     const from = formatTime(start)
     const to = end ? formatTime(end) : ''
-    parts.push(`Time: ${to && to !== from ? `${from} – ${to}` : from}`)
+    lines.push(`Time: ${to && to !== from ? `${from} – ${to}` : from}`)
   } else {
-    parts.push('Date: to be advised')
+    lines.push('Date: to be advised')
   }
 
-  if (venue) parts.push(`Location: ${venue}`)
-  return parts.join(' · ')
+  if (venue) lines.push(`Location: ${venue}`)
+  if (ticketType) lines.push(`Ticket: ${ticketType}`)
+  return lines
+}
+
+/** The same, on one line, for somewhere that certainly will not keep a break. */
+export function formatEventSummary(
+  start?: Date | string | null,
+  end?: Date | string | null,
+  venue?: string | null
+): string {
+  return eventSummaryLines(start, end, venue).join(' · ')
 }

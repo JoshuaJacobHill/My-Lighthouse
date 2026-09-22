@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatEventSummary } from '@/lib/utils'
+import { eventSummaryLines, formatEventSummary } from '@/lib/utils'
 
 /**
  * The line somebody reads on the payment page, right before they pay.
@@ -52,5 +52,28 @@ describe('formatEventSummary', () => {
 
   it('leaves the location out rather than trailing an empty label', () => {
     expect(formatEventSummary(at('2026-03-14T23:00:00Z'))).not.toContain('Location')
+  })
+})
+
+describe('eventSummaryLines', () => {
+  it('gives one labelled line per field, so a break is optional not load-bearing', () => {
+    expect(
+      eventSummaryLines(
+        at('2026-10-16T08:30:00Z'),
+        at('2026-10-17T07:00:00Z'),
+        'Lighthouse Family Church',
+        'Saturday Only'
+      )
+    ).toEqual([
+      'Date: 16–17 October 2026',
+      'Time: 6:30 pm – 5:00 pm',
+      'Location: Lighthouse Family Church',
+      'Ticket: Saturday Only',
+    ])
+  })
+
+  it('leaves out the ticket line when there is nothing to say', () => {
+    const lines = eventSummaryLines(at('2026-10-16T08:30:00Z'), null, 'Crestmead')
+    expect(lines.some((l) => l.startsWith('Ticket:'))).toBe(false)
   })
 })
