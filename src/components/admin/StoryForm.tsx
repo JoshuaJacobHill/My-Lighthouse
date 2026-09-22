@@ -122,7 +122,7 @@ export function StoryForm({ story }: { story?: StoryFormValues }) {
         <span className="text-sm font-medium text-gray-700">Published (visible on the dashboard)</span>
       </label>
 
-      <AudiencePicker value={audience} onChange={setAudience} canBePublic={false} />
+      <AudiencePicker value={audience} onChange={setAudience} canBePublic={false} showGate={false} />
 
       <div className="flex items-center gap-3 pt-2">
         <Button type="submit" disabled={saving}>

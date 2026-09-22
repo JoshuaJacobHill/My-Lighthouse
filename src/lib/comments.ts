@@ -10,7 +10,7 @@
 import prisma from '@/lib/prisma'
 import { notify } from '@/lib/notifications'
 import { isAdminRole } from '@/lib/permissions-core'
-import { canSee, ruleFromRow } from '@/lib/audience-core'
+import { isListedFor, ruleFromRow } from '@/lib/audience-core'
 import { notificationAudienceFor } from '@/lib/audience'
 import { audienceUserWhere } from '@/lib/notifications'
 
@@ -91,7 +91,7 @@ export function canSeeStory(
   if (!story.isPublished && !isAdminRole(viewer.role)) return false
   if (story.staffOnly && !(viewer.isStaff || viewer.isTrainee)) return false
   if (story.churchOnly && !viewer.isChurchMember) return false
-  return canSee(ruleFromRow(story, { canBePublic: false }), {
+  return isListedFor(ruleFromRow(story, { canBePublic: false }), {
     isChurchMember: viewer.isChurchMember,
     isStaff: viewer.isStaff,
     isTrainee: viewer.isTrainee,

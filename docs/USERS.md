@@ -82,23 +82,33 @@ replaced by one rule both models share. **Read it through
 |---|---|
 | `audienceKinds` | `church`, `staff`, `volunteers`, `donors`, `partners`. Empty = any signed-in supporter. |
 | `audienceMatch` | `ANY` (in one of them) or `ALL` (in all at once). The picker only produces `ANY`; `ALL` exists to preserve stories that carried church *and* staff, which meant both. |
-| `audienceGate` | What somebody outside it gets: `ASK` (sign-in prompt) or `HIDE` (404). |
+| `audienceGate` | What somebody outside it gets **when they open the link**: `SHOW` (unlisted — the link works for anyone), `ASK` (sign-in prompt) or `HIDE` (404). |
 | `audiencePublic` | Readable by somebody not signed in. **Event only** — Story has no such column, because there is no public story page. |
 
-Two axes, on purpose. The list says *who*; the gate says whether a stranger may
-know the thing exists. A church-only event `HIDE`s because its existence is not
-public; a private one `ASK`s because it is usually a link emailed to supporters
-and a 404 would look broken to the people it was sent to.
+**Two axes, on purpose, and conflating them is the mistake this replaced.**
+
+- `audienceKinds` / `audiencePublic` decide **whose dashboard it appears on**.
+- `audienceGate` decides **what somebody already holding the link gets**.
+
+They are genuinely independent. GENERALZ is listed only for church members and
+its link is open to anybody — promoted to one group, forwarded well beyond it.
+That is `SHOW`, and it is the common case for anything advertised. `ASK` is a
+link emailed to supporters where a 404 would look broken to the people it was
+sent to. `HIDE` is for something whose existence is not public.
+
+Asked as two functions, and the distinction matters at every call site:
+`isListedFor()` for a dashboard, `canOpen()` for a page somebody navigated to.
 
 The audiences are the ones the database can answer from how somebody is
 connected. **Shoppers and Santa's Little Helpers are deliberately absent** —
 both are real audiences with nothing behind them yet, and a tickbox that
 silently matches nobody reads as a promise the app cannot keep.
 
-Asked in two places, which must agree: `canSee()` for one item, and
-`storyAudienceWhere()` / `eventAudienceWhere()` for a list. `audience.test.ts`
-runs every viewer against every rule and demands the same answer from both,
-because two expressions of one rule is exactly where content leaks.
+Listing is asked in two places, which must agree: `isListedFor()` for one item,
+and `storyAudienceWhere()` / `eventAudienceWhere()` for a list.
+`audience.test.ts` runs every viewer against every rule and demands the same
+answer from both, because two expressions of one rule is exactly where content
+leaks.
 
 **The old booleans are still written and still filtered on.** Until the backfill
 is confirmed everywhere, every read applies both — a row the backfill has not

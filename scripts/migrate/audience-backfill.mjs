@@ -104,7 +104,11 @@ try {
     UPDATE "Event" SET
       "audienceKinds"  = CASE WHEN "churchOnly" THEN ARRAY['church'] ELSE ARRAY[]::text[] END,
       "audienceMatch"  = 'ANY'::"AudienceMatch",
-      "audienceGate"   = CASE WHEN "churchOnly" THEN 'HIDE' ELSE 'ASK' END::"AudienceGate",
+      "audienceGate"   = CASE
+                           WHEN "churchOnly" THEN 'HIDE'
+                           WHEN "signedInOnly" THEN 'ASK'
+                           ELSE 'SHOW'
+                         END::"AudienceGate",
       "audiencePublic" = NOT ("churchOnly" OR "signedInOnly")
   `)
 

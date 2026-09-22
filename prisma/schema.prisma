@@ -1205,13 +1205,20 @@ enum AudienceMatch {
   ALL
 }
 
-/// What somebody outside the audience gets.
+/// What somebody outside the audience gets when they open the link.
 ///
-/// ASK admits the thing exists and asks them to sign in — right for a link
-/// emailed to supporters, where a 404 looks broken to the people it was sent to.
-/// HIDE 404s, so its existence stays unknown. Keep them distinct: "who is this
-/// for" and "may a stranger know it exists" are separate decisions.
+/// Separate from the audience itself, because "who sees this listed" and "who
+/// may open it" are different questions. The audience decides the first; this
+/// decides the second.
+///
+/// SHOW is unlisted: it never appears on their dashboard, but the link works
+/// for anybody who has it. Right for an event promoted to one group and then
+/// forwarded — GENERALZ is a church event whose link is shared widely.
+/// ASK admits it exists and asks them to sign in, so an emailed link does not
+/// look broken to the people it was sent to.
+/// HIDE 404s, so its existence stays unknown.
 enum AudienceGate {
+  SHOW
   ASK
   HIDE
 }

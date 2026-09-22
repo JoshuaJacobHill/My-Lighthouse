@@ -51,7 +51,13 @@ export const AUDIENCE_HINTS: Record<AudienceKind, string> = {
 }
 
 export type AudienceMatch = 'ANY' | 'ALL'
-export type AudienceGate = 'ASK' | 'HIDE'
+/**
+ * What somebody holding the link gets when they are outside the audience.
+ *
+ * SHOW is unlisted — the link works for anyone, signed in or not, but the thing
+ * never appears on their dashboard. ASK makes them sign in first. HIDE 404s.
+ */
+export type AudienceGate = 'SHOW' | 'ASK' | 'HIDE'
 
 /**
  * How somebody is connected to Lighthouse, as the audience rules ask about it.
@@ -82,12 +88,15 @@ export type AudienceRule = {
   kinds: AudienceKind[]
   /** ANY is what the picker produces; see the enum comment in the schema. */
   match: AudienceMatch
-  /** What somebody outside the audience gets. Does not affect list queries. */
+  /**
+   * What somebody outside the audience gets when they open the link. Never
+   * affects listing — that is what `kinds` and `public` are for.
+   */
   gate: AudienceGate
 }
 
 /** A public event: anyone may read it. */
-export const PUBLIC_RULE: AudienceRule = { public: true, kinds: [], match: 'ANY', gate: 'ASK' }
+export const PUBLIC_RULE: AudienceRule = { public: true, kinds: [], match: 'ANY', gate: 'SHOW' }
 
 /** Any signed-in supporter, and a sign-in prompt for everybody else. */
 export const SIGNED_IN_RULE: AudienceRule = {
@@ -115,19 +124,32 @@ export function missingKinds(v: ViewerConnections): AudienceKind[] {
 }
 
 /**
- * May this viewer read it? `null` is somebody who is not signed in.
+ * Does this appear on their dashboard? `null` is somebody not signed in.
  *
- * The single source of truth for one item. List queries express the same rule
- * as SQL in `audience.ts` — if you change one, change both, and the tests
- * compare them against each other.
+ * Listing only. The SQL in `audience.ts` expresses this same rule for a page of
+ * rows — change one, change both, and the tests compare them against each other
+ * on every combination.
  */
-export function canSee(rule: AudienceRule, viewer: ViewerConnections | null): boolean {
+export function isListedFor(rule: AudienceRule, viewer: ViewerConnections | null): boolean {
   if (!viewer) return rule.public
   if (rule.kinds.length === 0) return true
   const held = new Set(heldKinds(viewer))
   return rule.match === 'ALL'
     ? rule.kinds.every((k) => held.has(k))
     : rule.kinds.some((k) => held.has(k))
+}
+
+/**
+ * May this viewer open the link?
+ *
+ * A wider question than listing, and deliberately so. An event promoted to one
+ * group is routinely forwarded to somebody outside it, and refusing them makes
+ * a link we sent look broken. `SHOW` is that case: never on their dashboard,
+ * but the link works.
+ */
+export function canOpen(rule: AudienceRule, viewer: ViewerConnections | null): boolean {
+  if (rule.gate === 'SHOW') return true
+  return isListedFor(rule, viewer)
 }
 
 /**
@@ -153,8 +175,10 @@ export function ruleFromFlags(flags: {
   if (flags.churchOnly) kinds.push('church')
   if (flags.staffOnly) kinds.push('staff')
 
-  // church-only hid the thing entirely; private admitted it existed and asked.
-  const gate: AudienceGate = flags.churchOnly || flags.staffOnly ? 'HIDE' : 'ASK'
+  // Exactly today's behaviour, so the backfill changes nothing: church-only and
+  // staff-only 404ed, private asked, and an unflagged event opened for anybody.
+  const gate: AudienceGate =
+    flags.churchOnly || flags.staffOnly ? 'HIDE' : flags.signedInOnly ? 'ASK' : 'SHOW'
 
   const restricted = kinds.length > 0 || flags.signedInOnly === true
   return {
@@ -238,7 +262,10 @@ export function ruleFromRow(
     public: opts.canBePublic && (row.audiencePublic ?? fromFlags.public),
     kinds,
     match: row.audienceMatch === 'ALL' ? 'ALL' : 'ANY',
-    gate: row.audienceGate === 'HIDE' ? 'HIDE' : 'ASK',
+    gate:
+      row.audienceGate === 'HIDE' || row.audienceGate === 'ASK' || row.audienceGate === 'SHOW'
+        ? row.audienceGate
+        : fromFlags.gate,
   }
 }
 
@@ -272,7 +299,7 @@ export function ruleFromInput(
     public: opts.canBePublic && a.public === true && kinds.length === 0,
     kinds,
     match: a.match === 'ALL' ? 'ALL' : 'ANY',
-    gate: a.gate === 'HIDE' ? 'HIDE' : 'ASK',
+    gate: a.gate === 'HIDE' || a.gate === 'SHOW' ? a.gate : 'ASK',
   }
 }
 

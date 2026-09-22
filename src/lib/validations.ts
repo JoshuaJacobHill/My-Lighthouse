@@ -28,7 +28,7 @@ export const audienceRuleSchema = z.object({
   public: z.boolean().optional().default(false),
   kinds: z.array(z.enum(AUDIENCE_ENUM)).max(AUDIENCE_KINDS.length).optional().default([]),
   match: z.enum(['ANY', 'ALL']).optional().default('ANY'),
-  gate: z.enum(['ASK', 'HIDE']).optional().default('ASK'),
+  gate: z.enum(['SHOW', 'ASK', 'HIDE']).optional().default('ASK'),
 })
 
 // ─── Volunteer signup ─────────────────────────────────────────────────────────

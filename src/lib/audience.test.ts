@@ -4,8 +4,8 @@ import { describe, it, expect, vi } from 'vitest'
  * The audience rules, and the one property that actually protects anybody:
  * the single-item check and the list filter must agree.
  *
- * They are written twice — `canSee` in TypeScript for one item, `audienceWhere`
- * as SQL for a list — because a page reads one row and a dashboard reads a
+ * They are written twice — `isListedFor` in TypeScript for one item,
+ * `audienceWhere` as SQL for a list — because a page reads one row and a dashboard reads a
  * page of them. Two expressions of one rule is exactly where private content
  * leaks: the item page refuses and the list quietly includes it, or the other
  * way round. So the last block runs every viewer against every rule and
@@ -16,7 +16,8 @@ vi.mock('@/lib/prisma', () => ({ default: {} }))
 
 const {
   AUDIENCE_KINDS,
-  canSee,
+  isListedFor,
+  canOpen,
   ruleFromFlags,
   flagsFromRule,
   describeAudienceRule,
@@ -46,34 +47,67 @@ const connections = (...kinds: Kind[]) => ({
   isPartner: kinds.includes('partners'),
 })
 
-describe('canSee', () => {
+describe('isListedFor', () => {
   it('lets a stranger read a public event and nothing else', () => {
-    expect(canSee(PUBLIC_RULE, null)).toBe(true)
-    expect(canSee(SIGNED_IN_RULE, null)).toBe(false)
-    expect(canSee({ ...PUBLIC_RULE, public: false, kinds: ['church'] }, null)).toBe(false)
+    expect(isListedFor(PUBLIC_RULE, null)).toBe(true)
+    expect(isListedFor(SIGNED_IN_RULE, null)).toBe(false)
+    expect(isListedFor({ ...PUBLIC_RULE, public: false, kinds: ['church'] }, null)).toBe(false)
   })
 
   it('lets any signed-in supporter read one with no audiences listed', () => {
-    expect(canSee(SIGNED_IN_RULE, NOBODY)).toBe(true)
+    expect(isListedFor(SIGNED_IN_RULE, NOBODY)).toBe(true)
   })
 
   it('ANY means any one of them is enough', () => {
     const rule = { public: false, kinds: ['church', 'staff'] as Kind[], match: 'ANY' as const, gate: 'HIDE' as const }
-    expect(canSee(rule, connections('church'))).toBe(true)
-    expect(canSee(rule, connections('staff'))).toBe(true)
-    expect(canSee(rule, connections('donors'))).toBe(false)
+    expect(isListedFor(rule, connections('church'))).toBe(true)
+    expect(isListedFor(rule, connections('staff'))).toBe(true)
+    expect(isListedFor(rule, connections('donors'))).toBe(false)
   })
 
   it('ALL means all of them at once', () => {
     const rule = { public: false, kinds: ['church', 'staff'] as Kind[], match: 'ALL' as const, gate: 'HIDE' as const }
-    expect(canSee(rule, connections('church'))).toBe(false)
-    expect(canSee(rule, connections('staff'))).toBe(false)
-    expect(canSee(rule, connections('church', 'staff'))).toBe(true)
+    expect(isListedFor(rule, connections('church'))).toBe(false)
+    expect(isListedFor(rule, connections('staff'))).toBe(false)
+    expect(isListedFor(rule, connections('church', 'staff'))).toBe(true)
   })
 
   it('counts a trainee as staff', () => {
     const rule = { public: false, kinds: ['staff'] as Kind[], match: 'ANY' as const, gate: 'HIDE' as const }
-    expect(canSee(rule, { ...NOBODY, isTrainee: true })).toBe(true)
+    expect(isListedFor(rule, { ...NOBODY, isTrainee: true })).toBe(true)
+  })
+})
+
+describe('canOpen', () => {
+  const church = (gate: 'SHOW' | 'ASK' | 'HIDE') => ({
+    public: false,
+    kinds: ['church'] as Kind[],
+    match: 'ANY' as const,
+    gate,
+  })
+
+  it('SHOW opens the link for anybody, signed in or not', () => {
+    expect(canOpen(church('SHOW'), null)).toBe(true)
+    expect(canOpen(church('SHOW'), connections('donors'))).toBe(true)
+  })
+
+  it('SHOW still keeps it off everybody else\'s dashboard', () => {
+    // The whole point: unlisted, not public. GENERALZ is the case — church
+    // members see it listed, anyone holding the link can open it.
+    expect(isListedFor(church('SHOW'), null)).toBe(false)
+    expect(isListedFor(church('SHOW'), connections('donors'))).toBe(false)
+    expect(isListedFor(church('SHOW'), connections('church'))).toBe(true)
+  })
+
+  it('ASK refuses a stranger and admits a member', () => {
+    expect(canOpen(church('ASK'), null)).toBe(false)
+    expect(canOpen(church('ASK'), connections('church'))).toBe(true)
+  })
+
+  it('HIDE refuses everybody outside the audience', () => {
+    expect(canOpen(church('HIDE'), null)).toBe(false)
+    expect(canOpen(church('HIDE'), connections('donors'))).toBe(false)
+    expect(canOpen(church('HIDE'), connections('church'))).toBe(true)
   })
 })
 
@@ -81,6 +115,10 @@ describe('ruleFromFlags', () => {
   it('keeps church-only hidden rather than asking', () => {
     const r = ruleFromFlags({ churchOnly: true, canBePublic: true })
     expect(r).toMatchObject({ public: false, kinds: ['church'], match: 'ANY', gate: 'HIDE' })
+  })
+
+  it('leaves an unflagged event open to anyone with the link', () => {
+    expect(ruleFromFlags({ canBePublic: true }).gate).toBe('SHOW')
   })
 
   it('keeps a private event asking rather than hiding', () => {
@@ -93,8 +131,8 @@ describe('ruleFromFlags', () => {
     // to people who were both. ANY here would hand it to every church member.
     const r = ruleFromFlags({ churchOnly: true, staffOnly: true, canBePublic: false })
     expect(r.match).toBe('ALL')
-    expect(canSee(r, connections('church'))).toBe(false)
-    expect(canSee(r, connections('church', 'staff'))).toBe(true)
+    expect(isListedFor(r, connections('church'))).toBe(false)
+    expect(isListedFor(r, connections('church', 'staff'))).toBe(true)
   })
 
   it('never makes a story public', () => {
@@ -143,7 +181,7 @@ describe('ruleFromRow', () => {
       { canBePublic: true }
     )
     expect(r.public).toBe(false)
-    expect(canSee(r, null)).toBe(false)
+    expect(isListedFor(r, null)).toBe(false)
     expect(r.gate).toBe('ASK')
   })
 
@@ -220,7 +258,7 @@ describe('the list filter agrees with the single-item check', () => {
           const row: Row = { audienceKinds: kinds, audienceMatch: match, audiencePublic: false }
           const rule = { public: false, kinds, match, gate: 'HIDE' as const }
           expect(matches(where, row), `${match} [${kinds}] vs viewer [${viewerKinds}]`).toBe(
-            canSee(rule, viewer)
+            isListedFor(rule, viewer)
           )
           checked++
         }

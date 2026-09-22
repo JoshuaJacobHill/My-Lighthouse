@@ -14,10 +14,11 @@ import {
 /**
  * Who a story or an event is for.
  *
- * Two controls, not one, because they answer different questions. The list says
- * *who*; the refusal below says what everybody else gets. Folding the second
- * into the first would lose a real editorial decision — whether a stranger may
- * know the thing exists at all.
+ * Two controls, because there are two questions and conflating them is what
+ * made "church only" also slam the door on the link. The list decides whose
+ * dashboard it appears on. The choice below decides what somebody already
+ * holding the link gets — and "unlisted" is the common case: promoted to one
+ * group, forwarded to everybody.
  *
  * "Everyone" sits above the list rather than in it. Ticking all five audiences
  * is not the same as public: every one of them requires an account, so a
@@ -32,13 +33,19 @@ export function AudiencePicker({
   value,
   onChange,
   canBePublic,
-  publicLabel = 'Everyone, including people who are not signed in',
-  publicHint = 'The event page is readable by anyone with the link.',
+  showGate = canBePublic,
+  publicLabel = 'Everyone — show it to anybody, signed in or not',
+  publicHint = 'It appears for everyone and the link is open.',
 }: {
   value: AudienceRule
   onChange: (rule: AudienceRule) => void
   /** Events can be public. Stories cannot — there is no public story page. */
   canBePublic: boolean
+  /**
+   * Whether to offer the link behaviour. Stories have no page of their own, so
+   * there is no link for anybody to open and the question does not arise.
+   */
+  showGate?: boolean
   publicLabel?: string
   publicHint?: string
 }) {
@@ -46,7 +53,8 @@ export function AudiencePicker({
 
   const toggle = (kind: AudienceKind, on: boolean) => {
     const kinds = on ? [...value.kinds, kind] : value.kinds.filter((k) => k !== kind)
-    // Choosing an audience means it is no longer for everyone.
+    // Choosing an audience narrows the listing; it says nothing about the link,
+    // so the gate is left exactly as it was.
     set({ kinds, public: kinds.length > 0 ? false : value.public })
   }
 
@@ -55,7 +63,7 @@ export function AudiencePicker({
 
   return (
     <div className="rounded-2xl border border-gray-200 p-4">
-      <p className="text-sm font-semibold text-gray-900">Who can see this?</p>
+      <p className="text-sm font-semibold text-gray-900">Whose dashboard does this appear on?</p>
 
       {canBePublic && (
         <div className="mt-3">
@@ -98,7 +106,7 @@ export function AudiencePicker({
 
         <p className="mt-3 text-xs text-gray-500">
           {value.kinds.length === 0 && !value.public
-            ? 'Nobody chosen, so anyone signed in can see it.'
+            ? 'Nobody chosen, so it appears for anyone signed in.'
             : value.kinds.length > 1 && value.match === 'ANY'
               ? 'Anyone in one or more of these. Most people are in several.'
               : null}
@@ -113,35 +121,51 @@ export function AudiencePicker({
         )}
       </div>
 
-      {restricted && (
+      {showGate && restricted && (
         <div className="mt-4 border-t border-gray-100 pt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Everybody else sees
+            If somebody outside that opens the link
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Separate from the list above, which only decides whose dashboard it appears on.
           </p>
           <div className="mt-2 space-y-2">
             <GateChoice
+              checked={value.gate === 'SHOW'}
+              onSelect={() => set({ gate: 'SHOW' })}
+              title="They can open it"
+              hint="The link works for anyone, signed in or not. It still never appears on their dashboard. Right for an event you promote to one group and expect to be forwarded."
+            />
+            <GateChoice
               checked={value.gate === 'ASK'}
               onSelect={() => set({ gate: 'ASK' })}
-              title="A prompt to sign in"
-              hint="They see the name and are asked to sign in or create an account. Right for a link you have emailed — a not-found page would look broken to the people you sent it to."
+              title="They are asked to sign in"
+              hint="They see the name and a prompt to sign in or create an account. The details, photo and tickets stay hidden until they do."
             />
             <GateChoice
               checked={value.gate === 'HIDE'}
               onSelect={() => set({ gate: 'HIDE' })}
-              title="A not-found page"
-              hint="Nothing at all, not even the name. Use this when the fact that it exists is not public."
+              title="Nothing — a not-found page"
+              hint="Not even the name, and no link preview. Use this when the fact that it exists is not public."
             />
           </div>
         </div>
       )}
 
       <p className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
-        <span className="font-semibold text-gray-900">{describeAudienceRule(value)}</span>
-        {restricted && value.kinds.length > 0
-          ? value.gate === 'HIDE'
-            ? ' — everyone else gets a not-found page.'
-            : ' — everyone else is asked to sign in.'
-          : null}
+        <span className="font-semibold text-gray-900">
+          {describeAudienceRule(value)}
+        </span>
+        {showGate && restricted ? (
+          <>
+            {value.kinds.length > 0 ? ' see it on their dashboard' : ' can see it'}
+            {value.gate === 'SHOW'
+              ? ', and anyone with the link can open it.'
+              : value.gate === 'HIDE'
+                ? '. Everybody else gets a not-found page.'
+                : '. Everybody else is asked to sign in first.'}
+          </>
+        ) : null}
       </p>
     </div>
   )

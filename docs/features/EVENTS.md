@@ -33,24 +33,23 @@ sales window), `TicketOrder` → `Ticket`, `EventVolunteer`, `EventSponsor`.
 
 ## Three levels of visibility, and how each refuses
 
-| | Who can read it | What a stranger gets |
-|---|---|---|
-| `audiencePublic` | Anyone | The event |
-| No audiences listed | Any signed-in supporter | Depends on `audienceGate` |
-| `audienceKinds: [church]` and so on | People in that audience | Depends on `audienceGate` |
+**Listing and access are separate questions.** `audienceKinds` and
+`audiencePublic` decide whose dashboard the event appears on; `audienceGate`
+decides what somebody who already has the link gets.
 
-`audienceGate` decides the refusal, and it is a separate decision from the
-audience:
+| `audienceGate` | Somebody outside the audience, holding the link |
+|---|---|
+| **`SHOW`** | The event. Unlisted, not private — never on their dashboard, but the link works for anyone, signed in or not. |
+| **`ASK`** | A page saying to sign in or create an account, with the event's name and `?next=` so they come back to it. |
+| **`HIDE`** | A 404, and no link preview. |
 
-- **`ASK`** — a page saying to sign in or create an account, with the event's
-  name and `?next=` so they come back to it.
-- **`HIDE`** — a 404.
+`SHOW` is the ordinary case for anything advertised: GENERALZ is a church event
+whose link gets forwarded far beyond the church, and refusing those people makes
+a link we published look broken.
 
-Somebody **already signed in** who is outside the audience always gets the 404,
-whatever the gate says. "Sign in" to a person who just did reads as a broken
-page, and they have nothing left to do.
-
-The difference between the two gates is deliberate and worth keeping.
+Under `ASK`, somebody **already signed in** but outside the audience gets the
+404 rather than the prompt — they have nothing left to do, and "sign in" to a
+person who just did reads as broken.
 
 A **private** event is usually a link emailed to supporters. A 404 there would
 make the link look broken to exactly the people it was sent to, so the page
@@ -61,10 +60,11 @@ group chat preview gets no more than the name.
 
 A **hidden** event 404s because its existence is not public information. If
 something must not be known to exist, that is the gate — or leave it
-unpublished. `generateMetadata` refuses in the same shape the page does: a
-hidden event returns the generic fallback title and nothing else, because a link
-preview naming it would undo the 404. (Until the audience work it returned the
-full description and photo for a church-only event while 404ing the page.)
+unpublished. `generateMetadata` gives away exactly what the page would: the real
+preview under `SHOW`, the name and a generic line under `ASK`, and the fallback
+title alone under `HIDE`, because a preview naming a hidden event would undo the
+404. (Until the audience work it returned the full description and photo for a
+church-only event while 404ing the page.)
 
 `SignInToView` renders the prompt. `safeNext` validates the return path,
 because an unchecked `?next=` is an open redirect on the one page where
@@ -111,7 +111,8 @@ kiosk but a different table; attendees are not volunteers.
   *and* church-only, and correctly 404s for strangers — a 404 rather than a
   login prompt, so it does not reveal the event exists. **It is also the usual
   answer to "why does this event 404 for me?"**: there is no admin bypass, so a
-  church-only event 404s for a SUPER_ADMIN who is not a church member.
+  hidden event 404s for a SUPER_ADMIN who is not a church member. If the link is
+  meant to work for anyone, the event wants `SHOW`, not a wider audience.
 - The page runs one query for the event (cached, identical for everyone) and one
   for the session, **in parallel** — every database round-trip crosses
   Sydney→Tokyo, so two sequential reads are two crossings.
