@@ -12,7 +12,7 @@ import {
   sendTitheAccountSetupEmail,
 } from '@/lib/donation-emails'
 import { createAccountSetupToken } from '@/lib/account-setup'
-import { createOrderWithTickets, type Selection } from '@/lib/tickets'
+import { createOrderWithTickets, findTicketOwnerByEmail, type Selection } from '@/lib/tickets'
 import {
   sendTicketConfirmationEmailForOrder,
   inviteTicketPurchaserToAccount,
@@ -381,6 +381,12 @@ async function recordTicketOrder(session: Stripe.Checkout.Session): Promise<void
   const purchaserName = meta.purchaserName || session.customer_details?.name || 'Guest'
   const amountTotal = (session.amount_total ?? 0) / 100
 
+  // Whose order this is: the buyer's own session if they were signed in, and
+  // otherwise an account on that address — but only where the address has been
+  // verified. Typing an email proves nothing, and a ticket order carries a name
+  // and an event somebody attended.
+  const userId = meta.userId || (await findTicketOwnerByEmail(purchaserEmail))
+
   // createOrderWithTickets is idempotent on providerTransactionId and enforces
   // capacity, so a retry (or a race with the buyer's return) is safe.
   const { orderId } = await createOrderWithTickets({
@@ -391,6 +397,7 @@ async function recordTicketOrder(session: Stripe.Checkout.Session): Promise<void
     amountTotal,
     provider: 'STRIPE',
     providerTransactionId: paymentIntentId,
+    userId,
   })
 
   try {

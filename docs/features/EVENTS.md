@@ -93,8 +93,31 @@ somebody has just typed a password.
 **Availability is deliberately uncached** while the event read is cached. A
 stale count could oversell.
 
-`TicketOrder.userId` is matched by email, and `Ticket.attendeeName` is separate
-from `TicketOrder.purchaserName` — one person commonly buys for a family.
+`Ticket.attendeeName` is separate from `TicketOrder.purchaserName` — one person
+commonly buys for a family.
+
+## Whose order is it
+
+`TicketOrder.userId` is set three ways, and never on an unverified address:
+
+1. **Signed in at checkout** — the session's user id rides through Stripe
+   metadata, so the order is on the account from the moment it exists.
+2. **Signed out** — the webhook calls `findTicketOwnerByEmail`, which matches
+   only a **verified** address, primary or one of the extras on the account.
+3. **Later** — `claimTicketOrdersForUser` runs when somebody opens their
+   tickets, so an order bought before they had a password follows them in. The
+   ticket half of `claimDonationsForUser`, and for the same reason.
+
+Typing an address never links anything. A ticket order carries a name and an
+event somebody attended, and handing that to whoever guessed the email is the
+failure these guard against — `tickets.test.ts` asserts the *queries* filter on
+verification, because that is the line somebody removes while tidying.
+
+**`/dashboard/account/tickets`** shows them, reached from Account rather than
+the main nav: most people here never buy a ticket, and a permanent tab for
+something used twice a year is clutter on a phone. With no tickets it says so
+and lists what is coming up — filtered by the same audience rule, so it never
+advertises an event the person could not open.
 
 ## Check-in
 

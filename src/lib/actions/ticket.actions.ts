@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { getStripe, isStripeConfigured, toCents } from '@/lib/stripe'
 import { rateLimit } from '@/lib/rate-limit'
 import { createOrderWithTickets, TicketError, type Selection } from '@/lib/tickets'
+import { getSession } from '@/lib/auth'
 import { sendTicketConfirmationEmailForOrder } from '@/lib/event-emails'
 import { formatEventWhen } from '@/lib/utils'
 
@@ -37,6 +38,11 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
   if (!rateLimit(`event:${ip}`, 15, 60_000).ok) {
     return { success: false, error: 'Too many attempts — please wait a moment and try again.' }
   }
+
+  // Somebody signed in gets the order on their account from the start, rather
+  // than waiting to be matched back to it by email afterwards. Named for the
+  // person, because `session` in this file is already Stripe's.
+  const buyer = await getSession()
 
   const parsed = schema.safeParse(input)
   if (!parsed.success) {
@@ -84,6 +90,7 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
         purchaserEmail,
         amountTotal: 0,
         provider: 'FREE',
+        userId: buyer?.userId ?? null,
       })
       try {
         await sendTicketConfirmationEmailForOrder(orderId)
@@ -138,7 +145,15 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
     })
     // Compact selection encoding for the webhook (metadata values are size-limited).
     const encoded = JSON.stringify(selections.map((s) => ({ t: s.ticketTypeId, q: s.quantity })))
-    const metadata = { kind: 'event_tickets', eventId, purchaserName, selections: encoded }
+    const metadata: Record<string, string> = {
+      kind: 'event_tickets',
+      eventId,
+      purchaserName,
+      selections: encoded,
+      // Carried through Stripe so the webhook does not have to guess. Anonymous
+      // purchases are matched by verified email instead.
+      ...(buyer ? { userId: buyer.userId } : {}),
+    }
 
     const session = await getStripe().checkout.sessions.create({
       mode: 'payment',

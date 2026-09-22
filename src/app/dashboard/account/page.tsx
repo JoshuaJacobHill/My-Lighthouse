@@ -8,6 +8,7 @@ import {
   KeyRound,
   HandHeart,
   Church,
+  Ticket as TicketIcon,
   User as UserIcon,
 } from 'lucide-react'
 import { getSession } from '@/lib/auth'
@@ -144,6 +145,12 @@ export default async function AccountPage() {
               tone="accent"
             />
           )}
+          <Row
+            href="/dashboard/account/tickets"
+            icon={TicketIcon}
+            title="My tickets"
+            hint="Events you have booked"
+          />
           <Row
             href="/dashboard/account/partner"
             icon={Building2}

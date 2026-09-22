@@ -128,3 +128,58 @@ export async function createOrderWithTickets(params: {
     return { orderId: order.id }
   })
 }
+
+/**
+ * The account a ticket order belongs to, found by **verified** email only.
+ *
+ * Typing an address proves nothing — that rule is the whole of `SECURITY.md`,
+ * and attaching a purchase to an account on an unverified address would hand
+ * somebody else's ticket history to whoever guessed the email. Covers the extra
+ * addresses on an account too: a person who gave with a work address and buys a
+ * ticket with a personal one is one person.
+ */
+export async function findTicketOwnerByEmail(email: string): Promise<string | null> {
+  const clean = email.trim().toLowerCase()
+  if (!clean) return null
+
+  const direct = await prisma.user.findFirst({
+    where: { email: { equals: clean, mode: 'insensitive' }, emailVerified: { not: null } },
+    select: { id: true },
+  })
+  if (direct) return direct.id
+
+  const extra = await prisma.userEmail.findFirst({
+    where: { email: { equals: clean, mode: 'insensitive' }, verifiedAt: { not: null } },
+    select: { userId: true },
+  })
+  return extra?.userId ?? null
+}
+
+/**
+ * Attach orders bought before somebody had an account — or bought signed out.
+ *
+ * The ticket half of `claimDonationsForUser`, and for the same reason: history
+ * should follow a person in when they prove they control the inbox, rather than
+ * stranding it on an address. Verified addresses only, every one on the account.
+ */
+export async function claimTicketOrdersForUser(
+  userId: string,
+  email: string | null,
+  emailVerified: Date | null
+): Promise<number> {
+  const extras = await prisma.userEmail.findMany({
+    where: { userId, verifiedAt: { not: null } },
+    select: { email: true },
+  })
+  const addresses = [...(email && emailVerified ? [email] : []), ...extras.map((e) => e.email)]
+  if (addresses.length === 0) return 0
+
+  const { count } = await prisma.ticketOrder.updateMany({
+    where: {
+      userId: null,
+      OR: addresses.map((a) => ({ purchaserEmail: { equals: a, mode: 'insensitive' as const } })),
+    },
+    data: { userId },
+  })
+  return count
+}
