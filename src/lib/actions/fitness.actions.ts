@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { isAdminRole } from '@/lib/permissions-core'
 import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
+import { ENTRIES_CLOSED, entriesOpen } from '@/lib/fitness-window'
 import { readStepsFromScreenshot } from '@/lib/step-screenshot'
 import { generateFitnessCode } from '@/lib/fitness-code'
 
@@ -51,6 +52,9 @@ export async function logFitnessAction(input: LogFitnessInput): Promise<Result> 
     select: { startsAt: true, endsAt: true },
   })
   if (!challenge) return { success: false, error: 'That challenge isn’t running.' }
+  // Checked here rather than only where the form is drawn: a hidden button is a
+  // suggestion, and this action can be called directly.
+  if (!entriesOpen(challenge)) return { success: false, error: ENTRIES_CLOSED }
 
   const dayDate = calendarDay(day)
   if (!dayDate) return { success: false, error: 'Please choose a valid date.' }

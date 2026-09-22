@@ -8,6 +8,7 @@ import { StepsChart } from './StepsChart'
 import { TotalSteps, TipOfTheDay, TodaysTarget } from './ChallengePanels'
 import { getChallengeWeeks } from '@/lib/fitness-weeks'
 import { goalPhrase } from '@/lib/fitness-milestones'
+import { entriesOpen } from '@/lib/fitness-window'
 import { TopFive } from './TopFive'
 import { WeekWinners } from './WeekWinners'
 import { WeekSchedule } from './WeekSchedule'
@@ -89,6 +90,10 @@ export default async function StaffFitnessPage() {
     (!fitnessLink?.lastUsedAt || Date.now() - fitnessLink.lastUsedAt.getTime() > 36 * 3_600_000)
 
   const started = Date.now() >= challenge.startsAt.getTime()
+  // Running, or finished and sitting in its results week. Entry closes when the
+  // challenge ends; the page outlives it by a week so people can see where they
+  // finished.
+  const open = entriesOpen(challenge)
   const todaySoFar = board.days.find((d) => d.day === today)?.total ?? 0
   const pace = computePace({
     goal: challenge.goal,
@@ -151,7 +156,7 @@ export default async function StaffFitnessPage() {
           </div>
         )}
 
-        {fitnessLink && started && <SyncNowButton />}
+        {fitnessLink && started && open && <SyncNowButton />}
 
         {started && (
           <div className="mt-4">
@@ -175,7 +180,7 @@ export default async function StaffFitnessPage() {
           </p>
         </section>
 
-        {started ? (
+        {started && open ? (
           <div className="mt-3">
             <LogStepsForm
               challengeId={challenge.id}
@@ -192,9 +197,13 @@ export default async function StaffFitnessPage() {
               <Lock className="h-5 w-5" aria-hidden="true" />
             </span>
             <div>
-              <p className="font-bold text-neutral-950">Step logging opens on {startLabel}</p>
+              <p className="font-bold text-neutral-950">
+                {started ? 'Step logging has closed' : `Step logging opens on ${startLabel}`}
+              </p>
               <p className="mt-0.5 text-sm text-neutral-500">
-                Nothing to do yet. You can link your phone now so it is ready on day one.
+                {started
+                  ? 'That is the final total. Thanks for walking with us.'
+                  : 'Nothing to do yet. You can link your phone now so it is ready on day one.'}
               </p>
             </div>
           </section>

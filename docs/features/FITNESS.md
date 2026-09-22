@@ -15,6 +15,36 @@ contradicts the bar underneath it.
 
 `/dashboard/fitness`
 
+## Three states, not two
+
+A challenge does not vanish at midnight on the last day — people walked for a
+month, and the page disappearing before anyone sees where they finished is a
+poor way to end it. `src/lib/fitness-window.ts`:
+
+| Phase | The page | Step entry |
+|---|---|---|
+| `upcoming` | Countdown | Closed — no valid day exists yet |
+| `running` | Live | Open |
+| `results` | Readable, read-only, for **7 days** | **Closed** |
+| `finished` | Gone from the portal | Closed |
+
+Entry closes when the challenge ends, not when the page does: steps added during
+the results week would move a total people have already seen and talked about,
+which is worse than a missed day.
+
+**Closed is enforced in three places, and the form is the least important one.**
+`logFitnessAction` re-checks because a server action can be called directly, and
+the phone endpoint re-checks because a Shortcut keeps posting every morning long
+after anybody has thought about it. The endpoint answers
+`{ ok: true, recorded: false, reason }` rather than an error, so it does not look
+broken on somebody's lock screen.
+
+**The window is UTC and Brisbane is UTC+10**, so midnight on 1 September is
+`2026-08-31T14:00:00Z` and the last second of the 30th is
+`2026-09-30T13:59:59Z`. Ten hours out is the trap in `docs/DATA.md`, and here it
+decides whether the last day counts — `scripts/migrate/set-challenge-goal.mjs`
+takes `--starts` and `--ends` and prints both in Brisbane time before writing.
+
 ## Who sees it
 
 Staff and trainees (`isStaff` or `isTrainee`), plus admin roles. Everyone else

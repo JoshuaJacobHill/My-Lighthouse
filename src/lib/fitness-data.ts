@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { brisbaneToday, calendarDay, calendarDayString } from '@/lib/fitness-days'
+import { RESULTS_DAYS } from '@/lib/fitness-window'
 import { currentWeekRange } from '@/lib/fitness-weeks'
 
 /**
@@ -27,8 +28,13 @@ export const getCurrentChallenge = cache(async function getCurrentChallenge() {
   // One query rather than two. Sorting by "is it running right now" first means
   // the running challenge wins and the next one due to start is the fallback,
   // without a second round trip to find out.
+  //
+  // A finished challenge stays here through its results week rather than
+  // disappearing at midnight on the last day — people walked for a month, and
+  // the page vanishing before anyone sees where they finished is a poor way to
+  // end it. `challengePhase()` is what decides it is read-only.
   const candidates = await prisma.fitnessChallenge.findMany({
-    where: { isActive: true, endsAt: { gte: now } },
+    where: { isActive: true, endsAt: { gte: new Date(now.getTime() - RESULTS_DAYS * 86_400_000) } },
     orderBy: { startsAt: 'asc' },
     take: 5,
   })

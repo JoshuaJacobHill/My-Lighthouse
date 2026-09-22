@@ -4,6 +4,7 @@ import { brisbaneToday, calendarDay } from '@/lib/fitness-days'
 import { normaliseFitnessCode } from '@/lib/fitness-code'
 import { rateLimit } from '@/lib/rate-limit'
 import { getCurrentChallenge } from '@/lib/fitness-data'
+import { ENTRIES_CLOSED, entriesOpen } from '@/lib/fitness-window'
 
 export const dynamic = 'force-dynamic'
 
@@ -128,6 +129,13 @@ export async function recordSteps(request: NextRequest, rawToken: string) {
   const challenge = await getCurrentChallenge()
   if (!challenge) {
     return NextResponse.json({ ok: false, error: 'No challenge is running' }, { status: 409 })
+  }
+
+  // A Shortcut on somebody's phone keeps posting every morning long after the
+  // challenge ends. Same shape as the out-of-range answer below: not an error,
+  // just nothing recorded, so it does not look broken on their lock screen.
+  if (!entriesOpen(challenge)) {
+    return NextResponse.json({ ok: true, recorded: false, reason: ENTRIES_CLOSED })
   }
 
   const dayDate = calendarDay(day)
