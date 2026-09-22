@@ -8,9 +8,14 @@ because a real event is usually several of those at once.
 
 ## The model
 
-`Event` — `title`, `slug`, `description`, `imageUrl`, `venue`, `startsAt`,
-`endsAt`, `capacity`, optional `fundId`, and five switches that decide what the
-page actually offers:
+`Event` — `title`, `slug`, `description`, `imageUrl`, `venue`, `address`,
+`startsAt`, `endsAt`, `capacity`, optional `fundId`, and the switches that
+decide what the page actually offers:
+
+**`venue` is the place's name, `address` is the street.** Kept apart because
+they are used separately: the event page shows the name in bold with the street
+under it, and the Stripe checkout line lists them as two fields. Both are
+optional, and an empty one is left out rather than printed as a bare label.
 
 | Switch | Effect |
 |---|---|

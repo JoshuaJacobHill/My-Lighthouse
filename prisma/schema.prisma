@@ -1144,7 +1144,11 @@ model Event {
   slug              String        @unique
   description       String        @db.Text
   imageUrl          String?
+  /// The place by name, e.g. "Lighthouse Family Church".
   venue             String?
+  /// The street address, kept apart from the name so a ticket page, a checkout
+  /// line and a map link can each use the part they need.
+  address           String?
   startsAt          DateTime? // null = date To Be Advised (e.g. collecting sponsors early)
   endsAt            DateTime?
   fundId            String?

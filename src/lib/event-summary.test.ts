@@ -62,18 +62,23 @@ describe('eventSummaryLines', () => {
         at('2026-10-16T08:30:00Z'),
         at('2026-10-17T07:00:00Z'),
         'Lighthouse Family Church',
+        '17 Magnesium Dr, Crestmead QLD 4132',
         'Saturday Only'
       )
     ).toEqual([
       'Date: 16–17 October 2026',
       'Time: 6:30 pm – 5:00 pm',
       'Location: Lighthouse Family Church',
+      'Address: 17 Magnesium Dr, Crestmead QLD 4132',
       'Ticket: Saturday Only',
     ])
   })
 
-  it('leaves out the ticket line when there is nothing to say', () => {
+  it('leaves out the lines it has nothing to say for', () => {
+    // Most events have no separate street address; an empty "Address:" label
+    // reads as missing information rather than as absent information.
     const lines = eventSummaryLines(at('2026-10-16T08:30:00Z'), null, 'Crestmead')
     expect(lines.some((l) => l.startsWith('Ticket:'))).toBe(false)
+    expect(lines.some((l) => l.startsWith('Address:'))).toBe(false)
   })
 })

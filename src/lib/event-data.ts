@@ -24,6 +24,7 @@ export const getCachedEvent = unstable_cache(
         description: true,
         imageUrl: true,
         venue: true,
+        address: true,
         startsAt: true,
         endsAt: true,
         capacity: true,

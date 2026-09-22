@@ -64,6 +64,7 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
       startsAt: true,
       endsAt: true,
       venue: true,
+      address: true,
       isPublished: true,
       ticketTypes: { select: { id: true, name: true, price: true } },
     },
@@ -139,7 +140,7 @@ export async function registerForEventAction(input: RegisterInput): Promise<Regi
           // Quantity is left to Stripe, which already prints "Qty 2" beside it.
           product_data: {
             name: event.title,
-            description: eventSummaryLines(event.startsAt, event.endsAt, event.venue, tt.name).join(
+            description: eventSummaryLines(event.startsAt, event.endsAt, event.venue, event.address, tt.name).join(
               '\n'
             ),
             images,

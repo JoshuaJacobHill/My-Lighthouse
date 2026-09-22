@@ -28,6 +28,7 @@ export interface EventFormValues {
   description: string
   imageUrl: string
   venue: string
+  address: string
   startsAt: string
   endsAt: string
   capacity: string
@@ -86,6 +87,7 @@ export function EventForm({
       description: (fd.get('description') as string) ?? '',
       imageUrl,
       venue: (fd.get('venue') as string) ?? '',
+      address: (fd.get('address') as string) ?? '',
       startsAt: (fd.get('startsAt') as string) ?? '',
       endsAt: (fd.get('endsAt') as string) ?? '',
       capacity: (fd.get('capacity') as string) ?? '',
@@ -149,6 +151,13 @@ export function EventForm({
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Venue" name="venue" defaultValue={event?.venue} placeholder="Leave blank if the location is still TBA" />
+          <Input
+            label="Street address"
+            name="address"
+            defaultValue={event?.address}
+            placeholder="17 Magnesium Dr, Crestmead QLD 4132"
+            hint="Shown under the venue name, on the event page and at checkout."
+          />
           <div className="flex flex-col gap-1">
             <label htmlFor="fundId" className="text-sm font-medium text-gray-700">Allocate proceeds to fund</label>
             <select

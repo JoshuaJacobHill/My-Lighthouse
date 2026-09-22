@@ -184,7 +184,12 @@ export default async function EventPage({
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
                 <MapPin className="h-5 w-5" />
               </span>
-              <p className="text-sm font-semibold text-gray-900">{event.venue || 'Location to be advised'}</p>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {event.venue || 'Location to be advised'}
+                </p>
+                {event.address && <p className="text-sm text-gray-500">{event.address}</p>}
+              </div>
             </div>
           </div>
           <hr className="mt-6 border-gray-200" />

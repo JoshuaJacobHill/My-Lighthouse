@@ -50,6 +50,7 @@ export default async function EditEventPage({
     slug: event.slug,
     description: event.description,
     venue: event.venue ?? '',
+    address: event.address ?? '',
     startsAt: toDateTimeLocal(event.startsAt),
     endsAt: toDateTimeLocal(event.endsAt),
     capacity: event.capacity != null ? String(event.capacity) : '',

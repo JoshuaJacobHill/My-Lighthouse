@@ -218,6 +218,7 @@ export function eventSummaryLines(
   start?: Date | string | null,
   end?: Date | string | null,
   venue?: string | null,
+  address?: string | null,
   ticketType?: string | null
 ): string[] {
   const lines: string[] = []
@@ -248,6 +249,7 @@ export function eventSummaryLines(
   }
 
   if (venue) lines.push(`Location: ${venue}`)
+  if (address) lines.push(`Address: ${address}`)
   if (ticketType) lines.push(`Ticket: ${ticketType}`)
   return lines
 }
@@ -256,7 +258,8 @@ export function eventSummaryLines(
 export function formatEventSummary(
   start?: Date | string | null,
   end?: Date | string | null,
-  venue?: string | null
+  venue?: string | null,
+  address?: string | null
 ): string {
-  return eventSummaryLines(start, end, venue).join(' · ')
+  return eventSummaryLines(start, end, venue, address).join(' · ')
 }
