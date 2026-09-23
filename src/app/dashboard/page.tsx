@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation'
 import { ArrowRight, ArrowUpRight, Heart, HandHeart, CalendarDays, MapPin, ExternalLink } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { isDonorPortalEnabled } from '@/lib/features'
+import { canPreviewSlh, isDonorPortalEnabled } from '@/lib/features'
+import { SantaMark } from '@/components/slh/SantaMark'
+import { SAMPLE_CHILDREN, WISH_STEPS } from '@/lib/slh-sample'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
 import { commentsForStories } from '@/lib/story-comments'
@@ -234,6 +236,53 @@ export default async function DonorHomePage() {
         {isStaffOrTrainee && challengeBanner && (
           <section className="mb-5">
             <ChallengeBanner {...challengeBanner} />
+          </section>
+        )}
+
+        {/* Santa's Little Helpers — a preview, on sample data, for super admins
+            only. It sits here because it is one thing a supporter does, not a
+            place they live; the nav stays untouched. */}
+        {canPreviewSlh(session.user) && (
+          <section className="mb-14">
+            <Link
+              href="/dashboard/slh"
+              className="block overflow-hidden rounded-[28px] bg-[#c8102e] transition-shadow hover:shadow-lg hover:shadow-red-200/60"
+            >
+              <span className="block p-4">
+                <span className="grid justify-items-center gap-2 rounded-[18px] bg-white px-4 py-7">
+                  <SantaMark className="h-16 w-16" />
+                  <span className="text-2xl font-extrabold leading-none tracking-tight text-[#c8102e]">
+                    SANTA&rsquo;S
+                  </span>
+                  <span className="text-[11px] font-bold tracking-[0.22em] text-neutral-900">
+                    LITTLE HELPERS
+                  </span>
+                </span>
+              </span>
+              <span className="block bg-neutral-950 px-5 pb-5 pt-4 text-white">
+                <span className="flex items-center gap-3">
+                  <span className="whitespace-nowrap text-sm font-bold">Wish list progress</span>
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
+                    <span
+                      className="block h-full rounded-full bg-orange-500"
+                      style={{
+                        width: `${Math.max(
+                          4,
+                          Math.round(
+                            (SAMPLE_CHILDREN.reduce((n, c) => n + c.done.length, 0) /
+                              (SAMPLE_CHILDREN.length * WISH_STEPS.length)) *
+                              100
+                          )
+                        )}%`,
+                      }}
+                    />
+                  </span>
+                </span>
+                <span className="mt-3 flex items-center gap-2 text-[15px] font-bold">
+                  View your wish lists <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </span>
+              </span>
+            </Link>
           </section>
         )}
 

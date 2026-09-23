@@ -30,6 +30,22 @@ export function isOnPageTicketCheckoutEnabled(): boolean {
   return process.env.TICKETS_ON_PAGE_CHECKOUT === 'true'
 }
 
+/**
+ * Who can see the Santa's Little Helpers preview.
+ *
+ * A role rather than a capability, deliberately, and this is the exception that
+ * proves the rule in `AGENTS.md`. A capability answers "may this person do this
+ * job"; this answers "is this finished enough to show anybody", which is a
+ * different question with a different lifespan. It disappears the moment the
+ * program has real data and a real audience.
+ *
+ * Until then the pages render sample data, so nobody but a super admin should
+ * find them — not because the content is sensitive, but because it is fiction.
+ */
+export function canPreviewSlh(user: { role?: string | null }): boolean {
+  return user.role === 'SUPER_ADMIN'
+}
+
 function earlyAccessEmails(): string[] {
   return (process.env.DONOR_PORTAL_EARLY_ACCESS_EMAILS ?? '')
     .split(',')

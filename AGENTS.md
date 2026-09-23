@@ -48,6 +48,7 @@ Feature docs, in `docs/features/`:
 | `FITNESS.md` | The staff steps challenge, and how phones push to it |
 | `KIOSK.md` | The shop iPad: volunteer and guest sign-in |
 | `ADMIN.md` | Settings, email templates, notifications, the finance route group |
+| `SLH.md` | Santa's Little Helpers — a super-admin preview on sample data, and the decisions behind it |
 
 These files are re-read automatically after a compaction, by the PostCompact
 hook (`scripts/reload-instructions.py`). **If you are reading them because a
