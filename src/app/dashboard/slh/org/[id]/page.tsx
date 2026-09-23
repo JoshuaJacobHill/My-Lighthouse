@@ -1,18 +1,19 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, CalendarDays, ChevronRight, Users } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Users } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
-import { activeProgram, canOpenSlhOrg, enrolment, slhOrg } from '@/lib/slh'
-import { FamilyList, type FamilyRow } from '@/components/slh/FamilyList'
 import {
-  SAMPLE_EVENT,
-  SAMPLE_FAMILIES,
-  SAMPLE_NOMINATED,
-  childById,
-  listComplete,
-  unfamiliedChildren,
-} from '@/lib/slh-sample'
+  activeProgram,
+  canOpenSlhOrg,
+  enrolment,
+  orgFamilies,
+  orgLooseChildren,
+  orgNominatedCount,
+  slhOrg,
+} from '@/lib/slh'
+import { FamilyList, type FamilyRow } from '@/components/slh/FamilyList'
+import { ageOn } from '@/lib/slh-steps'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Santa’s Little Helpers', robots: { index: false } }
@@ -26,10 +27,9 @@ export const metadata = { title: 'Santa’s Little Helpers', robots: { index: fa
  * Reaching this page at all means an enrolment exists; `canOpenSlhOrg` checks
  * that before it checks who is asking.
  *
- * The families and children inside are still sample data, because they have
- * nowhere to live yet. That split is the point of the page: it shows the
- * organisation's side bolted onto the framework that already exists, so the
- * rest of the schema can be designed against something somebody has used.
+ * The families and children are real too, counted rather than estimated: the
+ * allocation bar reads the nominations actually recorded against this
+ * organisation, so it cannot drift from what the list below shows.
  */
 export default async function SlhOrgPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -42,24 +42,28 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
   // `canOpenSlhOrg` already required both; this narrows the types.
   if (!org || !program || !enrolled) notFound()
 
-  const families: FamilyRow[] = SAMPLE_FAMILIES.map((f) => ({
+  const [rows, loose, nominated] = await Promise.all([
+    orgFamilies(org.id),
+    orgLooseChildren(org.id),
+    orgNominatedCount(org.id),
+  ])
+
+  const families: FamilyRow[] = rows.map((f) => ({
     id: f.id,
-    guardian: f.guardian,
-    email: f.email,
-    phone: f.phone,
-    children: f.childIds.flatMap((childId) => {
-      const child = childById(childId)
-      return child
-        ? [{ id: child.id, name: child.name, age: child.age, complete: listComplete(child) }]
-        : []
-    }),
+    guardian: f.guardianName,
+    email: f.guardianEmail ?? '',
+    phone: f.guardianPhone ?? '',
+    children: f.children.map((c) => ({
+      id: c.id,
+      name: c.firstName,
+      age: ageOn(c.dateOfBirth),
+      // "Complete" here means the wish list has been filled in, not shopped
+      // for — it is what the organisation chases a family about.
+      complete: Boolean(c.wishWant && c.wishNeed && c.wishWear && c.wishRead),
+    })),
   }))
 
-  const loose = unfamiliedChildren()
   const allocation = enrolled.allocation
-  // Nominations are still fiction, so this one number stays sample data — but
-  // it is capped by the real allocation so the bar can't run past its ceiling.
-  const nominated = Math.min(SAMPLE_NOMINATED, allocation)
   const remaining = Math.max(0, allocation - nominated)
   // An allocation of 0 means "approved, ceiling not set yet" — not "none left".
   const pct = allocation > 0 ? Math.round((nominated / allocation) * 100) : 0
@@ -156,7 +160,8 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
                   key={child.id}
                   className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-[13px] font-semibold"
                 >
-                  {child.name} <span className="font-normal text-neutral-400">{child.age}</span>
+                  {child.firstName}{' '}
+                  <span className="font-normal text-neutral-400">{ageOn(child.dateOfBirth)}</span>
                 </span>
               ))}
             </div>
@@ -164,20 +169,6 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
         )}
 
         <div className="mt-8 divide-y divide-neutral-100 overflow-hidden rounded-[28px] border border-neutral-200">
-          <div className="flex items-center gap-3 px-5 py-4">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-neutral-100 text-neutral-500">
-              <CalendarDays className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-bold">Your event</span>
-              <span className="block text-[13px] text-neutral-400">
-                {SAMPLE_EVENT.on
-                  ? `On · ${SAMPLE_EVENT.when.split(',')[0]} · ${SAMPLE_EVENT.rsvps} coming`
-                  : 'Off'}
-              </span>
-            </span>
-            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
-          </div>
           <Link
             href={`/partners/${org.slug}`}
             className="flex items-center gap-3 px-5 py-4 transition-colors hover:bg-neutral-50"
@@ -196,9 +187,9 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
         </div>
 
         <p className="mt-8 rounded-[28px] border border-dashed border-neutral-300 p-5 text-center text-xs text-neutral-500">
-          <b className="text-neutral-700">{org.name}, its approval and its allocation are real.</b>{' '}
-          The families, children and event below are sample data — they have nowhere to live until
-          the rest of the program has a schema, and nothing on this page saves them.
+          Santa&rsquo;s Little Helpers is still being set up, so only super admins and this
+          organisation&rsquo;s own admins can see this page. The reminder emails are not connected
+          yet — everything else here saves.
         </p>
       </div>
     </div>

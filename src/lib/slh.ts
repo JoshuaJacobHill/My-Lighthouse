@@ -21,6 +21,7 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { canAdminOrg } from '@/lib/organisations'
 import { canPreviewSlh } from '@/lib/features'
+import { WISH_STEPS, doneCount } from '@/lib/slh-steps'
 
 export type SlhOrgSummary = {
   id: string
@@ -151,4 +152,193 @@ export async function slhOrg(organisationId: string) {
     where: { id: organisationId },
     select: { id: true, name: true, slug: true, logoUrl: true, about: true, status: true },
   })
+}
+
+/* ── Shoppers ──────────────────────────────────────────────────────────────
+ *
+ * The other half of the program. A `GiftShopper` row is somebody who has been
+ * through onboarding; its absence is why the join flow appears.
+ */
+
+/** This person's sign-up for the active program, or null if they have not. */
+export async function myShopper() {
+  const session = await getSession()
+  if (!session) return null
+
+  const program = await activeProgram()
+  if (!program) return null
+
+  return prisma.giftShopper.findUnique({
+    where: { programId_userId: { programId: program.id, userId: session.userId } },
+    include: { organisation: { select: { id: true, name: true, slug: true } } },
+  })
+}
+
+export type ShopperOrgOption = {
+  id: string
+  name: string
+  logoUrl: string | null
+  allocation: number
+  /** Children nominated but not yet handed to a shopper. */
+  waiting: number
+  dropOffAddress: string | null
+  dropOffOpensAt: Date | null
+  dropOffClosesAt: Date | null
+}
+
+/**
+ * The organisations a shopper may choose between.
+ *
+ * Only approved ones, and only what a supporter needs to decide: who they are,
+ * how many children are still waiting, and whether they can get to the
+ * drop-off. `waiting` is counted, not estimated — an organisation with nobody
+ * waiting still appears, because a shopper choosing it is how the next
+ * nomination gets picked up.
+ */
+export async function orgsOpenToShoppers(): Promise<ShopperOrgOption[]> {
+  const program = await activeProgram()
+  if (!program) return []
+
+  const partners = await prisma.giftProgramPartner.findMany({
+    where: { programId: program.id },
+    orderBy: { organisation: { name: 'asc' } },
+    select: {
+      allocation: true,
+      dropOffAddress: true,
+      dropOffOpensAt: true,
+      dropOffClosesAt: true,
+      organisation: { select: { id: true, name: true, logoUrl: true } },
+    },
+  })
+  if (partners.length === 0) return []
+
+  const waiting = await prisma.giftChild.groupBy({
+    by: ['organisationId'],
+    where: { programId: program.id, shopperId: null },
+    _count: { _all: true },
+  })
+  const waitingBy = new Map(waiting.map((w) => [w.organisationId, w._count._all]))
+
+  return partners.map((p) => ({
+    id: p.organisation.id,
+    name: p.organisation.name,
+    logoUrl: p.organisation.logoUrl,
+    allocation: p.allocation,
+    waiting: waitingBy.get(p.organisation.id) ?? 0,
+    dropOffAddress: p.dropOffAddress,
+    dropOffOpensAt: p.dropOffOpensAt,
+    dropOffClosesAt: p.dropOffClosesAt,
+  }))
+}
+
+/** The wish lists handed to this person. Empty until a list is assigned. */
+export async function myWishLists() {
+  const shopper = await myShopper()
+  if (!shopper) return []
+
+  return prisma.giftChild.findMany({
+    where: { shopperId: shopper.id },
+    orderBy: { firstName: 'asc' },
+  })
+}
+
+/**
+ * One wish list, if it belongs to the person asking.
+ *
+ * Ownership is the rule, checked in the query rather than after it. A super
+ * admin previewing gets a read-only look at any child in the program; that is
+ * scaffolding, and it comes out with the rest of the preview gating.
+ */
+export async function wishListForViewer(childId: string) {
+  const session = await getSession()
+  if (!session) return null
+
+  const shopper = await myShopper()
+  if (shopper) {
+    const mine = await prisma.giftChild.findFirst({
+      where: { id: childId, shopperId: shopper.id },
+      include: { organisation: { select: { id: true, name: true } } },
+    })
+    if (mine) return mine
+  }
+
+  if (!canPreviewSlh(session.user)) return null
+  return prisma.giftChild.findUnique({
+    where: { id: childId },
+    include: { organisation: { select: { id: true, name: true } } },
+  })
+}
+
+/* ── The organisation's side ───────────────────────────────────────────────── */
+
+/** Families this organisation has nominated, with their children. */
+export async function orgFamilies(organisationId: string) {
+  const program = await activeProgram()
+  if (!program) return []
+
+  return prisma.giftFamily.findMany({
+    where: { programId: program.id, organisationId },
+    orderBy: { createdAt: 'desc' },
+    include: { children: { orderBy: { firstName: 'asc' } } },
+  })
+}
+
+/**
+ * Children nominated without a family.
+ *
+ * Expected, not an error: residential and kinship care, where there is no
+ * parent to fill the guardian details in.
+ */
+export async function orgLooseChildren(organisationId: string) {
+  const program = await activeProgram()
+  if (!program) return []
+
+  return prisma.giftChild.findMany({
+    where: { programId: program.id, organisationId, familyId: null },
+    orderBy: { firstName: 'asc' },
+  })
+}
+
+/** How many children this organisation has nominated, against its ceiling. */
+export async function orgNominatedCount(organisationId: string): Promise<number> {
+  const program = await activeProgram()
+  if (!program) return 0
+
+  return prisma.giftChild.count({ where: { programId: program.id, organisationId } })
+}
+
+/**
+ * The dashboard card's one number.
+ *
+ * Returns null for somebody who has not signed up, which is what makes the
+ * card say "join" rather than show a bar at 0% — an empty progress bar reads
+ * as failure, and they have not failed at anything.
+ */
+export async function slhDashboardCard(): Promise<{
+  organisation: string
+  lists: number
+  done: number
+  total: number
+} | null> {
+  const shopper = await myShopper()
+  if (!shopper) return null
+
+  const children = await prisma.giftChild.findMany({
+    where: { shopperId: shopper.id },
+    select: {
+      receivedAt: true,
+      shoppedAt: true,
+      wrappedAt: true,
+      labelsAt: true,
+      dropoffAt: true,
+      deliveredAt: true,
+    },
+  })
+
+  return {
+    organisation: shopper.organisation.name,
+    lists: children.length,
+    done: children.reduce((n, c) => n + doneCount(c), 0),
+    total: children.length * WISH_STEPS.length,
+  }
 }

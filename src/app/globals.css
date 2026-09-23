@@ -132,3 +132,40 @@ body {
   /* Confetti is pure decoration — with motion off it's just clutter. */
   .animate-confetti { display: none !important; }
 }
+
+/* ── Santa's Little Helpers onboarding ────────────────────────────────────
+ *
+ * Snow behind the welcome screens. Fixed positions rather than random ones so
+ * the same screen looks the same every time — a demo should never produce a
+ * freak blizzard — and the whole thing is decorative, so it sits behind
+ * `aria-hidden` and stops entirely for anyone who asked for less motion.
+ */
+@keyframes slh-fall {
+  0% {
+    transform: translateY(-10%) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(105vh) translateX(14px);
+    opacity: 0;
+  }
+}
+
+.slh-snow i {
+  position: absolute;
+  top: -12px;
+  border-radius: 9999px;
+  background: #fff;
+  animation-name: slh-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slh-snow {
+    display: none;
+  }
+}

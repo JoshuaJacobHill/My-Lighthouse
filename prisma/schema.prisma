@@ -190,6 +190,7 @@ model User {
   comments          Comment[]
   commentMentions   CommentMention[]
   pushSubscriptions PushSubscription[]
+  giftShopping      GiftShopper[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -1005,6 +1006,9 @@ model GiftProgram {
   updatedAt DateTime @updatedAt
 
   partners GiftProgramPartner[]
+  shoppers GiftShopper[]
+  families GiftFamily[]
+  children GiftChild[]
 
   @@index([isActive])
 }
@@ -1049,6 +1053,159 @@ model GiftProgramPartner {
   /// not a second allocation.
   @@unique([programId, organisationId])
   @@index([organisationId])
+}
+
+/// A supporter who has signed up to shop for children this Christmas.
+///
+/// The other half of the pairing: `GiftProgramPartner` is an organisation
+/// approved to refer, this is a person offering to shop, and both point at the
+/// same program. What a shopper chooses during onboarding — which organisation,
+/// how many lists, who they would prefer to shop for — is all true of that
+/// pairing rather than of the person, which is why none of it sits on `User`.
+/// Somebody who shops for two years running has two rows, and last year's
+/// preferences do not quietly become this year's.
+model GiftShopper {
+  id             String @id @default(cuid())
+  programId      String
+  userId         String
+  /// The organisation whose children they shop for, and where gifts are taken.
+  organisationId String
+
+  /// How many wish lists they asked for. A request, not a grant — lists are
+  /// handed out against the organisation's allocation, which may run out.
+  requested Int @default(1)
+
+  /// Preferences, not promises: "any" is the default and the common answer.
+  /// Plain strings rather than enums so a new age band is a deploy, not a
+  /// migration. `slh-onboarding.ts` is the list they are checked against.
+  preferredAge    String @default("any")
+  preferredGender String @default("any")
+
+  /// When they confirmed they can get gifts to the address inside the window.
+  ///
+  /// The one thing on this row that is a commitment rather than a preference,
+  /// so it records the moment rather than a boolean: a shopper who ticked it
+  /// before the window moved has agreed to something that no longer exists.
+  acknowledgedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  program      GiftProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  children GiftChild[]
+
+  /// One sign-up per person per program. Changing your mind edits this row;
+  /// it does not add a second one.
+  @@unique([programId, userId])
+  @@index([programId, organisationId])
+}
+
+/// A household an organisation has nominated.
+///
+/// Families are the unit, not children: siblings share a guardian, a phone
+/// number and a Christmas morning. It is also the duplicate check — the same
+/// guardian with the same child is a double nomination, the same guardian with
+/// a different child is a sibling — which is the question that has no good
+/// answer if children are nominated one at a time with nothing joining them.
+///
+/// **This is an identifying record of a family in crisis.** A guardian's name,
+/// email and mobile, tied to an organisation that works with people in
+/// hardship. A shopper never sees any of it; see `docs/features/SLH.md` on
+/// deleting or anonymising these at the end of each program year.
+model GiftFamily {
+  id             String @id @default(cuid())
+  programId      String
+  organisationId String
+
+  guardianName  String
+  guardianEmail String?
+  guardianPhone String?
+
+  /// When the organisation recorded that the family agreed to take part.
+  /// A timestamp rather than a boolean: consent is given on a day, by someone.
+  consentAt     DateTime?
+  consentByName String?
+
+  /// Anything the organisation needs to pass on. Not shown to shoppers.
+  notes String? @db.Text
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  program      GiftProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  children     GiftChild[]
+
+  @@index([programId, organisationId])
+}
+
+/// One child, one wish list.
+///
+/// The fields stop where a shopper's need to know stops: a first name, an age,
+/// sizes, interests and an approved story. **No surname, no address, no
+/// photograph.** Anything identifying lives on `GiftFamily`, which a shopper
+/// never reads — the split is deliberate and should survive future changes.
+model GiftChild {
+  id             String  @id @default(cuid())
+  programId      String
+  organisationId String
+  /// Optional: a child in residential or kinship care has no family row.
+  familyId       String?
+
+  firstName   String
+  /// Date of birth, not age — an age is wrong by December. `@db.Date` so it is
+  /// a Brisbane calendar day rather than an instant. See docs/DATA.md.
+  dateOfBirth DateTime @db.Date
+  /// "girl" | "boy" — what the avatar and the shopper's preference match on.
+  gender      String
+
+  clothesSize String?
+  shoesSize   String?
+  /// Chips, not prose: "Spider-Man" buys a better present than "superheroes".
+  interests   String[]
+
+  /// The child's own words, and whether somebody here has read them.
+  ///
+  /// Never shown to a shopper until `storyApproved`. A child writing freely may
+  /// say something identifying or distressing, and the default has to be that
+  /// nobody outside Lighthouse has seen it yet.
+  storyText     String? @db.Text
+  storyApproved Boolean @default(false)
+
+  /// The four gifts, in the order the program asks for them.
+  wishWant String?
+  wishNeed String?
+  wishWear String?
+  wishRead String?
+
+  /// Who is shopping for this child, once a list has been handed out.
+  shopperId String?
+
+  /// The chain a shopper works through. Timestamps rather than a status, so
+  /// "when did this happen" is answerable and the order is self-evident.
+  receivedAt  DateTime?
+  shoppedAt   DateTime?
+  wrappedAt   DateTime?
+  labelsAt    DateTime?
+  dropoffAt   DateTime?
+  deliveredAt DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  program      GiftProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  family       GiftFamily?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  shopper      GiftShopper? @relation(fields: [shopperId], references: [id], onDelete: SetNull)
+
+  @@index([programId, organisationId])
+  @@index([shopperId])
+  @@index([familyId])
 }
 
 model Organisation {
@@ -1110,6 +1267,9 @@ model Organisation {
   recognitions OrgRecognition[]
   posts        OrgPost[]
   giftPrograms GiftProgramPartner[]
+  giftShopping GiftShopper[]
+  giftFamilies GiftFamily[]
+  giftChildren GiftChild[]
   fundraisers  Fundraiser[]
 
   @@index([isPublished])
