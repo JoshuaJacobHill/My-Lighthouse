@@ -143,8 +143,9 @@ export const SAMPLE_CHILDREN: SampleChild[] = [
     story: { text: '', approved: false },
     want: 'A Bluey playset',
     need: 'A swimming towel and bathers for summer',
-    wear: 'A purple singlet and shorts set',
-    read: 'Bluey picture books',
+    // Half-filled on purpose: this is what the organisation chases.
+    wear: '',
+    read: '',
     done: [],
   },
 ]
@@ -165,3 +166,74 @@ export function daysUntil(day: string, now: Date = new Date()): number {
     (Date.UTC(y, m - 1, d) - Date.UTC(ny, nm - 1, nd)) / 86_400_000
   )
 }
+
+/* ── The organisation's side ───────────────────────────────────────────────
+   Families are the unit an organisation works with: one guardian, one phone
+   number, and however many children. A child with no family is allowed and
+   expected — residential care, a kinship placement — so `familyId` is optional
+   on the child rather than required.
+
+   The guardian's details are the part a shopper must never see. They are here
+   because the organisation and Lighthouse both need them: to chase an unfilled
+   list, and to ring a family directly when the organisation goes quiet. */
+
+export type SampleFamily = {
+  id: string
+  /** Parent, guardian, grandparent, kinship carer — whoever holds the family. */
+  guardian: string
+  email: string
+  phone: string
+  childIds: string[]
+  /** Recorded, not assumed: they know, and they agreed we may contact them. */
+  consentedOn: string
+}
+
+export const SAMPLE_FAMILIES: SampleFamily[] = [
+  {
+    id: 'f1',
+    guardian: 'Leila M.',
+    email: 'leila.m@example.com',
+    phone: '0412 884 221',
+    childIds: ['123-LIG', '125-LIG'],
+    consentedOn: '4 November 2026',
+  },
+  {
+    id: 'f2',
+    guardian: 'Dave R.',
+    email: 'dave.r@example.com',
+    phone: '0431 550 118',
+    childIds: ['124-LIG'],
+    consentedOn: '6 November 2026',
+  },
+]
+
+/** Lighthouse sets the ceiling. An organisation cannot nominate past it. */
+export const SAMPLE_ALLOCATION = 62
+
+/** Children this organisation has nominated, beyond the shopper's three. */
+export const SAMPLE_NOMINATED = 41
+
+export const SAMPLE_EVENT = {
+  on: true,
+  name: 'Village Connect Christmas Party',
+  when: 'Saturday 13 December, 10:00am – 1:00pm',
+  where: '12 George Street, Beenleigh',
+  note: 'Lunch, a jumping castle and a visit from Santa. Bring the whole family.',
+  rsvps: 4,
+}
+
+export const familyOf = (childId: string) =>
+  SAMPLE_FAMILIES.find((f) => f.childIds.includes(childId)) ?? null
+
+/** Children with no family attached — nominated on their own. */
+export const unfamiliedChildren = () =>
+  SAMPLE_CHILDREN.filter((c) => !familyOf(c.id))
+
+/**
+ * Whether a child's wish list is finished.
+ *
+ * All four gifts named. A half-filled list is the thing the reminder button
+ * exists to chase, so "done" has to mean the same thing everywhere.
+ */
+export const listComplete = (child: SampleChild) =>
+  Boolean(child.want && child.need && child.wear && child.read)

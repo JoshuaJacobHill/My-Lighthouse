@@ -15,14 +15,28 @@ A walkthrough, not a feature. Two pages render **fiction** from
 |---|---|
 | `/dashboard/slh` | Countdown to drop-off, the shopper's wish lists, progress per child |
 | `/dashboard/slh/[id]` | One child: interests, their own words, sizes, four gifts, six steps |
+| `/dashboard/slh/org` | Which referring organisation to open — **real organisations** |
+| `/dashboard/slh/org/[id]` | Allocation, families, who is outstanding, the reminder |
+| `/dashboard/slh/org/[id]/family` | Nominating a family: guardian, consent, a child |
 
-Plus a card on `/dashboard` that leads to it. All three are behind
+Plus a card on `/dashboard` that leads to it. All of them are behind
 `canPreviewSlh()`, which asks for **SUPER_ADMIN** — a role rather than a
 capability, deliberately. A capability answers "may this person do this job";
 this answers "is this finished enough to show anybody", and it disappears once
 the program has real data.
 
-**No schema, no writes, no emails.** Nothing here touches the database.
+**No schema, no writes, no emails** for the program itself.
+
+**The organisations are real, though.** A referring agency is not a new kind of
+thing: `Organisation` already holds a name, a logo, a blurb and members who sign
+in, which is exactly what a referrer needs. `src/lib/slh.ts` reads them through
+the same per-row rule the partner pages use — `canAdminOrg`, because a global
+"partner admin" would hand its holder every company at once.
+
+What is genuinely new is the **link** between an organisation and a program: the
+allocation, the drop-off address and the window. None of that belongs on
+`Organisation` — a corporate partner has no drop-off window — so it lands on a
+join table when the schema exists, and `slh-sample.ts` stands in until then.
 
 ## The design it came from
 

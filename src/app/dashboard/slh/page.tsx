@@ -94,7 +94,20 @@ export default async function SlhPage() {
           })}
         </div>
 
-        <p className="mt-10 rounded-[28px] border border-dashed border-neutral-300 p-5 text-center text-xs text-neutral-500">
+        <Link
+          href="/dashboard/slh/org"
+          className="mt-8 flex items-center gap-3 rounded-[28px] border border-neutral-200 px-5 py-4 transition-colors hover:bg-neutral-50"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold">Referring organisations</span>
+            <span className="block text-[13px] text-neutral-400">
+              The other side: families, allocations and reminders
+            </span>
+          </span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
+        </Link>
+
+        <p className="mt-8 rounded-[28px] border border-dashed border-neutral-300 p-5 text-center text-xs text-neutral-500">
           Preview with sample children. Nothing here is real, and only super admins can see it.
         </p>
       </div>
