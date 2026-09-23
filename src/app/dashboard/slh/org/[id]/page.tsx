@@ -2,10 +2,10 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, CalendarDays, ChevronRight, Users } from 'lucide-react'
 import { getSession } from '@/lib/auth'
-import { canOpenSlhOrg, slhOrg } from '@/lib/slh'
+import { formatDate } from '@/lib/utils'
+import { activeProgram, canOpenSlhOrg, enrolment, slhOrg } from '@/lib/slh'
 import { FamilyList, type FamilyRow } from '@/components/slh/FamilyList'
 import {
-  SAMPLE_ALLOCATION,
   SAMPLE_EVENT,
   SAMPLE_FAMILIES,
   SAMPLE_NOMINATED,
@@ -21,13 +21,15 @@ export const metadata = { title: 'Santa’s Little Helpers', robots: { index: fa
  * A referring organisation's program area.
  *
  * The organisation is real — name, logo, members, and the same per-row
- * `canAdminOrg` rule the partner pages use. Everything inside it is sample data
- * until the program has a schema, because none of it has anywhere to live yet:
- * the allocation, the families, the children, the drop-off window.
+ * `canAdminOrg` rule the partner pages use — and so is its **enrolment**: the
+ * approval to refer, the allocation Lighthouse set, and the drop-off window.
+ * Reaching this page at all means an enrolment exists; `canOpenSlhOrg` checks
+ * that before it checks who is asking.
  *
- * That split is the point of this page. It shows what the organisation's side
- * looks like bolted onto the framework that already exists, so the schema can
- * be designed against something somebody has actually used.
+ * The families and children inside are still sample data, because they have
+ * nowhere to live yet. That split is the point of the page: it shows the
+ * organisation's side bolted onto the framework that already exists, so the
+ * rest of the schema can be designed against something somebody has used.
  */
 export default async function SlhOrgPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -36,8 +38,9 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
   const { id } = await params
   if (!(await canOpenSlhOrg(id))) notFound()
 
-  const org = await slhOrg(id)
-  if (!org) notFound()
+  const [org, program, enrolled] = await Promise.all([slhOrg(id), activeProgram(), enrolment(id)])
+  // `canOpenSlhOrg` already required both; this narrows the types.
+  if (!org || !program || !enrolled) notFound()
 
   const families: FamilyRow[] = SAMPLE_FAMILIES.map((f) => ({
     id: f.id,
@@ -53,8 +56,16 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
   }))
 
   const loose = unfamiliedChildren()
-  const remaining = SAMPLE_ALLOCATION - SAMPLE_NOMINATED
-  const pct = Math.round((SAMPLE_NOMINATED / SAMPLE_ALLOCATION) * 100)
+  const allocation = enrolled.allocation
+  // Nominations are still fiction, so this one number stays sample data — but
+  // it is capped by the real allocation so the bar can't run past its ceiling.
+  const nominated = Math.min(SAMPLE_NOMINATED, allocation)
+  const remaining = Math.max(0, allocation - nominated)
+  // An allocation of 0 means "approved, ceiling not set yet" — not "none left".
+  const pct = allocation > 0 ? Math.round((nominated / allocation) * 100) : 0
+  const closes = program.nominationsCloseAt
+    ? formatDate(program.nominationsCloseAt, 'd MMMM')
+    : null
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
@@ -77,7 +88,7 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
           </span>
           <div className="min-w-0">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#c8102e]">
-              Santa&rsquo;s Little Helpers 2026
+              {program.name}
             </p>
             <h1 className="mt-0.5 text-2xl font-extrabold tracking-tight">{org.name}</h1>
           </div>
@@ -88,18 +99,39 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
           <div className="flex items-baseline justify-between">
             <b className="text-sm">Your allocation</b>
             <span className="text-[13px] tabular-nums text-neutral-500">
-              {SAMPLE_NOMINATED} of {SAMPLE_ALLOCATION}
+              {allocation > 0 ? `${nominated} of ${allocation}` : 'Not set yet'}
             </span>
           </div>
           <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-neutral-200">
             <div className="h-full rounded-full bg-[#c8102e]" style={{ width: `${pct}%` }} />
           </div>
           <p className="mt-2.5 text-sm text-neutral-500">
-            You can nominate <b className="text-neutral-900">{remaining}</b> more{' '}
-            {remaining === 1 ? 'child' : 'children'} until nominations close on{' '}
-            <b className="text-neutral-900">21 November</b>.
+            {allocation === 0 ? (
+              <>
+                You&rsquo;re approved to refer children this year. Lighthouse will confirm how many
+                you can nominate.
+              </>
+            ) : (
+              <>
+                You can nominate <b className="text-neutral-900">{remaining}</b> more{' '}
+                {remaining === 1 ? 'child' : 'children'}
+                {closes ? (
+                  <>
+                    {' '}
+                    until nominations close on <b className="text-neutral-900">{closes}</b>
+                  </>
+                ) : null}
+                .
+              </>
+            )}
           </p>
         </div>
+
+        {enrolled.dropOffAddress && (
+          <p className="mt-3 text-sm text-neutral-500">
+            Gifts come to <b className="text-neutral-900">{enrolled.dropOffAddress}</b>.
+          </p>
+        )}
 
         <Link
           href={`/dashboard/slh/org/${org.id}/family`}
@@ -164,9 +196,9 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
         </div>
 
         <p className="mt-8 rounded-[28px] border border-dashed border-neutral-300 p-5 text-center text-xs text-neutral-500">
-          <b className="text-neutral-700">{org.name} is real.</b> The allocation, families,
-          children and drop-off window are sample data — they have nowhere to live until the program
-          has a schema. Nothing on this page saves.
+          <b className="text-neutral-700">{org.name}, its approval and its allocation are real.</b>{' '}
+          The families, children and event below are sample data — they have nowhere to live until
+          the rest of the program has a schema, and nothing on this page saves them.
         </p>
       </div>
     </div>

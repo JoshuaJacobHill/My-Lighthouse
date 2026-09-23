@@ -15,8 +15,8 @@ A walkthrough, not a feature. Two pages render **fiction** from
 |---|---|
 | `/dashboard/slh` | Countdown to drop-off, the shopper's wish lists, progress per child |
 | `/dashboard/slh/[id]` | One child: interests, their own words, sizes, four gifts, six steps |
-| `/dashboard/slh/org` | Which referring organisation to open — **real organisations** |
-| `/dashboard/slh/org/[id]` | Allocation, families, who is outstanding, the reminder |
+| `/dashboard/slh/org` | **Real.** Who is approved to refer, their allocation, and who can be added |
+| `/dashboard/slh/org/[id]` | Real allocation and drop-off address; sample families and event |
 | `/dashboard/slh/org/[id]/family` | Nominating a family: guardian, consent, a child |
 
 Plus a card on `/dashboard` that leads to it. All of them are behind
@@ -25,18 +25,44 @@ capability, deliberately. A capability answers "may this person do this job";
 this answers "is this finished enough to show anybody", and it disappears once
 the program has real data.
 
-**No schema, no writes, no emails** for the program itself.
+**No writes and no emails** for the families and children themselves.
 
-**The organisations are real, though.** A referring agency is not a new kind of
-thing: `Organisation` already holds a name, a logo, a blurb and members who sign
-in, which is exactly what a referrer needs. `src/lib/slh.ts` reads them through
-the same per-row rule the partner pages use — `canAdminOrg`, because a global
-"partner admin" would hand its holder every company at once.
+**The organisations and their approvals are real.** A referring agency is not a
+new kind of thing: `Organisation` already holds a name, a logo, a blurb and
+members who sign in, which is exactly what a referrer needs. `src/lib/slh.ts`
+reads them through the same per-row rule the partner pages use — `canAdminOrg`,
+because a global "partner admin" would hand its holder every company at once.
 
-What is genuinely new is the **link** between an organisation and a program: the
-allocation, the drop-off address and the window. None of that belongs on
-`Organisation` — a corporate partner has no drop-off window — so it lands on a
-join table when the schema exists, and `slh-sample.ts` stands in until then.
+## Approval is a row, not a flag
+
+Having an account does not make an organisation a referrer. **Good Food is a
+corporate partner and has no business nominating children** — that was the bug
+this fixed: every organisation appeared as a referrer because the code had no
+concept of approval at all.
+
+Two tables carry it:
+
+| Table | Is |
+|---|---|
+| `GiftProgram` | A year. Name, slug, `year`, `nominationsCloseAt`, `isActive`. One active at a time. |
+| `GiftProgramPartner` | **The approval.** Program × organisation, unique, plus `allocation`, `dropOffAddress` and the drop-off window. |
+
+The row *is* the decision — there is no `approved` boolean to forget to set.
+Creating it approves, deleting it withdraws, and its absence is why an
+organisation does not appear. `canOpenSlhOrg` checks for it **before** it checks
+who is asking, so a super admin previewing still cannot open a program area for
+an organisation nobody enrolled.
+
+This is also the answer to "where does the allocation live". Not on
+`Organisation` — a corporate partner has no drop-off window — and not on the
+program either, because every organisation's ceiling and address differ. It
+belongs to the pairing, which is exactly what the join table is.
+
+Approving is Lighthouse's call: `/dashboard/slh/org` is super-admin only, and
+every action in `src/lib/actions/slh.actions.ts` re-checks for itself rather
+than trusting that the page hid the button.
+
+The families, children and wish lists are still `slh-sample.ts`.
 
 ## The design it came from
 
@@ -72,7 +98,11 @@ named, is the whole of it.
 **Deadlines count backwards from the organisation's own window.** Each
 organisation takes gifts at its own address inside its own dates, so a list
 released for reassignment on 25 November is fine and the same list released on
-20 December is a child without a present.
+20 December is a child without a present. That is why the window sits on
+`GiftProgramPartner` rather than the program.
+
+**An allocation of 0 means "approved, ceiling not set yet"** — not "none left".
+The organisation's page says so in words rather than drawing a full bar.
 
 ## Before this becomes real
 

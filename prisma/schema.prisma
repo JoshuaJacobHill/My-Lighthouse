@@ -985,6 +985,72 @@ enum OrgRecognitionKind {
 }
 
 /// A supporting company, club or school.
+/// A gift program — Santa's Little Helpers 2026, and whatever follows it.
+///
+/// Named for the domain rather than the campaign on purpose. Easter hampers and
+/// back-to-school are the same shape: a year, a window, partner organisations
+/// who nominate children, and supporters who shop. A `SantaProgram` table would
+/// have to be copied the first time anything else ran.
+model GiftProgram {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+  year Int
+
+  /// After this, children can still be added but a shopper is not promised.
+  nominationsCloseAt DateTime?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partners GiftProgramPartner[]
+
+  @@index([isActive])
+}
+
+/// An organisation approved to refer children to a program.
+///
+/// The link, not the organisation. `Organisation` already holds who they are —
+/// name, logo, blurb, the people who sign in — and this holds what is true only
+/// inside a program: how many children they may nominate, where the gifts are
+/// taken, and when.
+///
+/// None of that belongs on `Organisation` itself. Good Food is a corporate
+/// partner with no drop-off window, and being a partner is not the same as
+/// being approved to refer children. **A row here is that approval**, and its
+/// absence is what stops an organisation appearing in the program at all.
+model GiftProgramPartner {
+  id             String @id @default(cuid())
+  programId      String
+  organisationId String
+
+  /// The ceiling. An organisation cannot nominate past it.
+  allocation Int @default(0)
+
+  /// Where shoppers bring the gifts, and the window they may bring them in.
+  /// Separate from any address on the organisation: a referrer takes gifts
+  /// somewhere specific, which may not be their office.
+  dropOffAddress  String?
+  dropOffOpensAt  DateTime?
+  dropOffClosesAt DateTime?
+
+  /// Who at Lighthouse approved them, and when.
+  approvedById String?
+  approvedAt   DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  program      GiftProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  /// One enrolment per organisation per program. Enrolling twice is a mistake,
+  /// not a second allocation.
+  @@unique([programId, organisationId])
+  @@index([organisationId])
+}
+
 model Organisation {
   id   String @id @default(cuid())
   name String
@@ -1043,6 +1109,7 @@ model Organisation {
   members      OrgMember[]
   recognitions OrgRecognition[]
   posts        OrgPost[]
+  giftPrograms GiftProgramPartner[]
   fundraisers  Fundraiser[]
 
   @@index([isPublished])

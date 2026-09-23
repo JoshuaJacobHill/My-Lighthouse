@@ -10,9 +10,12 @@
  * What is genuinely new is the **link** between an organisation and a program:
  * how many children they may nominate, where the gifts are taken, and the
  * window they are taken in. None of that belongs on `Organisation` — a
- * corporate partner has no drop-off window — so it lands on a join table when
- * the schema exists. Until then `slh-sample.ts` stands in for it, and the
- * organisation itself is real.
+ * corporate partner has no drop-off window — so it lives on `GiftProgramPartner`.
+ *
+ * That row is also the **approval**. Having an account does not make an
+ * organisation a referrer; Lighthouse picking it does. There is no `approved`
+ * flag to forget to set — the row's existence is the decision, which is why
+ * every read here starts from the join table rather than from `Organisation`.
  */
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
@@ -25,21 +28,33 @@ export type SlhOrgSummary = {
   slug: string
   logoUrl: string | null
   members: number
+  allocation: number
   /** Whether this person administers it, rather than just being able to see it. */
   mine: boolean
 }
 
+/** The program everything currently hangs off. One at a time, for now. */
+export async function activeProgram() {
+  return prisma.giftProgram.findFirst({
+    where: { isActive: true },
+    orderBy: { year: 'desc' },
+  })
+}
+
 /**
- * Organisations this person can open the program area for.
+ * Organisations **approved to refer** to the active program.
  *
- * Normally the ones they administer — the same per-row rule the partner pages
- * use, because a global "partner admin" would hand its holder every company at
- * once. A super admin previewing sees every organisation, which is the only
- * reason this is not simply `myMemberships()`.
+ * Being a partner organisation is not the same as being a referrer. Good Food
+ * is a corporate partner and has no business appearing here; what puts an
+ * organisation in this list is a `GiftProgramPartner` row, which is Lighthouse
+ * approving them. The absence of that row is the whole point.
  */
 export async function slhOrgsForViewer(): Promise<SlhOrgSummary[]> {
   const session = await getSession()
   if (!session) return []
+
+  const program = await activeProgram()
+  if (!program) return []
 
   const mine = await prisma.orgMember.findMany({
     where: { userId: session.userId, status: 'ACTIVE', role: 'ADMIN' },
@@ -47,26 +62,70 @@ export async function slhOrgsForViewer(): Promise<SlhOrgSummary[]> {
   })
   const mineIds = new Set(mine.map((m) => m.organisationId))
 
-  const orgs = await prisma.organisation.findMany({
-    where: canPreviewSlh(session.user) ? {} : { id: { in: [...mineIds] } },
-    orderBy: { name: 'asc' },
+  const enrolled = await prisma.giftProgramPartner.findMany({
+    where: {
+      programId: program.id,
+      // A referrer sees their own; Lighthouse sees every one it approved.
+      ...(canPreviewSlh(session.user) ? {} : { organisationId: { in: [...mineIds] } }),
+    },
+    orderBy: { organisation: { name: 'asc' } },
     select: {
-      id: true,
-      name: true,
-      slug: true,
-      logoUrl: true,
-      _count: { select: { members: true } },
+      allocation: true,
+      organisation: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          _count: { select: { members: true } },
+        },
+      },
     },
   })
 
+  return enrolled.map((e) => ({
+    id: e.organisation.id,
+    name: e.organisation.name,
+    slug: e.organisation.slug,
+    logoUrl: e.organisation.logoUrl,
+    members: e.organisation._count.members,
+    allocation: e.allocation,
+    mine: mineIds.has(e.organisation.id),
+  }))
+}
+
+/**
+ * Organisations that could be approved but have not been.
+ *
+ * Every organisation with an account, minus the ones already enrolled. This is
+ * the list Lighthouse picks from, and picking is the approval.
+ */
+export async function orgsAvailableToEnrol(): Promise<
+  { id: string; name: string; logoUrl: string | null; members: number }[]
+> {
+  const program = await activeProgram()
+  if (!program) return []
+
+  const orgs = await prisma.organisation.findMany({
+    where: { giftPrograms: { none: { programId: program.id } } },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, logoUrl: true, _count: { select: { members: true } } },
+  })
   return orgs.map((o) => ({
     id: o.id,
     name: o.name,
-    slug: o.slug,
     logoUrl: o.logoUrl,
     members: o._count.members,
-    mine: mineIds.has(o.id),
   }))
+}
+
+/** The enrolment itself, or null if this organisation was never approved. */
+export async function enrolment(organisationId: string) {
+  const program = await activeProgram()
+  if (!program) return null
+  return prisma.giftProgramPartner.findUnique({
+    where: { programId_organisationId: { programId: program.id, organisationId } },
+  })
 }
 
 /**
@@ -78,6 +137,10 @@ export async function slhOrgsForViewer(): Promise<SlhOrgSummary[]> {
  * of the preview gating.
  */
 export async function canOpenSlhOrg(organisationId: string): Promise<boolean> {
+  // Approval first. An organisation nobody enrolled has no program area to
+  // open, however senior the person asking.
+  if (!(await enrolment(organisationId))) return false
+
   if (await canAdminOrg(organisationId)) return true
   const session = await getSession()
   return Boolean(session && canPreviewSlh(session.user))
