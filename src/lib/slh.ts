@@ -181,6 +181,10 @@ export type ShopperOrgOption = {
   allocation: number
   /** Children nominated but not yet handed to a shopper. */
   waiting: number
+  /** Wish lists still to be promised: allocation minus what shoppers asked for. */
+  available: number
+  /** False when no allocation is set — "come back later", not "all taken". */
+  open: boolean
   dropOffAddress: string | null
   dropOffOpensAt: Date | null
   dropOffClosesAt: Date | null
@@ -212,12 +216,22 @@ export async function orgsOpenToShoppers(): Promise<ShopperOrgOption[]> {
   })
   if (partners.length === 0) return []
 
-  const waiting = await prisma.giftChild.groupBy({
-    by: ['organisationId'],
-    where: { programId: program.id, shopperId: null },
-    _count: { _all: true },
-  })
+  const [waiting, committed] = await Promise.all([
+    prisma.giftChild.groupBy({
+      by: ['organisationId'],
+      where: { programId: program.id, shopperId: null },
+      _count: { _all: true },
+    }),
+    // What every shopper has already asked for, per organisation. One query
+    // rather than one per card.
+    prisma.giftShopper.groupBy({
+      by: ['organisationId'],
+      where: { programId: program.id },
+      _sum: { requested: true },
+    }),
+  ])
   const waitingBy = new Map(waiting.map((w) => [w.organisationId, w._count._all]))
+  const committedBy = new Map(committed.map((c) => [c.organisationId, c._sum.requested ?? 0]))
 
   return partners.map((p) => ({
     id: p.organisation.id,
@@ -225,6 +239,8 @@ export async function orgsOpenToShoppers(): Promise<ShopperOrgOption[]> {
     logoUrl: p.organisation.logoUrl,
     allocation: p.allocation,
     waiting: waitingBy.get(p.organisation.id) ?? 0,
+    available: Math.max(0, p.allocation - (committedBy.get(p.organisation.id) ?? 0)),
+    open: p.allocation > 0,
     dropOffAddress: p.dropOffAddress,
     dropOffOpensAt: p.dropOffOpensAt,
     dropOffClosesAt: p.dropOffClosesAt,
@@ -340,5 +356,64 @@ export async function slhDashboardCard(): Promise<{
     lists: children.length,
     done: children.reduce((n, c) => n + doneCount(c), 0),
     total: children.length * WISH_STEPS.length,
+  }
+}
+
+export type Capacity = {
+  /** The ceiling Lighthouse set for the organisation. 0 = not set yet. */
+  allocation: number
+  /** What every shopper has already asked for. */
+  committed: number
+  /** What is left to give away. */
+  available: number
+  /** False when the allocation has not been set, which is not the same as full. */
+  open: boolean
+}
+
+/**
+ * How many more wish lists an organisation can promise.
+ *
+ * Measured against the **allocation**, not the children actually nominated.
+ * Shoppers sign up in October and organisations nominate through November, so
+ * counting real children would tell an early shopper an organisation has
+ * nothing for them when in fact it has forty coming.
+ *
+ * `exceptShopperId` leaves one shopper's own request out of the sum, so
+ * somebody changing 3 to 4 is measured against everyone else rather than
+ * competing with themselves.
+ */
+export async function shopperCapacity(
+  organisationId: string,
+  exceptShopperId?: string,
+): Promise<Capacity> {
+  const program = await activeProgram()
+  if (!program) return { allocation: 0, committed: 0, available: 0, open: false }
+
+  const [partner, agg] = await Promise.all([
+    prisma.giftProgramPartner.findUnique({
+      where: { programId_organisationId: { programId: program.id, organisationId } },
+    }),
+    prisma.giftShopper.aggregate({
+      where: {
+        programId: program.id,
+        organisationId,
+        ...(exceptShopperId ? { id: { not: exceptShopperId } } : {}),
+      },
+      _sum: { requested: true },
+    }),
+  ])
+
+  const allocation = partner?.allocation ?? 0
+  const committed = agg._sum.requested ?? 0
+
+  return {
+    allocation,
+    committed,
+    available: Math.max(0, allocation - committed),
+    // An allocation of 0 means Lighthouse has not said how many children this
+    // organisation may nominate. Nothing can be promised against a number
+    // nobody has set, so it is closed rather than full — and the screens say so
+    // differently, because "come back later" and "all taken" are not the same.
+    open: allocation > 0,
   }
 }

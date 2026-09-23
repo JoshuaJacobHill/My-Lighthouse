@@ -31,6 +31,10 @@ export type JoinOrg = {
   name: string
   logoUrl: string | null
   waiting: number
+  /** Wish lists still to be promised. */
+  available: number
+  /** False when no allocation is set — "not open yet", not "all taken". */
+  open: boolean
   dropOffAddress: string | null
   window: string | null
 }
@@ -229,23 +233,42 @@ export function JoinFlow({ orgs, year }: { orgs: JoinOrg[]; year: number }) {
           <div className="mt-5 grid gap-3">
             {orgs.map((o) => {
               const on = orgId === o.id
+              // Nothing to promise: either Lighthouse has not set an allocation
+              // yet, or other shoppers have taken all of it. Different reasons,
+              // different sentences — "come back later" is not "all gone".
+              const closed = !o.open || o.available === 0
               return (
                 <button
                   key={o.id}
                   type="button"
-                  onClick={() => setOrgId(o.id)}
+                  onClick={() => {
+                    if (closed) return
+                    setOrgId(o.id)
+                    // Going back and picking a smaller organisation must not
+                    // carry the larger request across.
+                    setCount((c) => Math.min(c, o.available))
+                  }}
                   aria-pressed={on}
+                  aria-disabled={closed}
                   className={`rounded-[22px] p-4 text-left transition-colors ${
-                    on ? 'bg-white text-neutral-900' : 'border border-white/30 hover:bg-white/10'
+                    on
+                      ? 'bg-white text-neutral-900'
+                      : closed
+                        ? 'cursor-not-allowed border border-white/15 opacity-55'
+                        : 'border border-white/30 hover:bg-white/10'
                   }`}
                 >
                   <span className="block text-lg font-extrabold leading-tight">{o.name}</span>
                   <span
                     className={`mt-1 block text-[13px] ${on ? 'text-neutral-500' : 'text-white/70'}`}
                   >
-                    {o.waiting > 0
-                      ? `${o.waiting} ${o.waiting === 1 ? 'child' : 'children'} waiting`
-                      : 'Wish lists coming soon'}
+                    {!o.open
+                      ? 'Not open for shoppers yet'
+                      : o.available === 0
+                        ? 'Every wish list has been taken'
+                        : o.waiting > 0
+                          ? `${o.waiting} ${o.waiting === 1 ? 'child' : 'children'} waiting`
+                          : `${o.available} wish ${o.available === 1 ? 'list' : 'lists'} to fill`}
                   </span>
                   {o.window && (
                     <span
@@ -274,7 +297,8 @@ export function JoinFlow({ orgs, year }: { orgs: JoinOrg[]; year: number }) {
   }
 
   if (step === 'lists' && org) {
-    const ready = canSubmit({ organisationId: orgId, acknowledged: ack })
+    const ready =
+      canSubmit({ organisationId: orgId, acknowledged: ack }) && count > 0 && count <= org.available
     return (
       <Takeover tone="red">
         <Dots step={2} />
@@ -287,12 +311,16 @@ export function JoinFlow({ orgs, year }: { orgs: JoinOrg[]; year: number }) {
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          {WISHLIST_COUNTS.map((n) => (
+          {WISHLIST_COUNTS.filter((n) => n <= org.available).map((n) => (
             <Choice key={n} on={count === n} onClick={() => setCount(n)}>
               {n}
             </Choice>
           ))}
         </div>
+        <p className="mt-3 text-[13px] text-white/70">
+          {org.name} has {org.available} wish {org.available === 1 ? 'list' : 'lists'} left this
+          year. You can change this later.
+        </p>
 
         <hr className="my-7 border-white/20" />
 

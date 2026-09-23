@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { canPreviewSlh } from '@/lib/features'
-import { activeProgram, canOpenSlhOrg } from '@/lib/slh'
-import { canSubmit, cleanAge, cleanCount, cleanGender } from '@/lib/slh-onboarding'
+import { activeProgram, canOpenSlhOrg, shopperCapacity } from '@/lib/slh'
+import { canSubmit, clampRequest, cleanAge, cleanCount, cleanGender } from '@/lib/slh-onboarding'
 import { WISH_STEPS, stepField, type WishStepKey } from '@/lib/slh-steps'
 
 /**
@@ -167,8 +167,34 @@ export async function joinAsShopperAction(formData: FormData): Promise<Result> {
   })
   if (!partner) return { success: false, error: 'That organisation is not taking shoppers.' }
 
+  // The allocation is a ceiling on promises, not just on nominations. Checked
+  // here rather than trusted from the form: the page's copy of what is left can
+  // be minutes old, and two people signing up at once is exactly when it
+  // matters. An existing shopper's own request is excluded from the sum so
+  // somebody changing their mind is not competing with themselves.
+  const existing = await prisma.giftShopper.findUnique({
+    where: { programId_userId: { programId: program.id, userId: session.userId } },
+    select: { id: true },
+  })
+  const capacity = await shopperCapacity(organisationId, existing?.id)
+
+  if (!capacity.open) {
+    return { success: false, error: 'That organisation is not taking shoppers yet.' }
+  }
+
+  const requested = cleanCount(formData.get('requested'))
+  if (requested > capacity.available) {
+    return {
+      success: false,
+      error:
+        capacity.available === 0
+          ? 'Every wish list at that organisation has been taken. Please choose another.'
+          : `Only ${capacity.available} wish ${capacity.available === 1 ? 'list is' : 'lists are'} left there.`,
+    }
+  }
+
   const data = {
-    requested: cleanCount(formData.get('requested')),
+    requested,
     preferredAge: cleanAge(formData.get('preferredAge')),
     preferredGender: cleanGender(formData.get('preferredGender')),
     organisationId,
@@ -383,5 +409,111 @@ export async function addFamilyAction(formData: FormData): Promise<Result> {
   } catch (err) {
     console.error('addFamilyAction failed', err)
     return { success: false, error: 'Could not save that family.' }
+  }
+}
+
+/**
+ * Change how many wish lists you have asked for.
+ *
+ * Both directions. Somebody who finds they can manage two more should not have
+ * to ring anybody, and somebody who realises in November that five was
+ * ambitious needs to say so *then* — a shopper who quietly cannot finish is
+ * how a child ends up without a present, so the path down has to be as easy as
+ * the path up.
+ *
+ * Lists already assigned are the floor. Releasing those is
+ * `releaseWishListAction`, which is a different and more deliberate act.
+ */
+export async function setRequestedAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const program = await activeProgram()
+  if (!program) return { success: false, error: 'No program is running.' }
+
+  const shopper = await prisma.giftShopper.findUnique({
+    where: { programId_userId: { programId: program.id, userId: session.userId } },
+  })
+  if (!shopper) return { success: false, error: 'You have not signed up yet.' }
+
+  const [capacity, held] = await Promise.all([
+    shopperCapacity(shopper.organisationId, shopper.id),
+    prisma.giftChild.count({ where: { shopperId: shopper.id } }),
+  ])
+
+  const wanted = clampRequest(formData.get('requested'), capacity.available)
+  if (wanted < held) {
+    return {
+      success: false,
+      error: `You are holding ${held} wish ${held === 1 ? 'list' : 'lists'}. Give one back first.`,
+    }
+  }
+
+  try {
+    await prisma.giftShopper.update({ where: { id: shopper.id }, data: { requested: wanted } })
+    revalidatePath('/dashboard/slh')
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (err) {
+    console.error('setRequestedAction failed', err)
+    return { success: false, error: 'Could not change that.' }
+  }
+}
+
+/**
+ * Give a wish list back.
+ *
+ * The list returns to the pool for somebody else, and the shopper's request
+ * drops by one so it is not handed straight back to them. Any steps they had
+ * ticked are cleared: the next shopper has not shopped or wrapped anything,
+ * and inheriting someone else's ticks would tell them they had.
+ *
+ * Only the shopper holding it. This is the thing the onboarding screen asks
+ * people to do early, so it must be one button and no conversation.
+ */
+export async function releaseWishListAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const program = await activeProgram()
+  if (!program) return { success: false, error: 'No program is running.' }
+
+  const shopper = await prisma.giftShopper.findUnique({
+    where: { programId_userId: { programId: program.id, userId: session.userId } },
+  })
+  if (!shopper) return { success: false, error: 'You are not shopping this year.' }
+
+  const childId = String(formData.get('childId') ?? '')
+  const child = await prisma.giftChild.findFirst({
+    where: { id: childId, shopperId: shopper.id },
+    select: { id: true },
+  })
+  if (!child) return { success: false, error: 'That is not one of your wish lists.' }
+
+  try {
+    await prisma.$transaction([
+      prisma.giftChild.update({
+        where: { id: child.id },
+        data: {
+          shopperId: null,
+          receivedAt: null,
+          shoppedAt: null,
+          wrappedAt: null,
+          labelsAt: null,
+          dropoffAt: null,
+          deliveredAt: null,
+        },
+      }),
+      prisma.giftShopper.update({
+        where: { id: shopper.id },
+        data: { requested: Math.max(0, shopper.requested - 1) },
+      }),
+    ])
+    revalidatePath('/dashboard/slh')
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (err) {
+    console.error('releaseWishListAction failed', err)
+    return { success: false, error: 'Could not give that list back.' }
   }
 }

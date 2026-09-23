@@ -50,6 +50,8 @@ export default async function SlhJoinPage() {
     name: o.name,
     logoUrl: o.logoUrl,
     waiting: o.waiting,
+    available: o.available,
+    open: o.open,
     dropOffAddress: o.dropOffAddress,
     window: windowLabel(o.dropOffOpensAt, o.dropOffClosesAt),
   }))

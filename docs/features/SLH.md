@@ -92,6 +92,34 @@ is a sibling. A child with no family is expected — residential and kinship car
 families. "The organisation said it was fine" is not the same as recording when,
 and who said so.
 
+**Capacity is measured against the allocation, not against nominated children.**
+Shoppers sign up in October and organisations nominate through November, so
+counting real children would tell an early shopper an organisation has nothing
+for them when it has forty coming. `shopperCapacity()` sums what every shopper
+has asked for and subtracts it from the allocation. A shopper changing their
+own request is excluded from that sum, so they are not competing with
+themselves.
+
+**An organisation with no allocation is closed, not full.** Nothing can be
+promised against a number nobody has set. The screens say those two things
+differently — "not open for shoppers yet" versus "every wish list has been
+taken" — because they need different responses.
+
+**Changing your mind is one button, and it does not apologise.** The onboarding
+screen asks people to tell us early if they cannot finish, so `ManageLists`
+sits on the page they already look at and `ReleaseList` is one confirmation
+naming the child. A shopper who quietly cannot manage is how a child ends up
+without a present; a button that makes somebody feel judged is one they avoid
+until December.
+
+**Giving a list back clears its steps.** The next shopper has not shopped or
+wrapped anything, and inheriting someone else's ticks would tell them they had.
+The request drops by one at the same time, so the list is not handed straight
+back.
+
+**Lists in hand are the floor.** The counter cannot go below what has already
+been assigned — dropping those is the separate, deliberate act above.
+
 **Progress is per wish list.** An overall "8 of 18 steps" bar was removed: it
 measured nothing a shopper acts on. Six timestamps on `GiftChild` rather than a
 status column, so "when did this happen" is answerable; `slh-steps.ts` turns
@@ -124,9 +152,9 @@ survive a refresh as a row nobody meant to create. Snow is decorative, behind
 
 ## Not built yet
 
-- **Handing lists out.** `GiftChild.shopperId` exists and every read respects
-  it, but nothing assigns it — matching a shopper's request to waiting children
-  is the next piece.
+- **Handing lists out.** `GiftChild.shopperId` exists, every read respects it
+  and a shopper can give one back, but nothing *assigns* it — matching a
+  shopper's request to waiting children is the next piece.
 - **The child's own form.** `storyText`, `interests` and the four gifts have
   columns and are read everywhere; only an organisation typing them in is
   missing, along with the "let the family fill it in" link.

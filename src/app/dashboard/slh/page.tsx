@@ -6,7 +6,9 @@ import { canPreviewSlh } from '@/lib/features'
 import { SantaMark } from '@/components/slh/SantaMark'
 import { ChildAvatar } from '@/components/slh/ChildAvatar'
 import { StepTrack } from '@/components/slh/StepTrack'
-import { activeProgram, enrolment, myShopper, myWishLists } from '@/lib/slh'
+import { activeProgram, enrolment, myShopper, myWishLists, shopperCapacity } from '@/lib/slh'
+import { ManageLists } from '@/components/slh/ManageLists'
+import { ReleaseList } from '@/components/slh/ReleaseList'
 import { WISH_STEPS, ageOn, daysUntil, doneCount, nextStep } from '@/lib/slh-steps'
 import { describeRequest } from '@/lib/slh-onboarding'
 
@@ -35,9 +37,12 @@ export default async function SlhPage() {
   const shopper = await myShopper()
   if (!shopper) redirect('/dashboard/slh/join')
 
-  const [children, partner] = await Promise.all([
+  const [children, partner, capacity] = await Promise.all([
     myWishLists(),
     enrolment(shopper.organisationId),
+    // Excluding this shopper's own request, so the control measures them
+    // against everyone else rather than against themselves.
+    shopperCapacity(shopper.organisationId, shopper.id),
   ])
 
   const closes = partner?.dropOffClosesAt ?? null
@@ -84,6 +89,13 @@ export default async function SlhPage() {
 
         <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Your wish lists</h1>
 
+        <ManageLists
+          requested={shopper.requested}
+          held={children.length}
+          available={capacity.available}
+          organisation={shopper.organisation.name}
+        />
+
         {children.length === 0 ? (
           <div className="mt-4 rounded-[28px] border border-dashed border-neutral-300 p-8 text-center">
             <p className="font-semibold">Your wish lists are on their way</p>
@@ -98,32 +110,47 @@ export default async function SlhPage() {
               const next = nextStep(child)
               const done = doneCount(child)
               return (
-                <Link
-                  key={child.id}
-                  href={`/dashboard/slh/${child.id}`}
-                  className="flex items-center gap-4 py-4 transition-colors hover:bg-neutral-50"
-                >
-                  <ChildAvatar
-                    gender={child.gender === 'girl' ? 'girl' : 'boy'}
-                    className="h-16 w-16 shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-2xl font-extrabold leading-tight tracking-tight">
-                      {child.firstName}
-                    </p>
-                    <p className="text-sm text-neutral-500">
-                      {child.gender === 'girl' ? 'Girl' : 'Boy'} age {ageOn(child.dateOfBirth)}
-                    </p>
-                    <StepTrack done={done} total={WISH_STEPS.length} className="mt-2.5" />
-                    <p className="mt-1.5 text-xs text-neutral-500">
-                      <span className="font-bold tabular-nums text-neutral-700">
-                        {done}/{WISH_STEPS.length}
-                      </span>
-                      {next ? ` · Next: ${next.title}` : ' · Delivered — thank you'}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
-                </Link>
+                // The row is a div, not a link: "I can't do this one" is a
+                // button, and a button inside a link is neither valid nor
+                // usable with a keyboard.
+                <div key={child.id} className="py-4">
+                  <Link
+                    href={`/dashboard/slh/${child.id}`}
+                    className="-mx-2 flex items-center gap-4 rounded-2xl px-2 py-1 transition-colors hover:bg-neutral-50"
+                  >
+                    <ChildAvatar
+                      gender={child.gender === 'girl' ? 'girl' : 'boy'}
+                      className="h-16 w-16 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-2xl font-extrabold leading-tight tracking-tight">
+                        {child.firstName}
+                      </p>
+                      <p className="text-sm text-neutral-500">
+                        {child.gender === 'girl' ? 'Girl' : 'Boy'} age {ageOn(child.dateOfBirth)}
+                      </p>
+                      <StepTrack done={done} total={WISH_STEPS.length} className="mt-2.5" />
+                      <p className="mt-1.5 text-xs text-neutral-500">
+                        <span className="font-bold tabular-nums text-neutral-700">
+                          {done}/{WISH_STEPS.length}
+                        </span>
+                        {next ? ` · Next: ${next.title}` : ' · Delivered — thank you'}
+                      </p>
+                    </div>
+                    <ChevronRight
+                      className="h-5 w-5 shrink-0 text-neutral-300"
+                      aria-hidden="true"
+                    />
+                  </Link>
+
+                  {/* Not offered once the gifts are in — there is nothing left
+                      to hand to somebody else. */}
+                  {!child.deliveredAt && (
+                    <div className="mt-2 pl-20">
+                      <ReleaseList childId={child.id} name={child.firstName} />
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>

@@ -9,7 +9,14 @@ import {
   stepDone,
   stepField,
 } from './slh-steps'
-import { canSubmit, cleanAge, cleanCount, cleanGender, describeRequest } from './slh-onboarding'
+import {
+  canSubmit,
+  clampRequest,
+  cleanAge,
+  cleanCount,
+  cleanGender,
+  describeRequest,
+} from './slh-onboarding'
 
 describe('wish list steps', () => {
   it('a fresh child has nothing done and starts at the first step', () => {
@@ -114,5 +121,30 @@ describe('onboarding choices', () => {
     expect(describeRequest({ requested: 3, preferredAge: '9-12', preferredGender: 'any' })).toBe(
       '3 wish lists · aged 9–12',
     )
+  })
+})
+
+describe('clampRequest', () => {
+  it('never promises more than is left', () => {
+    expect(clampRequest(3, 5)).toBe(3)
+    expect(clampRequest(9, 5)).toBe(5)
+    expect(clampRequest(1, 0)).toBe(0)
+  })
+
+  it('allows zero — "not shopping this year after all" is a real answer', () => {
+    expect(clampRequest(0, 5)).toBe(0)
+    expect(clampRequest(-4, 5)).toBe(0)
+  })
+
+  it('does not round a realistic number down to one, unlike sign-up', () => {
+    // cleanCount only accepts the offered pills; changing your mind is freer.
+    expect(cleanCount(4)).toBe(1)
+    expect(clampRequest(4, 10)).toBe(4)
+  })
+
+  it('treats junk and a negative ceiling as zero rather than throwing', () => {
+    expect(clampRequest('heaps', 5)).toBe(0)
+    expect(clampRequest(null, 5)).toBe(0)
+    expect(clampRequest(3, -2)).toBe(0)
   })
 })

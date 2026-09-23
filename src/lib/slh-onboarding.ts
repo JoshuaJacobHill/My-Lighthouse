@@ -56,6 +56,23 @@ export function cleanCount(raw: unknown): number {
   return (WISHLIST_COUNTS as readonly number[]).includes(rounded) ? rounded : 1
 }
 
+/**
+ * Clamp an *adjusted* count, once somebody has already signed up.
+ *
+ * Wider than `cleanCount` on purpose. The sign-up screen offers a short list
+ * because a free number invites a figure typed in enthusiasm; changing your
+ * mind afterwards is the opposite situation — somebody is being realistic, and
+ * "I can only manage 4 of the 5" should not round to 1.
+ *
+ * Zero is allowed and means "not shopping this year after all". That is a
+ * legitimate answer and better learned now than in December.
+ */
+export function clampRequest(raw: unknown, max: number): number {
+  const n = Number(String(raw ?? '').trim())
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(Math.round(n), Math.max(0, max)))
+}
+
 export function cleanAge(raw: unknown): AgeBand {
   const v = String(raw ?? '').trim()
   return (AGE_BANDS.find(([value]) => value === v)?.[0] ?? 'any') as AgeBand
