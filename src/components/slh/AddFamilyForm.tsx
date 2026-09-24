@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Plus, X } from 'lucide-react'
 import { addFamilyAction } from '@/lib/actions/slh.actions'
+import { EmailField } from '@/components/EmailField'
 
 /**
  * Nominating a family.
@@ -144,19 +145,15 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
                 placeholder="Mobile number"
               />
             </div>
-            <div>
-              <label className={label} htmlFor="guardianEmail">
-                Email
-              </label>
-              <input
-                id="guardianEmail"
-                inputMode="email"
-                value={guardianEmail}
-                onChange={(e) => setGuardianEmail(e.target.value)}
-                className={`${field} mt-1.5`}
-                placeholder="Email address"
-              />
-            </div>
+            {/* Checked as it is typed. A wrong guardian address means a
+                family silently never hears from us, and nobody finds that out
+                until December. */}
+            <EmailField
+              id="guardianEmail"
+              label="Email"
+              value={guardianEmail}
+              onChange={setGuardianEmail}
+            />
           </div>
 
           <button

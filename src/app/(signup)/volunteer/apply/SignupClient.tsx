@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { emailHint } from '@/lib/email-hint'
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -194,15 +195,38 @@ function Step1({
         />
       </div>
       <div className={known.email ? 'hidden' : undefined}>
+      {/* Checked as it is typed — this becomes the account. A validation
+          error from the form outranks the typing hint. */}
       <Input
         label="Email address *"
         type="email"
         value={data.email}
         onChange={(e) => onChange({ email: e.target.value })}
         placeholder="Email address"
-        error={errors.email}
+        error={
+          errors.email ??
+          (emailHint(data.email).kind === 'invalid'
+            ? (emailHint(data.email) as { message: string }).message
+            : undefined)
+        }
         autoComplete="email"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
       />
+      {(() => {
+        const typed = emailHint(data.email)
+        if (typed.kind !== 'suggestion') return null
+        return (
+          <button
+            type="button"
+            onClick={() => onChange({ email: typed.suggestion })}
+            className="mt-1 block text-left text-xs font-semibold text-orange-600 underline underline-offset-2 hover:text-orange-700"
+          >
+            {typed.message} Tap to use it.
+          </button>
+        )
+      })()}
       </div>
       <div className={known.mobile ? 'hidden' : undefined}>
       <Input

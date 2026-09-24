@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { emailHint } from '@/lib/email-hint'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, AlertCircle, MailCheck, ArrowLeft, UserCheck } from 'lucide-react'
@@ -183,6 +184,8 @@ export function SignupForm() {
   }
 
   // ── Step one: email ──
+  const typed = emailHint(email)
+
   return (
     <div>
       <div className="mb-7">
@@ -194,17 +197,40 @@ export function SignupForm() {
       </div>
 
       <form onSubmit={submitEmail} noValidate className="space-y-5">
+        {/* Checked as it is typed. This address becomes the account — a typo
+            here is not a bounced email, it is somebody locked out of a portal
+            they think they signed up for. */}
         <Input
           label="Email address"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
+          placeholder="Email address"
           required
           autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
           autoFocus
-          hint="Use the email you give or volunteer with, and we’ll bring your history across."
+          // A server error outranks a typing hint: it is about what happened,
+          // not about what is being typed.
+          error={!error && typed.kind === 'invalid' ? typed.message : undefined}
+          hint={
+            typed.kind === 'invalid'
+              ? undefined
+              : 'Use the email you give or volunteer with, and we’ll bring your history across.'
+          }
         />
+
+        {typed.kind === 'suggestion' && (
+          <button
+            type="button"
+            onClick={() => setEmail(typed.suggestion)}
+            className="-mt-2 block text-left text-xs font-semibold text-orange-600 underline underline-offset-2 hover:text-orange-700"
+          >
+            {typed.message} Tap to use it.
+          </button>
+        )}
 
         {error && (
           <div
