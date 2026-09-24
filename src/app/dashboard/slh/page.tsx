@@ -176,7 +176,7 @@ export default async function SlhPage() {
             and the page behind it would refuse them anyway. */}
         {canPreviewSlh(session.user) && (
           <Link
-            href="/dashboard/slh/org"
+            href="/admin/slh/organisations"
             className="mt-8 flex items-center gap-3 rounded-[28px] border border-neutral-200 px-5 py-4 transition-colors hover:bg-neutral-50"
           >
             <span className="min-w-0 flex-1">

@@ -726,3 +726,40 @@ export async function setDeliveryAction(formData: FormData): Promise<Result> {
     return { success: false, error: 'Could not save the drop-off details.' }
   }
 }
+
+/**
+ * The program's own settings: what it is called, and when nominations close.
+ *
+ * `nominationsCloseAt` had no screen at all until now — the button that starts
+ * a program asked nothing, so every organisation's page said "you can nominate
+ * N more children" with no deadline attached. That date is the most useful
+ * field on the row and nothing was setting it.
+ */
+export async function updateProgramAction(formData: FormData): Promise<Result> {
+  if (!(await requireLighthouseAdmin())) return { success: false, error: 'Not allowed.' }
+
+  const program = await activeProgram()
+  if (!program) return { success: false, error: 'No program is running.' }
+
+  const name = String(formData.get('name') ?? '').trim().slice(0, 120)
+  if (!name) return { success: false, error: 'The program needs a name.' }
+
+  const closesRaw = String(formData.get('nominationsCloseAt') ?? '').trim()
+  const nominationsCloseAt = closesRaw ? asDateOnly(closesRaw) : null
+  if (closesRaw && !nominationsCloseAt) {
+    return { success: false, error: 'That closing date could not be read.' }
+  }
+
+  try {
+    await prisma.giftProgram.update({
+      where: { id: program.id },
+      data: { name, nominationsCloseAt },
+    })
+    revalidatePath('/admin/slh')
+    revalidatePath('/admin/slh/organisations')
+    return { success: true }
+  } catch (err) {
+    console.error('updateProgramAction failed', err)
+    return { success: false, error: 'Could not save the program.' }
+  }
+}

@@ -36,11 +36,11 @@ export default async function AdminSlhPage() {
 
   const cards = [
     {
-      href: '/dashboard/slh/org',
+      href: '/admin/slh/organisations',
       icon: Building2,
       title: 'Referring organisations',
       line: `${orgs.length} approved`,
-      note: 'Approve organisations and set their allocations',
+      note: 'Approve organisations, set allocations and drop-off windows',
     },
     {
       href: '/admin/slh/shoppers',
