@@ -16,6 +16,7 @@ wrap four gifts each, and deliver them back to the organisation.
 | `/dashboard/slh/org` | Lighthouse | Who is approved to refer, their allocation, and who can be added |
 | `/dashboard/slh/org/[id]` | The organisation | Allocation, families, who is outstanding |
 | `/dashboard/slh/org/[id]/family` | The organisation | Nominating a family: guardian, consent, their children |
+| `/dashboard/slh/org/[id]/child/[childId]` | The organisation | The wish list itself: interests, colour, sizes, four gifts, their own words |
 
 Plus a card on `/dashboard`. Everything is behind `canPreviewSlh()`, which asks
 for **SUPER_ADMIN** — a role rather than a capability, deliberately. A
@@ -92,6 +93,40 @@ is a sibling. A child with no family is expected — residential and kinship car
 families. "The organisation said it was fine" is not the same as recording when,
 and who said so.
 
+**A size needs a band.** "Size 4" is a different child in toddler than in
+youth, and a shopper is standing in a shop holding a phone. `clothesBand` and
+`shoesBand` carry Infant / Toddler / Kids / Youth / Adult; the number is
+whatever the family writes. `sizeLabel()` joins them and returns null when
+neither was answered, so a page leaves the chip out rather than printing an
+empty one.
+
+**Interests are chips plus a box.** The preset list will never keep up with
+what children are actually into, so anything can be typed in. `cleanInterests()`
+dedupes case-insensitively and lets the preset spelling win — a parent typing
+"lego" should not end up sitting next to the "LEGO" chip.
+
+**Editing a story un-approves it.** An approved story that is then rewritten
+has not been read in its new form. Only Lighthouse can approve
+(`setStoryApprovedAction`); the organisation that collected the words is the
+first pair of eyes, not the second.
+
+**A drop-off window is not an opening pattern.** An organisation taking gifts
+"1–12 December" is shut both weekends. `dropOffDays` holds the specific days
+inside the window; empty means every day. A shopper who drives over on the
+Saturday with four wrapped presents has been told something untrue.
+
+**The organisation's address and its drop-off address are different fields.**
+`Organisation.address` is where they are; `GiftProgramPartner.dropOffAddress`
+is where gifts go, and it only exists for an enrolled organisation — a
+corporate partner has no drop-off at all. That is why the drop-off panel
+appears on the program page and not on the partner profile.
+
+**Onboarding must not refresh on success.** `/dashboard/slh/join` redirects to
+`/dashboard/slh` the moment a sign-up exists, so calling `router.refresh()`
+after saving re-runs that guard and throws the person off the confirmation
+screen before they can read it. This was a live bug; the comment in
+`JoinFlow.tsx` says so, so nobody adds it back.
+
 **Capacity is measured against the allocation, not against nominated children.**
 Shoppers sign up in October and organisations nominate through November, so
 counting real children would tell an early shopper an organisation has nothing
@@ -155,9 +190,9 @@ survive a refresh as a row nobody meant to create. Snow is decorative, behind
 - **Handing lists out.** `GiftChild.shopperId` exists, every read respects it
   and a shopper can give one back, but nothing *assigns* it — matching a
   shopper's request to waiting children is the next piece.
-- **The child's own form.** `storyText`, `interests` and the four gifts have
-  columns and are read everywhere; only an organisation typing them in is
-  missing, along with the "let the family fill it in" link.
+- **The family's own link.** The organisation can now fill a wish list in at
+  `/dashboard/slh/org/[id]/child/[childId]`, but "send the family a link to do
+  it themselves" is not built.
 - **Reminder emails.** `FamilyList` shows the confirm-before-send dialog and
   does not send. Wiring it needs an email template — see `docs/features/ADMIN.md`.
 - **Gift tags and scanning at drop-off.** The `labels` and `delivered` steps are

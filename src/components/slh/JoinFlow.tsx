@@ -166,9 +166,12 @@ export function JoinFlow({ orgs, year }: { orgs: JoinOrg[]; year: number }) {
       fd.set('acknowledged', String(ack))
       const result = await joinAsShopperAction(fd)
       if (result.success) {
+        // Deliberately NOT router.refresh(). This route redirects to
+        // /dashboard/slh the moment a sign-up exists, so refreshing here
+        // re-runs that guard and throws the person off the confirmation
+        // screen before they can read it. The push below fetches fresh data
+        // anyway, when they choose to leave.
         setStep('done')
-        // So the dashboard and wish-list pages see the new sign-up.
-        router.refresh()
       } else {
         setError(result.error ?? 'Could not save your sign-up.')
       }
@@ -262,13 +265,17 @@ export function JoinFlow({ orgs, year }: { orgs: JoinOrg[]; year: number }) {
                   <span
                     className={`mt-1 block text-[13px] ${on ? 'text-neutral-500' : 'text-white/70'}`}
                   >
+                    {/* Always the allocation still going spare — never the
+                        number of wish lists parents have got around to
+                        filling in. An organisation allocated 100 with 12
+                        filled has 88 children a shopper can still take on,
+                        and saying "12" would turn people away from work that
+                        exists. */}
                     {!o.open
                       ? 'Not open for shoppers yet'
                       : o.available === 0
                         ? 'Every wish list has been taken'
-                        : o.waiting > 0
-                          ? `${o.waiting} ${o.waiting === 1 ? 'child' : 'children'} waiting`
-                          : `${o.available} wish ${o.available === 1 ? 'list' : 'lists'} to fill`}
+                        : `${o.available} ${o.available === 1 ? 'child' : 'children'} still need a shopper`}
                   </span>
                   {o.window && (
                     <span

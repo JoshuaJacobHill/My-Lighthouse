@@ -1039,6 +1039,14 @@ model GiftProgramPartner {
   dropOffOpensAt  DateTime?
   dropOffClosesAt DateTime?
 
+  /// The specific days inside that window they are open, as `YYYY-MM-DD`.
+  ///
+  /// Empty means every day between the two dates. Stored because a window is
+  /// not the same as an opening pattern: a school taking gifts "1–12 December"
+  /// is shut both weekends, and a shopper who drives there on the Saturday
+  /// with four wrapped presents has been told something untrue.
+  dropOffDays String[]
+
   /// Who at Lighthouse approved them, and when.
   approvedById String?
   approvedAt   DateTime @default(now())
@@ -1163,10 +1171,21 @@ model GiftChild {
   /// "girl" | "boy" — what the avatar and the shopper's preference match on.
   gender      String
 
+  /// Sizes, in two parts: the band and the number within it.
+  ///
+  /// "Size 4" means nothing on its own — a size 4 toddler and a size 4 youth
+  /// shoe are different children. The band is what makes the number usable by
+  /// somebody standing in a shop. See `SIZE_BANDS` in `slh-wishlist.ts`.
+  clothesBand String?
   clothesSize String?
+  shoesBand   String?
   shoesSize   String?
+
+  /// Their favourite colour. Small, and the thing shoppers most often say made
+  /// the difference — it turns "a t-shirt" into a present picked for someone.
+  favouriteColour String?
   /// Chips, not prose: "Spider-Man" buys a better present than "superheroes".
-  interests   String[]
+  interests       String[]
 
   /// The child's own words, and whether somebody here has read them.
   ///
@@ -1217,6 +1236,12 @@ model Organisation {
   logoUrl String?
   website String?
   about   String? @db.Text
+
+  /// Where the organisation actually is. One line, the way somebody would
+  /// write it on a parcel — the gift drop-off address is separate and lives on
+  /// the program link, because a referrer may take gifts somewhere else
+  /// entirely and a corporate partner has no drop-off at all.
+  address String?
 
   /// Who we deal with. NOT shown publicly — a public page naming a person and
   /// their direct line is a page that invites unsolicited contact.

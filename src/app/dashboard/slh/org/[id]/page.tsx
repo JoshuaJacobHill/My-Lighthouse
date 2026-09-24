@@ -13,7 +13,18 @@ import {
   slhOrg,
 } from '@/lib/slh'
 import { FamilyList, type FamilyRow } from '@/components/slh/FamilyList'
+import { DeliveryDetails } from '@/components/slh/DeliveryDetails'
 import { ageOn } from '@/lib/slh-steps'
+
+/**
+ * A `@db.Date` back to the `YYYY-MM-DD` a date input wants.
+ *
+ * Read in UTC, because that is how Prisma stores a date-only column — reading
+ * it in Brisbane would hand back the previous day.
+ */
+function isoDay(value: Date | null): string {
+  return value ? value.toISOString().slice(0, 10) : ''
+}
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Santa’s Little Helpers', robots: { index: false } }
@@ -131,12 +142,6 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
           </p>
         </div>
 
-        {enrolled.dropOffAddress && (
-          <p className="mt-3 text-sm text-neutral-500">
-            Gifts come to <b className="text-neutral-900">{enrolled.dropOffAddress}</b>.
-          </p>
-        )}
-
         <Link
           href={`/dashboard/slh/org/${org.id}/family`}
           className="mt-4 block rounded-full bg-[#c8102e] py-3.5 text-center text-base font-bold text-white hover:bg-[#9d0b23]"
@@ -145,7 +150,7 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
         </Link>
 
         <div className="mt-8">
-          <FamilyList families={families} />
+          <FamilyList families={families} organisationId={org.id} />
         </div>
 
         {loose.length > 0 && (
@@ -156,17 +161,29 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {loose.map((child) => (
-                <span
+                <Link
                   key={child.id}
-                  className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-[13px] font-semibold"
+                  href={`/dashboard/slh/org/${org.id}/child/${child.id}`}
+                  className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-[13px] font-semibold transition-colors hover:border-neutral-900"
                 >
                   {child.firstName}{' '}
                   <span className="font-normal text-neutral-400">{ageOn(child.dateOfBirth)}</span>
-                </span>
+                </Link>
               ))}
             </div>
           </>
         )}
+
+        {/* Only exists for an enrolled organisation — a corporate partner has
+            no drop-off, which is why this lives on the program link and not on
+            the partner profile. */}
+        <DeliveryDetails
+          organisationId={org.id}
+          address={enrolled.dropOffAddress ?? ''}
+          opensAt={isoDay(enrolled.dropOffOpensAt)}
+          closesAt={isoDay(enrolled.dropOffClosesAt)}
+          days={enrolled.dropOffDays}
+        />
 
         <div className="mt-8 divide-y divide-neutral-100 overflow-hidden rounded-[28px] border border-neutral-200">
           <Link

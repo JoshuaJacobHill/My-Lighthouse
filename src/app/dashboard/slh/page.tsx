@@ -48,6 +48,15 @@ export default async function SlhPage() {
   const closes = partner?.dropOffClosesAt ?? null
   const days = closes ? daysUntil(closes) : null
 
+  const openDays = (partner?.dropOffDays ?? []).map((iso) =>
+    new Date(`${iso}T00:00:00.000Z`).toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    }),
+  )
+
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
       <div className="mx-auto max-w-2xl px-5 py-8 sm:px-8">
@@ -86,6 +95,14 @@ export default async function SlhPage() {
           {shopper.organisation.name}
           {partner?.dropOffAddress ? ` · ${partner.dropOffAddress}` : ''}
         </p>
+        {/* The days, not just the range. An organisation open "1–12 December"
+            is shut both weekends, and a shopper who drives over on the Saturday
+            with four wrapped presents has been told something untrue. */}
+        {openDays.length > 0 && (
+          <p className="mt-1 text-sm text-neutral-500">
+            Open <b className="text-neutral-900">{openDays.join(', ')}</b>
+          </p>
+        )}
 
         <h1 className="mt-7 text-3xl font-extrabold tracking-tight">Your wish lists</h1>
 
@@ -156,18 +173,23 @@ export default async function SlhPage() {
           </div>
         )}
 
-        <Link
-          href="/dashboard/slh/org"
-          className="mt-8 flex items-center gap-3 rounded-[28px] border border-neutral-200 px-5 py-4 transition-colors hover:bg-neutral-50"
-        >
-          <span className="min-w-0 flex-1">
-            <span className="block font-bold">Referring organisations</span>
-            <span className="block text-[13px] text-neutral-400">
-              The other side: families, allocations and reminders
+        {/* Lighthouse's own door, not a shopper's. Somebody who signed up to
+            buy presents has no business being offered the allocations screen,
+            and the page behind it would refuse them anyway. */}
+        {canPreviewSlh(session.user) && (
+          <Link
+            href="/dashboard/slh/org"
+            className="mt-8 flex items-center gap-3 rounded-[28px] border border-neutral-200 px-5 py-4 transition-colors hover:bg-neutral-50"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold">Referring organisations</span>
+              <span className="block text-[13px] text-neutral-400">
+                The other side: families, allocations and reminders
+              </span>
             </span>
-          </span>
-          <ChevronRight className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
-        </Link>
+            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
+          </Link>
+        )}
       </div>
     </div>
   )

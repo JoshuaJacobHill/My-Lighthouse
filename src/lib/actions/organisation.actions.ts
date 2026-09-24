@@ -407,6 +407,7 @@ export async function updateOrgAction(
     name?: string
     website?: string
     about?: string
+    address?: string
     logoUrl?: string
     contactName?: string
     contactEmail?: string
@@ -425,6 +426,7 @@ export async function updateOrgAction(
       ...(name ? { name, slug: await uniqueSlug(name, id) } : {}),
       ...(input.website !== undefined ? { website: input.website.trim() || null } : {}),
       ...(input.about !== undefined ? { about: input.about.trim() || null } : {}),
+      ...(input.address !== undefined ? { address: input.address.trim() || null } : {}),
       ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl.trim() || null } : {}),
       ...(input.contactName !== undefined ? { contactName: input.contactName.trim() || null } : {}),
       ...(input.contactEmail !== undefined

@@ -32,6 +32,7 @@ type Org = {
   slug: string
   website: string | null
   about: string | null
+  address: string | null
   logoUrl: string | null
   contactName: string | null
   contactEmail: string | null
@@ -127,6 +128,7 @@ export function PartnerControls({
   const [website, setWebsite] = React.useState(org.website ?? '')
   const [logoUrl, setLogoUrl] = React.useState(org.logoUrl ?? '')
   const [about, setAbout] = React.useState(org.about ?? '')
+  const [address, setAddress] = React.useState(org.address ?? '')
   const [contactName, setContactName] = React.useState(org.contactName ?? '')
   const [contactEmail, setContactEmail] = React.useState(org.contactEmail ?? '')
 
@@ -230,6 +232,19 @@ export function PartnerControls({
               className="w-full rounded-2xl border border-neutral-300 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </label>
+          <label className="text-sm sm:col-span-2">
+            <span className="mb-1 block font-medium text-neutral-700">Address</span>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="13–15 Monte-Khoury Drive, Loganholme QLD 4129"
+              className={input}
+            />
+            <span className="mt-1 block text-xs text-neutral-400">
+              Where they are. Gift drop-off is set separately below, since it is often somewhere
+              else.
+            </span>
+          </label>
         </div>
 
         <p className="mt-5 text-xs font-bold uppercase tracking-wide text-neutral-400">
@@ -255,7 +270,15 @@ export function PartnerControls({
           disabled={pending}
           onClick={() =>
             run(() =>
-              updateOrgAction(org.id, { name, website, about, logoUrl, contactName, contactEmail }),
+              updateOrgAction(org.id, {
+                name,
+                website,
+                about,
+                address,
+                logoUrl,
+                contactName,
+                contactEmail,
+              }),
             )
           }
           className="mt-4 inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"

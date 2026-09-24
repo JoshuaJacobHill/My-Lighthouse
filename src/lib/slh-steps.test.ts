@@ -17,6 +17,7 @@ import {
   cleanGender,
   describeRequest,
 } from './slh-onboarding'
+import { cleanBand, cleanInterests, sizeLabel, wishListReady } from './slh-wishlist'
 
 describe('wish list steps', () => {
   it('a fresh child has nothing done and starts at the first step', () => {
@@ -146,5 +147,43 @@ describe('clampRequest', () => {
     expect(clampRequest('heaps', 5)).toBe(0)
     expect(clampRequest(null, 5)).toBe(0)
     expect(clampRequest(3, -2)).toBe(0)
+  })
+})
+
+describe('wish list questions', () => {
+  it('reads a size as a shopper would, and omits what nobody answered', () => {
+    expect(sizeLabel('kids', 'Size 7')).toBe('Kids · Size 7')
+    expect(sizeLabel('youth', null)).toBe('Youth')
+    expect(sizeLabel(null, 'Size 12')).toBe('Size 12')
+    expect(sizeLabel(null, null)).toBeNull()
+    expect(sizeLabel(null, '   ')).toBeNull()
+  })
+
+  it('only accepts bands it offers', () => {
+    expect(cleanBand('toddler')).toBe('toddler')
+    expect(cleanBand('mens')).toBeNull()
+    expect(cleanBand(null)).toBeNull()
+  })
+
+  it('dedupes interests case-insensitively, preferring the preset spelling', () => {
+    // A parent typing "lego" should not sit beside the "LEGO" chip.
+    expect(cleanInterests(['LEGO', 'lego', 'Lego'])).toEqual(['LEGO'])
+    expect(cleanInterests(['lego'])).toEqual(['LEGO'])
+    expect(cleanInterests(['  Horses  ', 'BMX'])).toEqual(['Horses', 'BMX'])
+  })
+
+  it('keeps genuinely new interests as typed, and drops the junk', () => {
+    expect(cleanInterests(['Warhammer', '', '   ', null, 'Sport'])).toEqual(['Warhammer', 'Sport'])
+  })
+
+  it('caps how many interests one child can carry', () => {
+    const many = Array.from({ length: 50 }, (_, i) => `Thing ${i}`)
+    expect(cleanInterests(many).length).toBe(20)
+  })
+
+  it('counts a list ready only when all four gifts are filled in', () => {
+    expect(wishListReady({ wishWant: 'a', wishNeed: 'b', wishWear: 'c', wishRead: 'd' })).toBe(true)
+    expect(wishListReady({ wishWant: 'a', wishNeed: 'b', wishWear: 'c' })).toBe(false)
+    expect(wishListReady({})).toBe(false)
   })
 })

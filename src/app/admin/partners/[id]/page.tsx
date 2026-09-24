@@ -98,6 +98,7 @@ export default async function AdminPartnerPage({ params }: { params: Promise<{ i
           id: org.id,
           name: org.name,
           slug: org.slug,
+          address: org.address,
           website: org.website,
           about: org.about,
           logoUrl: org.logoUrl,

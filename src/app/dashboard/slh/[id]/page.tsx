@@ -6,7 +6,8 @@ import { canPreviewSlh } from '@/lib/features'
 import { ChildAvatar } from '@/components/slh/ChildAvatar'
 import { StepList } from '@/components/slh/StepList'
 import { myShopper, wishListForViewer } from '@/lib/slh'
-import { WISH_KINDS, ageOn, doneSteps } from '@/lib/slh-steps'
+import { ageOn, doneSteps } from '@/lib/slh-steps'
+import { WISH_KINDS, sizeLabel } from '@/lib/slh-wishlist'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Wish list', robots: { index: false } }
@@ -34,6 +35,9 @@ export default async function WishListPage({ params }: { params: Promise<{ id: s
   const shopper = await myShopper()
   const mine = Boolean(shopper && child.shopperId === shopper.id)
 
+  const clothes = sizeLabel(child.clothesBand, child.clothesSize)
+  const shoes = sizeLabel(child.shoesBand, child.shoesSize)
+
   const gifts: Record<string, string | null> = {
     want: child.wishWant,
     need: child.wishNeed,
@@ -60,6 +64,7 @@ export default async function WishListPage({ params }: { params: Promise<{ id: s
             <h1 className="text-3xl font-extrabold tracking-tight">{child.firstName}</h1>
             <p className="text-sm text-neutral-500">
               {child.gender === 'girl' ? 'Girl' : 'Boy'} age {ageOn(child.dateOfBirth)}
+              {child.favouriteColour ? ` · ${child.favouriteColour} is their favourite` : ''}
             </p>
           </div>
         </div>
@@ -89,16 +94,18 @@ export default async function WishListPage({ params }: { params: Promise<{ id: s
           </figure>
         )}
 
-        {(child.clothesSize || child.shoesSize) && (
+        {/* The band carries the meaning: "Size 4" is a different child in
+            toddler than in youth, and a shopper is standing in a shop. */}
+        {(clothes || shoes) && (
           <div className="mt-5 flex flex-wrap gap-2">
-            {child.clothesSize && (
+            {clothes && (
               <span className="rounded-xl bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-500">
-                Clothes <b className="font-bold text-neutral-900">{child.clothesSize}</b>
+                Clothes <b className="font-bold text-neutral-900">{clothes}</b>
               </span>
             )}
-            {child.shoesSize && (
+            {shoes && (
               <span className="rounded-xl bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-500">
-                Shoes <b className="font-bold text-neutral-900">{child.shoesSize}</b>
+                Shoes <b className="font-bold text-neutral-900">{shoes}</b>
               </span>
             )}
           </div>

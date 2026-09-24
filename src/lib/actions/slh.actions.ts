@@ -7,6 +7,7 @@ import { canPreviewSlh } from '@/lib/features'
 import { activeProgram, canOpenSlhOrg, shopperCapacity } from '@/lib/slh'
 import { canSubmit, clampRequest, cleanAge, cleanCount, cleanGender } from '@/lib/slh-onboarding'
 import { WISH_STEPS, stepField, type WishStepKey } from '@/lib/slh-steps'
+import { cleanBand, cleanInterests } from '@/lib/slh-wishlist'
 
 /**
  * Approving a referring organisation.
@@ -515,5 +516,168 @@ export async function releaseWishListAction(formData: FormData): Promise<Result>
   } catch (err) {
     console.error('releaseWishListAction failed', err)
     return { success: false, error: 'Could not give that list back.' }
+  }
+}
+
+/**
+ * Fill in (or correct) a child's wish list.
+ *
+ * The organisation's job, not the shopper's. Guarded by `canOpenSlhOrg` and
+ * then checked again against the child's own organisation — an admin of one
+ * referrer must not be able to edit another's child by guessing an id.
+ *
+ * The story is deliberately **not** approvable here. An organisation writing a
+ * child's words down is not the same as Lighthouse having read them, and
+ * editing the text un-approves it again: an approved story that is then
+ * rewritten has not been read in its new form.
+ */
+export async function saveWishListAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const organisationId = String(formData.get('organisationId') ?? '')
+  if (!(await canOpenSlhOrg(organisationId))) return { success: false, error: 'Not allowed.' }
+
+  const childId = String(formData.get('childId') ?? '')
+  const child = await prisma.giftChild.findFirst({
+    where: { id: childId, organisationId },
+    select: { id: true, storyText: true },
+  })
+  if (!child) return { success: false, error: 'No such child here.' }
+
+  let interests: string[] = []
+  try {
+    interests = cleanInterests(JSON.parse(String(formData.get('interests') ?? '[]')))
+  } catch {
+    return { success: false, error: 'Could not read the interests.' }
+  }
+
+  const text = (raw: FormDataEntryValue | null, max = 200) =>
+    String(raw ?? '').trim().slice(0, max) || null
+
+  const storyText = text(formData.get('storyText'), 1200)
+  const storyChanged = (storyText ?? '') !== (child.storyText ?? '')
+
+  try {
+    await prisma.giftChild.update({
+      where: { id: child.id },
+      data: {
+        favouriteColour: text(formData.get('favouriteColour'), 40),
+        clothesBand: cleanBand(formData.get('clothesBand')),
+        clothesSize: text(formData.get('clothesSize'), 40),
+        shoesBand: cleanBand(formData.get('shoesBand')),
+        shoesSize: text(formData.get('shoesSize'), 40),
+        interests,
+        wishWant: text(formData.get('wishWant')),
+        wishNeed: text(formData.get('wishNeed')),
+        wishWear: text(formData.get('wishWear')),
+        wishRead: text(formData.get('wishRead')),
+        storyText,
+        // Rewritten words have not been read in their new form.
+        ...(storyChanged ? { storyApproved: false } : {}),
+      },
+    })
+    revalidatePath(`/dashboard/slh/org/${organisationId}`)
+    revalidatePath(`/dashboard/slh/org/${organisationId}/child/${child.id}`)
+    return { success: true }
+  } catch (err) {
+    console.error('saveWishListAction failed', err)
+    return { success: false, error: 'Could not save that wish list.' }
+  }
+}
+
+/**
+ * Approve a child's story for shoppers to read.
+ *
+ * Lighthouse only. A child writing freely may say something identifying or
+ * distressing, and the organisation that collected it is not a second pair of
+ * eyes — it is the first pair.
+ */
+export async function setStoryApprovedAction(formData: FormData): Promise<Result> {
+  if (!(await requireLighthouseAdmin())) return { success: false, error: 'Not allowed.' }
+
+  const childId = String(formData.get('childId') ?? '')
+  const approved = String(formData.get('approved') ?? '') === 'true'
+
+  try {
+    const child = await prisma.giftChild.update({
+      where: { id: childId },
+      data: { storyApproved: approved },
+      select: { organisationId: true },
+    })
+    revalidatePath(`/dashboard/slh/org/${child.organisationId}/child/${childId}`)
+    return { success: true }
+  } catch (err) {
+    console.error('setStoryApprovedAction failed', err)
+    return { success: false, error: 'Could not change that.' }
+  }
+}
+
+/**
+ * Where and when gifts are dropped off.
+ *
+ * Set by the organisation itself — they are the ones who know which days they
+ * have somebody on the desk — and by Lighthouse. Both reach it through
+ * `canOpenSlhOrg`.
+ *
+ * Lives on the enrolment rather than the organisation because a corporate
+ * partner has no drop-off at all, and because a referrer often takes gifts
+ * somewhere that is not their office.
+ */
+export async function setDeliveryAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const organisationId = String(formData.get('organisationId') ?? '')
+  if (!(await canOpenSlhOrg(organisationId))) return { success: false, error: 'Not allowed.' }
+
+  const program = await activeProgram()
+  if (!program) return { success: false, error: 'No program is running.' }
+
+  const opensAt = asDateOnly(String(formData.get('opensAt') ?? '').trim())
+  const closesAt = asDateOnly(String(formData.get('closesAt') ?? '').trim())
+
+  if (opensAt && closesAt && closesAt < opensAt) {
+    return { success: false, error: 'The last day cannot be before the first.' }
+  }
+
+  let days: string[] = []
+  try {
+    const raw = JSON.parse(String(formData.get('days') ?? '[]'))
+    if (Array.isArray(raw)) {
+      // Only days that are actually inside the window, so a window someone
+      // shortened cannot leave a stray day advertised outside it.
+      days = [...new Set(raw.map((d) => String(d)))]
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+        .filter((d) => {
+          const at = asDateOnly(d)
+          if (!at) return false
+          if (opensAt && at < opensAt) return false
+          if (closesAt && at > closesAt) return false
+          return true
+        })
+        .sort()
+    }
+  } catch {
+    return { success: false, error: 'Could not read the drop-off days.' }
+  }
+
+  try {
+    await prisma.giftProgramPartner.update({
+      where: { programId_organisationId: { programId: program.id, organisationId } },
+      data: {
+        dropOffAddress: String(formData.get('address') ?? '').trim() || null,
+        dropOffOpensAt: opensAt,
+        dropOffClosesAt: closesAt,
+        dropOffDays: days,
+      },
+    })
+    revalidatePath(`/dashboard/slh/org/${organisationId}`)
+    revalidatePath('/dashboard/slh')
+    revalidatePath('/dashboard/slh/join')
+    return { success: true }
+  } catch (err) {
+    console.error('setDeliveryAction failed', err)
+    return { success: false, error: 'Could not save the drop-off details.' }
   }
 }

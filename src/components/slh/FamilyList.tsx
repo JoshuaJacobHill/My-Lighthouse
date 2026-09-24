@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import { Check, X } from 'lucide-react'
 
 export type FamilyRow = {
@@ -23,7 +24,13 @@ export type FamilyRow = {
  * The send is a no-op here. There is no program schema yet, so this shows the
  * shape of the interaction rather than performing it, and says so.
  */
-export function FamilyList({ families }: { families: FamilyRow[] }) {
+export function FamilyList({
+  families,
+  organisationId,
+}: {
+  families: FamilyRow[]
+  organisationId: string
+}) {
   const [picking, setPicking] = React.useState(false)
   const [picked, setPicked] = React.useState<string[]>([])
   const [confirming, setConfirming] = React.useState(false)
@@ -108,9 +115,13 @@ export function FamilyList({ families }: { families: FamilyRow[] }) {
 
             <div className="mt-2.5 flex flex-wrap gap-2">
               {family.children.map((child) => (
-                <span
+                // The chip is the way in to the wish list. A dashed one is a
+                // list nobody has filled in — which is exactly the one somebody
+                // needs to open.
+                <Link
                   key={child.id}
-                  className={`inline-flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold ${
+                  href={`/dashboard/slh/org/${organisationId}/child/${child.id}`}
+                  className={`inline-flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3.5 text-[13px] font-semibold transition-colors hover:border-neutral-900 ${
                     child.complete
                       ? 'border-neutral-200'
                       : 'border-dashed border-neutral-300 text-neutral-500'
@@ -124,7 +135,7 @@ export function FamilyList({ families }: { families: FamilyRow[] }) {
                     <Check className="h-2.5 w-2.5" aria-hidden="true" />
                   </span>
                   {child.name} <span className="font-normal text-neutral-400">{child.age}</span>
-                </span>
+                </Link>
               ))}
             </div>
           </div>
