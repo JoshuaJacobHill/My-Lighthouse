@@ -6,7 +6,7 @@ import { canPreviewSlh } from '@/lib/features'
 import { SantaMark } from '@/components/slh/SantaMark'
 import { ChildAvatar } from '@/components/slh/ChildAvatar'
 import { StepTrack } from '@/components/slh/StepTrack'
-import { activeProgram, enrolment, myShopper, myWishLists, shopperCapacity } from '@/lib/slh'
+import { activeProgram, canShopSlh, enrolment, myShopper, myWishLists, shopperCapacity } from '@/lib/slh'
 import { ManageLists } from '@/components/slh/ManageLists'
 import { ReleaseList } from '@/components/slh/ReleaseList'
 import { WISH_STEPS, ageOn, daysUntil, doneCount, nextStep } from '@/lib/slh-steps'
@@ -29,7 +29,9 @@ export const metadata = { title: 'Santa’s Little Helpers', robots: { index: fa
 export default async function SlhPage() {
   const session = await getSession()
   if (!session) redirect('/login')
-  if (!canPreviewSlh(session.user)) notFound()
+  // Lighthouse, or somebody who administers an approved referring
+  // organisation. The shopper flow opens to everybody when the program does.
+  if (!(await canShopSlh())) notFound()
 
   const program = await activeProgram()
   if (!program) notFound()

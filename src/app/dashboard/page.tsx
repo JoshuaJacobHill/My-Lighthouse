@@ -6,7 +6,7 @@ import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { canPreviewSlh, isDonorPortalEnabled } from '@/lib/features'
 import { SantaMark } from '@/components/slh/SantaMark'
-import { slhDashboardCard } from '@/lib/slh'
+import { canShopSlh, myProgramOrgCards, slhDashboardCard } from '@/lib/slh'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
 import { commentsForStories } from '@/lib/story-comments'
@@ -212,8 +212,15 @@ export default async function DonorHomePage() {
   const viewer = viewerFromSession(session)
   const commentsByStory = await commentsForStories(stories.map((s) => s.id), viewer)
 
-  // Only asked for by the handful of people who can see the card at all.
-  const slh = canPreviewSlh(session.user) ? await slhDashboardCard() : null
+  // Two different relationships to the same program, and somebody can have
+  // both: administering 5 Fold does not stop you shopping for a child, and
+  // neither card should hide the other. This is the whole "one account per
+  // person" idea in miniature — see PURPOSE.md.
+  const inProgram = await canShopSlh()
+  const [slh, programOrgs] = await Promise.all([
+    inProgram ? slhDashboardCard() : null,
+    myProgramOrgCards(),
+  ])
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">
@@ -245,7 +252,76 @@ export default async function DonorHomePage() {
         {/* Santa's Little Helpers — a preview, on sample data, for super admins
             only. It sits here because it is one thing a supporter does, not a
             place they live; the nav stays untouched. */}
-        {canPreviewSlh(session.user) && (
+        {/* The organisation's side. Shown to whoever administers an approved
+            referring organisation, above their personal card, because the
+            children waiting on them are other people's business as well as
+            their own. */}
+        {programOrgs.map((org) => {
+          const pct =
+            org.allocation > 0 ? Math.round((org.nominated / org.allocation) * 100) : 0
+          return (
+            <section key={org.id} className="mb-5">
+              <Link
+                href={`/dashboard/slh/org/${org.id}`}
+                className="block rounded-[28px] border border-neutral-200 p-5 transition-colors hover:bg-neutral-50"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-neutral-100 text-sm font-extrabold text-neutral-500">
+                    {org.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={org.logoUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      org.name.slice(0, 2).toUpperCase()
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#c8102e]">
+                      Santa&rsquo;s Little Helpers
+                    </span>
+                    <span className="block text-lg font-extrabold tracking-tight">{org.name}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                </span>
+
+                {org.allocation > 0 && (
+                  <>
+                    <span className="mt-4 block h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                      <span
+                        className="block h-full rounded-full bg-[#c8102e]"
+                        style={{ width: `${Math.max(2, pct)}%` }}
+                      />
+                    </span>
+                    <span className="mt-2 block text-[13px] text-neutral-500">
+                      <b className="tabular-nums text-neutral-900">
+                        {org.nominated} of {org.allocation}
+                      </b>{' '}
+                      children nominated
+                      {org.unfilled > 0 ? (
+                        <>
+                          {' · '}
+                          <b className="text-[#c8102e]">
+                            {org.unfilled} wish {org.unfilled === 1 ? 'list' : 'lists'} to fill in
+                          </b>
+                        </>
+                      ) : org.nominated > 0 ? (
+                        ' · every wish list filled in'
+                      ) : (
+                        ''
+                      )}
+                    </span>
+                  </>
+                )}
+                {org.allocation === 0 && (
+                  <span className="mt-3 block text-[13px] text-neutral-500">
+                    Approved to refer children. Lighthouse will confirm how many.
+                  </span>
+                )}
+              </Link>
+            </section>
+          )
+        })}
+
+        {inProgram && (
           <section className="mb-14">
             <Link
               href="/dashboard/slh"

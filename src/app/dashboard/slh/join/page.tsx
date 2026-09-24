@@ -1,8 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
-import { canPreviewSlh } from '@/lib/features'
 import { formatDate } from '@/lib/utils'
-import { activeProgram, myShopper, orgsOpenToShoppers } from '@/lib/slh'
+import { activeProgram, canShopSlh, myShopper, orgsOpenToShoppers } from '@/lib/slh'
 import { JoinFlow, type JoinOrg } from '@/components/slh/JoinFlow'
 
 export const dynamic = 'force-dynamic'
@@ -37,7 +36,9 @@ function windowLabel(opens: Date | null, closes: Date | null): string | null {
 export default async function SlhJoinPage() {
   const session = await getSession()
   if (!session) redirect('/login')
-  if (!canPreviewSlh(session.user)) notFound()
+  // Lighthouse, or somebody who administers an approved referring
+  // organisation. The shopper flow opens to everybody when the program does.
+  if (!(await canShopSlh())) notFound()
 
   const program = await activeProgram()
   if (!program) notFound()

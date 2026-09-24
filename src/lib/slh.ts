@@ -22,6 +22,7 @@ import { getSession } from '@/lib/auth'
 import { canAdminOrg } from '@/lib/organisations'
 import { canPreviewSlh } from '@/lib/features'
 import { WISH_STEPS, doneCount } from '@/lib/slh-steps'
+import { wishListReady } from '@/lib/slh-wishlist'
 
 export type SlhOrgSummary = {
   id: string
@@ -416,4 +417,101 @@ export async function shopperCapacity(
     // differently, because "come back later" and "all taken" are not the same.
     open: allocation > 0,
   }
+}
+
+/* ── Who is in the program ─────────────────────────────────────────────────── */
+
+/** The enrolled organisations this person administers. Usually none, or one. */
+export async function myProgramOrgIds(): Promise<string[]> {
+  const session = await getSession()
+  if (!session) return []
+
+  const program = await activeProgram()
+  if (!program) return []
+
+  const rows = await prisma.giftProgramPartner.findMany({
+    where: {
+      programId: program.id,
+      organisation: {
+        members: { some: { userId: session.userId, status: 'ACTIVE', role: 'ADMIN' } },
+      },
+    },
+    select: { organisationId: true },
+  })
+  return rows.map((r) => r.organisationId)
+}
+
+/**
+ * May this person use the shopper side?
+ *
+ * Wider than `canPreviewSlh` on purpose. While the program is being set up the
+ * audience is "people involved in it" rather than "Lighthouse staff": somebody
+ * who administers an approved referring organisation needs to walk the shopper
+ * flow, both to test it and because they are often the first shopper.
+ *
+ * This is the gate that opens to everybody when the program goes live. The
+ * super-admin clause is scaffolding; the organisation clause is not.
+ */
+export async function canShopSlh(): Promise<boolean> {
+  const session = await getSession()
+  if (!session) return false
+  if (canPreviewSlh(session.user)) return true
+  return (await myProgramOrgIds()).length > 0
+}
+
+export type ProgramOrgCard = {
+  id: string
+  name: string
+  logoUrl: string | null
+  allocation: number
+  nominated: number
+  /** Wish lists nobody has filled in yet — what they need to chase. */
+  unfilled: number
+}
+
+/**
+ * The dashboard card for an organisation's own program area.
+ *
+ * Separate from the shopper card, and both can appear for the same person.
+ * That is the point of one account per person: somebody can administer 5 Fold
+ * *and* shop for a child, and neither fact should hide the other.
+ */
+export async function myProgramOrgCards(): Promise<ProgramOrgCard[]> {
+  const ids = await myProgramOrgIds()
+  if (ids.length === 0) return []
+
+  const program = await activeProgram()
+  if (!program) return []
+
+  const partners = await prisma.giftProgramPartner.findMany({
+    where: { programId: program.id, organisationId: { in: ids } },
+    orderBy: { organisation: { name: 'asc' } },
+    select: {
+      allocation: true,
+      organisation: { select: { id: true, name: true, logoUrl: true } },
+    },
+  })
+
+  const children = await prisma.giftChild.findMany({
+    where: { programId: program.id, organisationId: { in: ids } },
+    select: {
+      organisationId: true,
+      wishWant: true,
+      wishNeed: true,
+      wishWear: true,
+      wishRead: true,
+    },
+  })
+
+  return partners.map((p) => {
+    const mine = children.filter((c) => c.organisationId === p.organisation.id)
+    return {
+      id: p.organisation.id,
+      name: p.organisation.name,
+      logoUrl: p.organisation.logoUrl,
+      allocation: p.allocation,
+      nominated: mine.length,
+      unfilled: mine.filter((c) => !wishListReady(c)).length,
+    }
+  })
 }

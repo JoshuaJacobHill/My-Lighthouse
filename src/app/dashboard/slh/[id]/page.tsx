@@ -2,10 +2,9 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { getSession } from '@/lib/auth'
-import { canPreviewSlh } from '@/lib/features'
 import { ChildAvatar } from '@/components/slh/ChildAvatar'
 import { StepList } from '@/components/slh/StepList'
-import { myShopper, wishListForViewer } from '@/lib/slh'
+import { canShopSlh, myShopper, wishListForViewer } from '@/lib/slh'
 import { ageOn, doneSteps } from '@/lib/slh-steps'
 import { WISH_KINDS, sizeLabel } from '@/lib/slh-wishlist'
 
@@ -26,7 +25,9 @@ export const metadata = { title: 'Wish list', robots: { index: false } }
 export default async function WishListPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session) redirect('/login')
-  if (!canPreviewSlh(session.user)) notFound()
+  // Lighthouse, or somebody who administers an approved referring
+  // organisation. The shopper flow opens to everybody when the program does.
+  if (!(await canShopSlh())) notFound()
 
   const { id } = await params
   const child = await wishListForViewer(id)
