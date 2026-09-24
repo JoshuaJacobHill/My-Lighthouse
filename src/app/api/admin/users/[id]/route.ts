@@ -78,7 +78,17 @@ export async function PATCH(
   }
 }
 
-// ─── DELETE — remove an admin user ───────────────────────────────────────────
+/* ─── DELETE — permanently delete a person's whole account ────────────────────
+ *
+ * NOT "remove an admin user", which is what the heading here used to say while
+ * the code did this. Somebody reading that reasonably believed this took away
+ * admin access; it deleted the person, and took their donor profile, linked
+ * sign-ins, sessions, push subscriptions and extra email addresses with it.
+ * That happened to a real account.
+ *
+ * To take admin access away, PATCH the role instead. The account survives,
+ * which is almost always what was meant.
+ */
 
 export async function DELETE(
   request: NextRequest,
@@ -100,6 +110,29 @@ export async function DELETE(
   }
 
   try {
+    // Money is not ours to erase. A donation or a ticket order is a financial
+    // record with a receipt attached, and deleting the person who made it
+    // either orphans the row or destroys it. Deactivating keeps the history
+    // and still stops them signing in, which is what "remove them" nearly
+    // always means.
+    const [donations, ticketOrders] = await Promise.all([
+      prisma.donation.count({ where: { userId: id } }),
+      prisma.ticketOrder.count({ where: { userId: id } }),
+    ])
+    if (donations > 0 || ticketOrders > 0) {
+      const parts = [
+        donations > 0 ? `${donations} donation${donations === 1 ? '' : 's'}` : null,
+        ticketOrders > 0 ? `${ticketOrders} ticket order${ticketOrders === 1 ? '' : 's'}` : null,
+      ].filter(Boolean)
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This account has ${parts.join(' and ')}. Deactivate it instead — deleting it would take that history with it.`,
+        },
+        { status: 400 }
+      )
+    }
+
     await prisma.user.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (err) {

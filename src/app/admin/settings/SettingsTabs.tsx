@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Save, Loader2, Plus, Trash2, UserPlus, Pencil } from 'lucide-react'
+import { Save, Loader2, Plus, Trash2, UserPlus, UserMinus, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import { USER_ROLES, ASSIGNABLE_ADMIN_ROLES, ADMIN_ROLE_DESCRIPTIONS } from '@/lib/constants'
 import { PromoteUser } from '@/components/admin/PromoteUser'
@@ -113,10 +113,42 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
     setEditLoading(false)
   }
 
-  // Delete admin
+  // Take admin access away — the thing people actually mean, and which did
+  // not exist until an account got deleted instead.
+  const [demoteAdmin, setDemoteAdmin] = React.useState<AdminUser | null>(null)
+  const [demoteLoading, setDemoteLoading] = React.useState(false)
+  const [demoteError, setDemoteError] = React.useState<string | null>(null)
+
+  // Delete the whole account. Separate, and worded so it cannot be mistaken
+  // for the above.
   const [deleteAdmin, setDeleteAdmin] = React.useState<AdminUser | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = React.useState('')
   const [deleteLoading, setDeleteLoading] = React.useState(false)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
+
+  async function handleDemote() {
+    if (!demoteAdmin) return
+    setDemoteError(null)
+    setDemoteLoading(true)
+    try {
+      const res = await fetch(`/api/admin/users/${demoteAdmin.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        // The account stays; only what they can reach changes.
+        body: JSON.stringify({ role: 'VOLUNTEER' }),
+      })
+      const result = await res.json()
+      if (!res.ok || !result.success) {
+        setDemoteError(result.error ?? 'Failed to remove admin access.')
+      } else {
+        setDemoteAdmin(null)
+        router.refresh()
+      }
+    } catch {
+      setDemoteError('Something went wrong.')
+    }
+    setDemoteLoading(false)
+  }
 
   async function handleDelete() {
     if (!deleteAdmin) return
@@ -597,9 +629,20 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => { setDeleteAdmin(admin); setDeleteError(null) }}
+                          onClick={() => { setDemoteAdmin(admin); setDemoteError(null) }}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                          title="Remove admin access"
+                        >
+                          <UserMinus className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeleteAdmin(admin)
+                            setDeleteError(null)
+                            setDeleteConfirm('')
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                          title="Delete"
+                          title="Delete this person's whole account"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -720,7 +763,48 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
           )}
 
           {/* ── Delete confirmation modal ── */}
-          {deleteAdmin && (
+          {demoteAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="px-6 py-5">
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <UserMinus className="h-5 w-5 text-gray-600" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900">Remove admin access</h2>
+              </div>
+              <p className="text-sm text-gray-600">
+                <strong>{demoteAdmin.name ?? demoteAdmin.email}</strong> will keep their account
+                and everything on it, and will no longer be an admin. You can make them one again
+                at any time.
+              </p>
+              {demoteError && (
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {demoteError}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+              <button
+                onClick={() => setDemoteAdmin(null)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDemote}
+                disabled={demoteLoading}
+                className="flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+              >
+                {demoteLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Remove admin access
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteAdmin && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
               <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
                 <div className="px-6 py-5">
@@ -731,8 +815,28 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                     <h2 className="text-lg font-semibold text-gray-900">Delete Admin User</h2>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Are you sure you want to delete <strong>{deleteAdmin.name ?? deleteAdmin.email}</strong>? This cannot be undone.
+                    This permanently deletes the whole account for{' '}
+                    <strong>{deleteAdmin.name ?? deleteAdmin.email}</strong> — not just their admin
+                    access. Their donor profile, saved sign-ins and notification settings go with
+                    it, and it cannot be undone.
                   </p>
+                  <p className="mt-3 text-sm text-gray-600">
+                    To take away admin access and keep the account, close this and use{' '}
+                    <strong>Remove admin access</strong> instead.
+                  </p>
+                  {/* Typing the address is the point: it cannot be done by
+                      reflex, and it makes you look at WHICH account this is. */}
+                  <label className="mt-4 block text-sm">
+                    <span className="mb-1 block font-medium text-gray-700">
+                      Type <strong>{deleteAdmin.email}</strong> to confirm
+                    </span>
+                    <input
+                      value={deleteConfirm}
+                      onChange={(e) => setDeleteConfirm(e.target.value)}
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
+                    />
+                  </label>
                   {deleteError && (
                     <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
                       {deleteError}
@@ -748,11 +852,14 @@ export function SettingsTabs({ settings, admins, isSuperAdmin }: SettingsTabsPro
                   </button>
                   <button
                     onClick={handleDelete}
-                    disabled={deleteLoading}
+                    disabled={
+                      deleteLoading ||
+                      deleteConfirm.trim().toLowerCase() !== deleteAdmin.email.toLowerCase()
+                    }
                     className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
                   >
                     {deleteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    Delete
+                    Delete account
                   </button>
                 </div>
               </div>
