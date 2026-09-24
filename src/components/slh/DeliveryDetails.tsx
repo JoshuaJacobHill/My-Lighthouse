@@ -2,49 +2,36 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Check, Copy } from 'lucide-react'
 import { setDeliveryAction } from '@/lib/actions/slh.actions'
+import {
+  dayLabel,
+  datesBetween,
+  formatDay,
+  isWeekend,
+  parseDays,
+  type DropOffDay,
+} from '@/lib/slh-dropoff'
 
 /**
- * Where gifts are taken, and exactly which days somebody is there.
+ * Where gifts are taken, which days, and the hours on each of them.
  *
- * The window and the days are two different facts. An organisation taking
- * gifts "1–12 December" is shut both weekends, and a shopper who drives over
- * on the Saturday with four wrapped presents in the boot has been told
- * something untrue. So the window sets the range and the days are ticked
- * inside it — defaulting to every weekday, because that is the common answer.
+ * Three separate facts, and collapsing any two of them tells a shopper
+ * something untrue. A window of "1–12 December" is shut both weekends; a
+ * Wednesday inside it may be shut for a staff meeting; and "open Thursday"
+ * does not mean somebody is there at 8pm. A shopper who drives over with four
+ * wrapped presents in the boot and finds a locked door has been let down by
+ * whichever of the three nobody recorded.
+ *
+ * So: the window sets the range, each day is ticked or unticked inside it, and
+ * each open day carries its own hours. Hours are optional — plenty of
+ * organisations genuinely mean "any time we're open".
  */
 const field =
   'w-full rounded-2xl border border-neutral-200 px-4 py-3 text-base focus:border-neutral-400 focus:outline-none'
 const label = 'block text-[13px] font-bold'
-
-/** Every calendar day between two ISO dates, inclusive. Capped so a typo in a
- *  year cannot try to render a thousand chips. */
-function datesBetween(from: string, to: string): string[] {
-  if (!from || !to || to < from) return []
-  const out: string[] = []
-  const cursor = new Date(`${from}T00:00:00.000Z`)
-  const end = new Date(`${to}T00:00:00.000Z`)
-  while (cursor <= end && out.length < 60) {
-    out.push(cursor.toISOString().slice(0, 10))
-    cursor.setUTCDate(cursor.getUTCDate() + 1)
-  }
-  return out
-}
-
-function dayLabel(iso: string): string {
-  const d = new Date(`${iso}T00:00:00.000Z`)
-  return d.toLocaleDateString('en-AU', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-}
-
-const isWeekend = (iso: string) => {
-  const day = new Date(`${iso}T00:00:00.000Z`).getUTCDay()
-  return day === 0 || day === 6
-}
+const timeBox =
+  'rounded-xl border border-neutral-200 px-2.5 py-1.5 text-[13px] focus:border-neutral-400 focus:outline-none'
 
 export function DeliveryDetails({
   organisationId,
@@ -63,22 +50,51 @@ export function DeliveryDetails({
   const [address, setAddress] = useState(initialAddress)
   const [opensAt, setOpensAt] = useState(initialOpens)
   const [closesAt, setClosesAt] = useState(initialCloses)
-  const [days, setDays] = useState<string[]>(initialDays)
+  const [days, setDays] = useState<DropOffDay[]>(parseDays(initialDays))
+  const [touched, setTouched] = useState(initialDays.length > 0)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [pending, startTransition] = useTransition()
 
   const range = datesBetween(opensAt, closesAt)
-  // Nothing ticked means "every day in the window" — so show that as every day
-  // lit rather than as a row of empty chips that looks like a mistake.
-  const on = (iso: string) => days.length === 0 || days.includes(iso)
 
-  function toggle(iso: string) {
+  // Nothing chosen yet means "every day in the window" — shown as every day
+  // lit, rather than a row of empty chips that reads like a mistake.
+  const effective: DropOffDay[] = touched
+    ? days
+    : range.map((date) => ({ date, from: null, to: null }))
+
+  const dayFor = (date: string) => effective.find((d) => d.date === date) ?? null
+  const dirty = () => {
     setSaved(false)
-    setDays((current) => {
-      const base = current.length === 0 ? range : current
-      return base.includes(iso) ? base.filter((d) => d !== iso) : [...base, iso].sort()
-    })
+    setError(null)
+  }
+
+  function toggle(date: string) {
+    dirty()
+    setTouched(true)
+    const base = touched ? days : effective
+    setDays(
+      base.some((d) => d.date === date)
+        ? base.filter((d) => d.date !== date)
+        : [...base, { date, from: null, to: null }].sort((a, b) => a.date.localeCompare(b.date)),
+    )
+  }
+
+  function setTime(date: string, part: 'from' | 'to', value: string) {
+    dirty()
+    setTouched(true)
+    const base = touched ? days : effective
+    setDays(base.map((d) => (d.date === date ? { ...d, [part]: value || null } : d)))
+  }
+
+  /** Ten days of identical hours typed ten times is how mistakes get in. */
+  function copyFirstTimes() {
+    const first = effective.find((d) => d.from && d.to)
+    if (!first) return
+    dirty()
+    setTouched(true)
+    setDays(effective.map((d) => ({ ...d, from: first.from, to: first.to })))
   }
 
   function save() {
@@ -89,7 +105,7 @@ export function DeliveryDetails({
       fd.set('address', address)
       fd.set('opensAt', opensAt)
       fd.set('closesAt', closesAt)
-      fd.set('days', JSON.stringify(days))
+      fd.set('days', JSON.stringify(effective.map(formatDay)))
       const result = await setDeliveryAction(fd)
       if (result.success) {
         setSaved(true)
@@ -117,7 +133,7 @@ export function DeliveryDetails({
             value={address}
             onChange={(e) => {
               setAddress(e.target.value)
-              setSaved(false)
+              dirty()
             }}
             placeholder="Street, suburb, state and postcode"
             className={`${field} mt-1.5`}
@@ -139,7 +155,8 @@ export function DeliveryDetails({
               onChange={(e) => {
                 setOpensAt(e.target.value)
                 setDays([])
-                setSaved(false)
+                setTouched(false)
+                dirty()
               }}
               className={`${field} mt-1.5`}
             />
@@ -155,7 +172,8 @@ export function DeliveryDetails({
               onChange={(e) => {
                 setClosesAt(e.target.value)
                 setDays([])
-                setSaved(false)
+                setTouched(false)
+                dirty()
               }}
               className={`${field} mt-1.5`}
             />
@@ -164,26 +182,81 @@ export function DeliveryDetails({
 
         {range.length > 0 && (
           <div>
-            <span className={label}>Which days are you open?</span>
-            <p className="mt-1 text-xs text-neutral-400">
-              Untick any day nobody will be there. All ticked means every day in the window.
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              {range.map((iso) => (
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className={label}>Which days, and what times?</span>
+              {effective.some((d) => d.from && d.to) && (
                 <button
-                  key={iso}
                   type="button"
-                  onClick={() => toggle(iso)}
-                  aria-pressed={on(iso)}
-                  className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                    on(iso)
-                      ? 'bg-neutral-900 text-white'
-                      : `border border-neutral-300 ${isWeekend(iso) ? 'text-neutral-400' : ''}`
-                  }`}
+                  onClick={copyFirstTimes}
+                  className="inline-flex items-center gap-1 text-[13px] font-semibold text-neutral-500 underline underline-offset-2 hover:text-neutral-900"
                 >
-                  {dayLabel(iso)}
+                  <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Use the first day&rsquo;s
+                  times for all
                 </button>
-              ))}
+              )}
+            </div>
+            <p className="mt-1 text-xs text-neutral-400">
+              Untick any day nobody will be there — a Wednesday in the middle of the week is fine
+              to skip. Leave times blank for &ldquo;any time we&rsquo;re open&rdquo;.
+            </p>
+
+            <div className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200">
+              {range.map((date) => {
+                const day = dayFor(date)
+                const on = day !== null
+                return (
+                  <div
+                    key={date}
+                    className={`flex flex-wrap items-center gap-3 px-3.5 py-2.5 ${
+                      on ? '' : 'bg-neutral-50/60'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggle(date)}
+                      aria-pressed={on}
+                      className="flex min-w-[8.5rem] items-center gap-2.5 text-left"
+                    >
+                      <span
+                        className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition-colors ${
+                          on
+                            ? 'border-neutral-900 bg-neutral-900 text-white'
+                            : 'border-neutral-300 text-transparent'
+                        }`}
+                      >
+                        <Check className="h-3 w-3" aria-hidden="true" />
+                      </span>
+                      <span
+                        className={`text-[13px] font-semibold ${
+                          on ? '' : isWeekend(date) ? 'text-neutral-300' : 'text-neutral-400'
+                        }`}
+                      >
+                        {dayLabel(date)}
+                      </span>
+                    </button>
+
+                    {on && (
+                      <span className="flex items-center gap-2 text-[13px] text-neutral-400">
+                        <input
+                          type="time"
+                          value={day?.from ?? ''}
+                          onChange={(e) => setTime(date, 'from', e.target.value)}
+                          aria-label={`Open from on ${dayLabel(date)}`}
+                          className={timeBox}
+                        />
+                        to
+                        <input
+                          type="time"
+                          value={day?.to ?? ''}
+                          onChange={(e) => setTime(date, 'to', e.target.value)}
+                          aria-label={`Open until on ${dayLabel(date)}`}
+                          className={timeBox}
+                        />
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

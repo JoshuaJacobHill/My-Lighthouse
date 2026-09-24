@@ -11,6 +11,7 @@ import { ManageLists } from '@/components/slh/ManageLists'
 import { ReleaseList } from '@/components/slh/ReleaseList'
 import { WISH_STEPS, ageOn, daysUntil, doneCount, nextStep } from '@/lib/slh-steps'
 import { describeRequest } from '@/lib/slh-onboarding'
+import { describeDay, parseDays } from '@/lib/slh-dropoff'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Santa’s Little Helpers', robots: { index: false } }
@@ -50,14 +51,9 @@ export default async function SlhPage() {
   const closes = partner?.dropOffClosesAt ?? null
   const days = closes ? daysUntil(closes) : null
 
-  const openDays = (partner?.dropOffDays ?? []).map((iso) =>
-    new Date(`${iso}T00:00:00.000Z`).toLocaleDateString('en-AU', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      timeZone: 'UTC',
-    }),
-  )
+  // The days AND the hours. "Open Thursday" does not mean somebody is there
+  // at 8pm, and a shopper only reads this once.
+  const openDays = parseDays(partner?.dropOffDays).map(describeDay)
 
   return (
     <div className="-m-4 min-h-full bg-white text-neutral-950 lg:-m-6">

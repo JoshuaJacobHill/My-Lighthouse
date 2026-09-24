@@ -8,6 +8,7 @@ import { activeProgram, canOpenSlhOrg, shopperCapacity } from '@/lib/slh'
 import { canSubmit, clampRequest, cleanAge, cleanCount, cleanGender } from '@/lib/slh-onboarding'
 import { WISH_STEPS, stepField, type WishStepKey } from '@/lib/slh-steps'
 import { cleanBand, cleanInterests } from '@/lib/slh-wishlist'
+import { formatDay, parseDays, withinWindow } from '@/lib/slh-dropoff'
 
 /**
  * Approving a referring organisation.
@@ -676,18 +677,15 @@ export async function setDeliveryAction(formData: FormData): Promise<Result> {
   try {
     const raw = JSON.parse(String(formData.get('days') ?? '[]'))
     if (Array.isArray(raw)) {
-      // Only days that are actually inside the window, so a window someone
-      // shortened cannot leave a stray day advertised outside it.
-      days = [...new Set(raw.map((d) => String(d)))]
-        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
-        .filter((d) => {
-          const at = asDateOnly(d)
-          if (!at) return false
-          if (opensAt && at < opensAt) return false
-          if (closesAt && at > closesAt) return false
-          return true
-        })
-        .sort()
+      // Parsed rather than trusted: unreadable entries and impossible hours
+      // are dropped, and only days inside the window survive — a window
+      // somebody shortened must not leave a day advertised outside it.
+      const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null)
+      days = withinWindow(
+        parseDays(raw.map((d) => String(d))),
+        iso(opensAt),
+        iso(closesAt),
+      ).map(formatDay)
     }
   } catch {
     return { success: false, error: 'Could not read the drop-off days.' }
