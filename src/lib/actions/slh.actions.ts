@@ -268,13 +268,30 @@ export async function markStepAction(formData: FormData): Promise<Result> {
   }
 }
 
-/** One child as the nomination form sends them. */
+/**
+ * One child as the nomination form sends them.
+ *
+ * The wish list arrives with the nomination now rather than only afterwards —
+ * an organisation filling it in themselves has the answers in front of them,
+ * and making them save, find the child and open a second screen loses lists.
+ * All of it is optional: a nomination with nothing but a name and a birthday
+ * is normal and the rest is filled in later.
+ */
 type ChildInput = {
   firstName?: string
   dateOfBirth?: string
   gender?: string
+  favouriteColour?: string
+  clothesBand?: string
   clothesSize?: string
+  shoesBand?: string
   shoesSize?: string
+  interests?: unknown
+  wishWant?: string
+  wishNeed?: string
+  wishWear?: string
+  wishRead?: string
+  storyText?: string
 }
 
 /**
@@ -327,13 +344,27 @@ export async function addFamilyAction(formData: FormData): Promise<Result> {
     const dob = asDateOnly(String(c.dateOfBirth ?? '').trim())
     const gender = c.gender === 'girl' || c.gender === 'boy' ? c.gender : null
     if (!firstName || !dob || !gender) return []
+    const text = (raw: unknown, max = 200) => String(raw ?? '').trim().slice(0, max) || null
+
     return [
       {
         firstName,
         dateOfBirth: dob,
         gender,
-        clothesSize: String(c.clothesSize ?? '').trim() || null,
-        shoesSize: String(c.shoesSize ?? '').trim() || null,
+        favouriteColour: text(c.favouriteColour, 40),
+        clothesBand: cleanBand(c.clothesBand),
+        clothesSize: text(c.clothesSize, 40),
+        shoesBand: cleanBand(c.shoesBand),
+        shoesSize: text(c.shoesSize, 40),
+        interests: cleanInterests(c.interests),
+        wishWant: text(c.wishWant),
+        wishNeed: text(c.wishNeed),
+        wishWear: text(c.wishWear),
+        wishRead: text(c.wishRead),
+        storyText: text(c.storyText, 1200),
+        // Never arrives approved. Words collected by an organisation have not
+        // been read by us yet, whoever typed them in.
+        storyApproved: false,
       },
     ]
   })

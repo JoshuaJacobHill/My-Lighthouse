@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Check, Plus, X } from 'lucide-react'
 import { addFamilyAction } from '@/lib/actions/slh.actions'
 import { EmailField } from '@/components/EmailField'
+import {
+  EMPTY_WISH_LIST,
+  WishListFields,
+  type WishListValues,
+} from '@/components/slh/WishListFields'
 
 /**
  * Nominating a family.
@@ -29,8 +34,9 @@ type ChildRow = {
   firstName: string
   dateOfBirth: string
   gender: '' | 'girl' | 'boy'
-  clothesSize: string
-  shoesSize: string
+  /** Everything a shopper reads. Optional here — a nomination with no wish
+   *  list yet is normal, and the rest can be filled in later. */
+  wish: WishListValues
 }
 
 const emptyChild = (key: number): ChildRow => ({
@@ -38,8 +44,7 @@ const emptyChild = (key: number): ChildRow => ({
   firstName: '',
   dateOfBirth: '',
   gender: '',
-  clothesSize: '',
-  shoesSize: '',
+  wish: { ...EMPTY_WISH_LIST },
 })
 
 export function AddFamilyForm({ organisationId }: { organisationId: string }) {
@@ -52,6 +57,24 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
   const [children, setChildren] = useState<ChildRow[]>([emptyChild(1)])
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+
+  /** Has anybody put anything in this child's list yet? */
+  function wishStarted(child: ChildRow): boolean {
+    const w = child.wish
+    return Boolean(
+      w.interests.length ||
+        w.favouriteColour.trim() ||
+        w.clothesBand ||
+        w.clothesSize.trim() ||
+        w.shoesBand ||
+        w.shoesSize.trim() ||
+        w.wishWant.trim() ||
+        w.wishNeed.trim() ||
+        w.wishWear.trim() ||
+        w.wishRead.trim() ||
+        w.storyText.trim(),
+    )
+  }
 
   function setChild(key: number, patch: Partial<ChildRow>) {
     setChildren((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
@@ -77,8 +100,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
             firstName: c.firstName,
             dateOfBirth: c.dateOfBirth,
             gender: c.gender,
-            clothesSize: c.clothesSize,
-            shoesSize: c.shoesSize,
+            ...c.wish,
           })),
         ),
       )
@@ -269,32 +291,28 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={label} htmlFor={`clothes-${child.key}`}>
-                  Clothing size
-                </label>
-                <input
-                  id={`clothes-${child.key}`}
-                  value={child.clothesSize}
-                  onChange={(e) => setChild(child.key, { clothesSize: e.target.value })}
-                  className={`${field} mt-1.5`}
-                  placeholder="Clothing size"
+            {/* The wish list itself. Open when the organisation is filling it
+                in, because then they have the answers in front of them;
+                folded away otherwise, since a nomination usually happens
+                before anybody has asked the child what they want. */}
+            <details open={noGuardian} className="rounded-2xl border border-neutral-200">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold hover:bg-neutral-50">
+                Wish list
+                <span className="ml-2 font-normal text-neutral-400">
+                  {wishStarted(child) ? 'started' : 'optional — can be filled in later'}
+                </span>
+              </summary>
+              <div className="border-t border-neutral-100 px-4 py-5">
+                <WishListFields
+                  idPrefix={`c${child.key}`}
+                  value={child.wish}
+                  onChange={(patch) =>
+                    setChild(child.key, { wish: { ...child.wish, ...patch } })
+                  }
+                  childName={child.firstName}
                 />
               </div>
-              <div>
-                <label className={label} htmlFor={`shoes-${child.key}`}>
-                  Shoe size
-                </label>
-                <input
-                  id={`shoes-${child.key}`}
-                  value={child.shoesSize}
-                  onChange={(e) => setChild(child.key, { shoesSize: e.target.value })}
-                  className={`${field} mt-1.5`}
-                  placeholder="Shoe size"
-                />
-              </div>
-            </div>
+            </details>
           </div>
         ))}
       </div>
