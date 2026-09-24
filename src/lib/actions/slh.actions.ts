@@ -284,6 +284,9 @@ type ChildInput = {
   gender?: string
   favouriteColour?: string
   clothesBand?: string
+  topSize?: string
+  bottomSize?: string
+  dressSize?: string
   clothesSize?: string
   shoesBand?: string
   shoesSize?: string
@@ -354,6 +357,9 @@ export async function addFamilyAction(formData: FormData): Promise<Result> {
         gender,
         favouriteColour: text(c.favouriteColour, 40),
         clothesBand: cleanBand(c.clothesBand),
+        topSize: text(c.topSize, 40),
+        bottomSize: text(c.bottomSize, 40),
+        dressSize: text(c.dressSize, 40),
         clothesSize: text(c.clothesSize, 40),
         shoesBand: cleanBand(c.shoesBand),
         shoesSize: text(c.shoesSize, 40),
@@ -408,6 +414,11 @@ export async function addFamilyAction(formData: FormData): Promise<Result> {
 
   try {
     await prisma.$transaction(async (tx) => {
+      // Why they were nominated is a household fact. It lands on the family,
+      // or — for a child in residential or kinship care, who has no family
+      // row — on the child, because the reason exists either way.
+      const why = String(formData.get('nominationNote') ?? '').trim().slice(0, 2000) || null
+
       const familyId = noGuardian
         ? null
         : (
@@ -418,6 +429,7 @@ export async function addFamilyAction(formData: FormData): Promise<Result> {
                 guardianName,
                 guardianEmail: String(formData.get('guardianEmail') ?? '').trim() || null,
                 guardianPhone: String(formData.get('guardianPhone') ?? '').trim() || null,
+                notes: why,
                 consentAt: new Date(),
                 consentByName: session.user.name ?? null,
                 createdById: session.userId,
@@ -432,6 +444,7 @@ export async function addFamilyAction(formData: FormData): Promise<Result> {
           programId: program.id,
           organisationId,
           familyId,
+          nominationNote: familyId ? null : why,
           createdById: session.userId,
         })),
       })
@@ -596,6 +609,9 @@ export async function saveWishListAction(formData: FormData): Promise<Result> {
       data: {
         favouriteColour: text(formData.get('favouriteColour'), 40),
         clothesBand: cleanBand(formData.get('clothesBand')),
+        topSize: text(formData.get('topSize'), 40),
+        bottomSize: text(formData.get('bottomSize'), 40),
+        dressSize: text(formData.get('dressSize'), 40),
         clothesSize: text(formData.get('clothesSize'), 40),
         shoesBand: cleanBand(formData.get('shoesBand')),
         shoesSize: text(formData.get('shoesSize'), 40),

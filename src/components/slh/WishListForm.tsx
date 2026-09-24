@@ -48,6 +48,9 @@ export function WishListForm({
       for (const key of [
         'favouriteColour',
         'clothesBand',
+        'topSize',
+        'bottomSize',
+        'dressSize',
         'clothesSize',
         'shoesBand',
         'shoesSize',

@@ -270,20 +270,25 @@ export async function wishListForViewer(childId: string) {
   const session = await getSession()
   if (!session) return null
 
+  // `nominationNote` is why a family needs help — bereavement, violence, a
+  // parent in hospital. It is omitted at the query rather than left out of the
+  // markup: a field that never leaves the database cannot be leaked by the
+  // next person who adds a line to this page.
+  const hide = { nominationNote: true } as const
+  const org = { organisation: { select: { id: true, name: true } } }
+
   const shopper = await myShopper()
   if (shopper) {
     const mine = await prisma.giftChild.findFirst({
       where: { id: childId, shopperId: shopper.id },
-      include: { organisation: { select: { id: true, name: true } } },
+      omit: hide,
+      include: org,
     })
     if (mine) return mine
   }
 
   if (!canPreviewSlh(session.user)) return null
-  return prisma.giftChild.findUnique({
-    where: { id: childId },
-    include: { organisation: { select: { id: true, name: true } } },
-  })
+  return prisma.giftChild.findUnique({ where: { id: childId }, omit: hide, include: org })
 }
 
 /* ── The organisation's side ───────────────────────────────────────────────── */

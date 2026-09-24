@@ -6,7 +6,7 @@ import { ChildAvatar } from '@/components/slh/ChildAvatar'
 import { StepList } from '@/components/slh/StepList'
 import { canShopSlh, myShopper, wishListForViewer } from '@/lib/slh'
 import { ageOn, doneSteps } from '@/lib/slh-steps'
-import { WISH_KINDS, sizeLabel } from '@/lib/slh-wishlist'
+import { WISH_KINDS, clothingSummary, sizeLabel } from '@/lib/slh-wishlist'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Wish list', robots: { index: false } }
@@ -36,7 +36,7 @@ export default async function WishListPage({ params }: { params: Promise<{ id: s
   const shopper = await myShopper()
   const mine = Boolean(shopper && child.shopperId === shopper.id)
 
-  const clothes = sizeLabel(child.clothesBand, child.clothesSize)
+  const clothes = clothingSummary(child)
   const shoes = sizeLabel(child.shoesBand, child.shoesSize)
 
   const gifts: Record<string, string | null> = {

@@ -17,7 +17,13 @@ import {
   cleanGender,
   describeRequest,
 } from './slh-onboarding'
-import { cleanBand, cleanInterests, sizeLabel, wishListReady } from './slh-wishlist'
+import {
+  cleanBand,
+  cleanInterests,
+  clothingSummary,
+  sizeLabel,
+  wishListReady,
+} from './slh-wishlist'
 
 describe('wish list steps', () => {
   it('a fresh child has nothing done and starts at the first step', () => {
@@ -185,5 +191,31 @@ describe('wish list questions', () => {
     expect(wishListReady({ wishWant: 'a', wishNeed: 'b', wishWear: 'c', wishRead: 'd' })).toBe(true)
     expect(wishListReady({ wishWant: 'a', wishNeed: 'b', wishWear: 'c' })).toBe(false)
     expect(wishListReady({})).toBe(false)
+  })
+})
+
+describe('clothingSummary', () => {
+  it('leads with the band, then only what was answered', () => {
+    expect(
+      clothingSummary({ clothesBand: 'kids', topSize: '10', bottomSize: '8' }),
+    ).toBe('Kids · Top 10, Pants 8')
+  })
+
+  it('copes with a family who gives one size for everything', () => {
+    expect(clothingSummary({ clothesBand: 'kids', clothesSize: 'Size 7' })).toBe('Kids · Size 7')
+  })
+
+  it('works with no band, and with a band alone', () => {
+    expect(clothingSummary({ topSize: '10' })).toBe('Top 10')
+    expect(clothingSummary({ clothesBand: 'youth' })).toBe('Youth')
+  })
+
+  it('is null when nobody filled anything in, so the row can be left out', () => {
+    expect(clothingSummary({})).toBeNull()
+    expect(clothingSummary({ topSize: '   ' })).toBeNull()
+  })
+
+  it('names the dress separately, since it is not a top or a bottom', () => {
+    expect(clothingSummary({ dressSize: '8' })).toBe('Dress 8')
   })
 })

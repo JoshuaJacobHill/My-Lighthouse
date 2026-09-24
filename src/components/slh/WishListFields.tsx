@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { INTERESTS, SIZE_BANDS, WISH_KINDS } from '@/lib/slh-wishlist'
+import { GARMENTS, INTERESTS, SIZE_BANDS, SWATCHES, WISH_KINDS } from '@/lib/slh-wishlist'
 
 /**
  * The wish list questions themselves.
@@ -19,6 +19,9 @@ import { INTERESTS, SIZE_BANDS, WISH_KINDS } from '@/lib/slh-wishlist'
 export type WishListValues = {
   favouriteColour: string
   clothesBand: string
+  topSize: string
+  bottomSize: string
+  dressSize: string
   clothesSize: string
   shoesBand: string
   shoesSize: string
@@ -33,6 +36,9 @@ export type WishListValues = {
 export const EMPTY_WISH_LIST: WishListValues = {
   favouriteColour: '',
   clothesBand: '',
+  topSize: '',
+  bottomSize: '',
+  dressSize: '',
   clothesSize: '',
   shoesBand: '',
   shoesSize: '',
@@ -185,27 +191,73 @@ export function WishListFields({
       </div>
 
       <div>
-        <label className={label} htmlFor={`${idPrefix}-colour`}>
+        <span className={label} id={`${idPrefix}-colour-label`}>
           Favourite colour
-        </label>
+        </span>
+        <div
+          role="group"
+          aria-labelledby={`${idPrefix}-colour-label`}
+          className="mt-2 flex flex-wrap gap-2.5"
+        >
+          {SWATCHES.map(([hex, name]) => {
+            const on = v.favouriteColour.trim().toLowerCase() === name.toLowerCase()
+            return (
+              <button
+                key={name}
+                type="button"
+                onClick={() => onChange({ favouriteColour: on ? '' : name })}
+                aria-pressed={on}
+                aria-label={name}
+                title={name}
+                className={`h-10 w-10 rounded-xl border-[3px] transition-colors ${
+                  on ? 'border-neutral-900' : 'border-transparent'
+                }`}
+                style={{ background: hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.1)' }}
+              />
+            )
+          })}
+        </div>
+        {/* Children have favourite colours that are not on a palette. */}
         <input
           id={`${idPrefix}-colour`}
           value={v.favouriteColour}
           onChange={(e) => onChange({ favouriteColour: e.target.value })}
-          className={`${field} mt-1.5`}
-          placeholder="Favourite colour"
+          className={`${field} mt-2.5`}
+          placeholder="Or type another colour"
+          aria-label="Favourite colour, typed"
         />
       </div>
 
       <div>
-        <span className={label}>Clothing size</span>
+        <span className={label}>Clothing sizes</span>
         <Bands value={v.clothesBand} onChange={(b) => onChange({ clothesBand: b })} />
+        {/* One number does not dress a child: a ten-year-old can be a size 10
+            on top and a size 8 in the leg, and a shopper standing there with a
+            t-shirt and a pair of shorts needs both. */}
+        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-3">
+          {GARMENTS.map(([key, name]) => (
+            <div key={key}>
+              <label
+                className="mb-1 block text-xs font-semibold text-neutral-500"
+                htmlFor={`${idPrefix}-${key}`}
+              >
+                {name}
+              </label>
+              <input
+                id={`${idPrefix}-${key}`}
+                value={v[key]}
+                onChange={(e) => onChange({ [key]: e.target.value } as Partial<WishListValues>)}
+                className={field}
+              />
+            </div>
+          ))}
+        </div>
         <input
           value={v.clothesSize}
           onChange={(e) => onChange({ clothesSize: e.target.value })}
-          aria-label="Clothing size within that band"
+          aria-label="One size for everything"
           className={`${field} mt-2.5`}
-          placeholder="Clothing size"
+          placeholder="Or one size for everything"
         />
       </div>
 
@@ -250,17 +302,24 @@ export function WishListFields({
 
       <hr className="border-neutral-100" />
 
+      {/* The child talking to whoever buys their presents. Why the family
+          needs help is a different question, asked once per household on the
+          nomination form — a shopper has no business reading that one. */}
       <div>
         <label
           className="block text-base font-extrabold tracking-tight"
           htmlFor={`${idPrefix}-story`}
         >
-          In their own words
+          In {childName?.trim() ? `${childName.trim()}’s` : 'their'} own words
         </label>
         <p className="mt-0.5 text-sm text-neutral-500">
           Anything {childName?.trim() || 'they'} want{childName?.trim() ? 's' : ''} whoever is
-          shopping to know. A few sentences is plenty.
+          shopping to know — what they love, what they are looking forward to. A few sentences is
+          plenty.
         </p>
+        <span className="mt-2 inline-block rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-neutral-500">
+          The shopper reads this
+        </span>
         <textarea
           id={`${idPrefix}-story`}
           rows={4}
@@ -272,6 +331,7 @@ export function WishListFields({
           {storyNote ?? 'Somebody at Lighthouse reads this before any shopper sees it.'}
         </p>
       </div>
+
     </div>
   )
 }

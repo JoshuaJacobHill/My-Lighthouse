@@ -72,6 +72,9 @@ export default async function OrgWishListPage({
           initial={{
             favouriteColour: child.favouriteColour ?? '',
             clothesBand: child.clothesBand ?? '',
+            topSize: child.topSize ?? '',
+            bottomSize: child.bottomSize ?? '',
+            dressSize: child.dressSize ?? '',
             clothesSize: child.clothesSize ?? '',
             shoesBand: child.shoesBand ?? '',
             shoesSize: child.shoesSize ?? '',

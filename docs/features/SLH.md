@@ -75,6 +75,35 @@ children** — the avatars are silhouettes on a gradient and should stay that wa
 The identifying details live on `GiftFamily`, which no shopper page reads. That
 split is deliberate; keep it.
 
+**"Their own words" and "why they were nominated" are opposite fields.**
+`GiftChild.storyText` is the child talking to whoever buys their presents, and
+a shopper reads it once approved. `GiftFamily.notes` is the caseworker saying
+why a family needs help — bereavement, family violence, a parent in hospital —
+and **a shopper must never see it**. The two sounded alike enough that the
+second was being written into the first, so the form labels each with who
+reads it.
+
+It is asked **once per household**, because circumstances are a household fact
+and siblings share them. A child in residential or kinship care has no family
+row, so `GiftChild.nominationNote` holds it for them alone.
+
+`wishListForViewer` omits `nominationNote` **at the query**, not in the markup
+— a field that never leaves the database cannot be leaked by the next person
+who adds a line to that page. No shopper-facing query reads `GiftFamily` at
+all, which is the structural reason the household note is safe where it is.
+
+**A size per garment.** One number does not dress a child: a ten-year-old can
+be a size 10 on top and a size 8 in the leg. `topSize`, `bottomSize` and
+`dressSize` sit under the band, with `clothesSize` as the catch-all for a
+family who says "size 7 for everything". `clothingSummary()` renders whichever
+were answered.
+
+**Favourite colour is eight swatches plus a box.** The picker came from the
+child's own screen in the mockup and is worth having on the organisation's
+form too: a shopper reads "Red" rather than one person's "reddish" and
+another's "burgundy-ish?". The box stays, because children have favourite
+colours that are not on a palette.
+
 **Stories are approved before a shopper sees them.** A child writing freely may
 include something identifying or distressing. `storyApproved` defaults to false
 and the wish list page checks it, so unapproved means unseen.

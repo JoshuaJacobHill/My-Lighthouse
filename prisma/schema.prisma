@@ -1137,7 +1137,16 @@ model GiftFamily {
   consentAt     DateTime?
   consentByName String?
 
-  /// Anything the organisation needs to pass on. Not shown to shoppers.
+  /// **Why this family was nominated**, in the caseworker's words.
+  ///
+  /// Asked once per household, because the circumstances are a household fact
+  /// — siblings share them, and asking per child means typing it three times.
+  ///
+  /// A shopper must NEVER see this. It is the opposite of `GiftChild.storyText`:
+  /// that one is a child talking to the person buying their presents, this is
+  /// an organisation telling Lighthouse why a family needs help — bereavement,
+  /// family violence, a parent in hospital. No shopper-facing query reads
+  /// `GiftFamily` at all, which is the structural reason it is safe here.
   notes String? @db.Text
 
   createdById String?
@@ -1177,6 +1186,13 @@ model GiftChild {
   /// shoe are different children. The band is what makes the number usable by
   /// somebody standing in a shop. See `SIZE_BANDS` in `slh-wishlist.ts`.
   clothesBand String?
+  /// A size per garment, because one number does not dress a child: a
+  /// ten-year-old can be a size 10 on top and a size 8 in the leg, and a
+  /// shopper holding a t-shirt and a pair of shorts needs both.
+  topSize     String?
+  bottomSize  String?
+  dressSize   String?
+  /// The catch-all, for a family who says "size 7 for everything".
   clothesSize String?
   shoesBand   String?
   shoesSize   String?
@@ -1194,6 +1210,24 @@ model GiftChild {
   /// nobody outside Lighthouse has seen it yet.
   storyText     String? @db.Text
   storyApproved Boolean @default(false)
+
+  /// Why this child was nominated, when there is no family row to hold it.
+  ///
+  /// The question is asked per household and normally lands on
+  /// `GiftFamily.notes`. This is the residential and kinship care case: a
+  /// child nominated on their own still has a reason, and it has to live
+  /// somewhere.
+  ///
+  /// **A shopper must never see this, approved or not.** It is the opposite
+  /// field to `storyText`: that one is the child talking to the person buying
+  /// their presents, this one is an organisation telling Lighthouse why a
+  /// family needs help — bereavement, family violence, a parent in hospital.
+  /// It exists because "why them?" is the question the program answers, and it
+  /// was being written into the child's own story where it did not belong.
+  ///
+  /// Read by the organisation and by Lighthouse. `wishListForViewer` omits it
+  /// outright rather than trusting that no page happens to render it.
+  nominationNote String? @db.Text
 
   /// The four gifts, in the order the program asks for them.
   wishWant String?

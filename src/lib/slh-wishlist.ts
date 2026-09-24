@@ -41,6 +41,35 @@ export const SIZE_BANDS = [
 
 export type SizeBand = (typeof SIZE_BANDS)[number][0]
 
+/**
+ * Favourite colour, as eight swatches.
+ *
+ * From the child's own screen in the mockup, and worth having on the
+ * organisation's form too: a picker gives a shopper "Red" rather than one
+ * person's "reddish" and another's "burgundy-ish?", and it is quicker to tap
+ * than to type. Anything outside the eight can still be written in — children
+ * have favourite colours that are not on a palette.
+ */
+export const SWATCHES = [
+  ['#c8102e', 'Red'],
+  ['#ea580c', 'Orange'],
+  ['#eab308', 'Yellow'],
+  ['#2e9b24', 'Green'],
+  ['#0ea5e9', 'Blue'],
+  ['#9333ea', 'Purple'],
+  ['#ec4899', 'Pink'],
+  ['#111111', 'Black'],
+] as const
+
+/** The garments asked about separately, in the order they are worn about. */
+export const GARMENTS = [
+  ['topSize', 'Top'],
+  ['bottomSize', 'Pants or shorts'],
+  ['dressSize', 'Dress'],
+] as const
+
+export type Garment = (typeof GARMENTS)[number][0]
+
 export const WISH_KINDS = [
   ['want', 'Something they want', 'The one thing they would pick themselves.'],
   ['need', 'Something they need', 'Everyday things — a school bag, a drink bottle.'],
@@ -94,6 +123,32 @@ export function cleanInterests(raw: unknown, limit = 20): string[] {
     if (seen.size >= limit) break
   }
   return [...seen.values()]
+}
+
+/**
+ * Clothing sizes as one readable line.
+ *
+ * "Kids · Top 10, Pants 8" — the band once at the front, then only the
+ * garments somebody actually answered. Null when nothing was filled in, so a
+ * page leaves the row out rather than printing a label with nothing after it.
+ */
+export function clothingSummary(child: {
+  clothesBand?: string | null
+  topSize?: string | null
+  bottomSize?: string | null
+  dressSize?: string | null
+  clothesSize?: string | null
+}): string | null {
+  const parts = [
+    child.topSize?.trim() ? `Top ${child.topSize.trim()}` : null,
+    child.bottomSize?.trim() ? `Pants ${child.bottomSize.trim()}` : null,
+    child.dressSize?.trim() ? `Dress ${child.dressSize.trim()}` : null,
+    child.clothesSize?.trim() || null,
+  ].filter(Boolean)
+
+  const band = bandLabel(child.clothesBand)
+  if (parts.length === 0) return band
+  return band ? `${band} · ${parts.join(', ')}` : parts.join(', ')
 }
 
 /**

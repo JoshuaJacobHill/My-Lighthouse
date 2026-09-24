@@ -54,6 +54,8 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
   const [guardianPhone, setGuardianPhone] = useState('')
   const [guardianEmail, setGuardianEmail] = useState('')
   const [consent, setConsent] = useState(false)
+  // Asked once per household: siblings share their circumstances.
+  const [nominationNote, setNominationNote] = useState('')
   const [children, setChildren] = useState<ChildRow[]>([emptyChild(1)])
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -93,6 +95,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
       fd.set('guardianPhone', guardianPhone)
       fd.set('guardianEmail', guardianEmail)
       fd.set('consent', String(consent))
+      fd.set('nominationNote', nominationNote)
       fd.set(
         'children',
         JSON.stringify(
@@ -201,6 +204,28 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
           </button>
         </div>
       )}
+
+      <div className="mt-6">
+        <label className="block text-base font-extrabold tracking-tight" htmlFor="nominationNote">
+          {noGuardian
+            ? 'Why are you nominating this child?'
+            : 'Why are you nominating this family?'}
+        </label>
+        <p className="mt-0.5 text-sm text-neutral-500">
+          What is going on for them that brought them to you. It helps us understand who the
+          program is reaching, and it is the question everything else is answering.
+        </p>
+        <span className="mt-2 inline-block rounded-full bg-[#fdecef] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#c8102e]">
+          Your team and Lighthouse only — never the shopper
+        </span>
+        <textarea
+          id="nominationNote"
+          rows={3}
+          value={nominationNote}
+          onChange={(e) => setNominationNote(e.target.value)}
+          className={`${field} mt-2 resize-y`}
+        />
+      </div>
 
       <hr className="my-7 border-neutral-100" />
 
