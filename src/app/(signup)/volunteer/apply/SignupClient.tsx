@@ -180,7 +180,7 @@ function Step1({
           label="First name *"
           value={data.firstName}
           onChange={(e) => onChange({ firstName: e.target.value })}
-          placeholder="Jane"
+          placeholder="First name"
           error={errors.firstName}
           autoComplete="given-name"
         />
@@ -188,7 +188,7 @@ function Step1({
           label="Last name *"
           value={data.lastName}
           onChange={(e) => onChange({ lastName: e.target.value })}
-          placeholder="Smith"
+          placeholder="Last name"
           error={errors.lastName}
           autoComplete="family-name"
         />
@@ -199,7 +199,7 @@ function Step1({
         type="email"
         value={data.email}
         onChange={(e) => onChange({ email: e.target.value })}
-        placeholder="jane@example.com"
+        placeholder="Email address"
         error={errors.email}
         autoComplete="email"
       />
@@ -253,14 +253,14 @@ function Step1({
         label="Address line 1"
         value={data.addressLine1}
         onChange={(e) => onChange({ addressLine1: e.target.value })}
-        placeholder="123 Example Street"
+        placeholder="Street address"
         autoComplete="address-line1"
       />
       <Input
         label="Address line 2"
         value={data.addressLine2}
         onChange={(e) => onChange({ addressLine2: e.target.value })}
-        placeholder="Unit 4"
+        placeholder="Unit or apartment"
         autoComplete="address-line2"
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -269,7 +269,7 @@ function Step1({
             label="Suburb"
             value={data.suburb}
             onChange={(e) => onChange({ suburb: e.target.value })}
-            placeholder="Loganholme"
+            placeholder="Suburb"
             autoComplete="address-level2"
           />
         </div>
@@ -293,7 +293,7 @@ function Step1({
             label="Postcode"
             value={data.postcode}
             onChange={(e) => onChange({ postcode: e.target.value })}
-            placeholder="4129"
+            placeholder="Postcode"
             maxLength={4}
             error={errors.postcode}
             autoComplete="postal-code"
@@ -322,7 +322,7 @@ function Step2({
         label="Contact name *"
         value={data.emergencyName}
         onChange={(e) => onChange({ emergencyName: e.target.value })}
-        placeholder="John Smith"
+        placeholder="Their full name"
         error={errors.emergencyName}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

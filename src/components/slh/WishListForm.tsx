@@ -222,7 +222,7 @@ export function WishListForm({
             value={v.favouriteColour}
             onChange={(e) => set({ favouriteColour: e.target.value })}
             className={`${field} mt-1.5`}
-            placeholder="Red"
+            placeholder="Favourite colour"
           />
         </div>
 
@@ -234,7 +234,7 @@ export function WishListForm({
             onChange={(e) => set({ clothesSize: e.target.value })}
             aria-label="Clothing size within that band"
             className={`${field} mt-2.5`}
-            placeholder="Size 7"
+            placeholder="Clothing size"
           />
         </div>
 
@@ -246,7 +246,7 @@ export function WishListForm({
             onChange={(e) => set({ shoesSize: e.target.value })}
             aria-label="Shoe size within that band"
             className={`${field} mt-2.5`}
-            placeholder="Size 12"
+            placeholder="Shoe size"
           />
           <p className="mt-1.5 text-xs text-neutral-400">
             &ldquo;Size 4&rdquo; on its own means nothing in a shop — the band is what makes it

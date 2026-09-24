@@ -237,7 +237,7 @@ export function PartnerControls({
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="13–15 Monte-Khoury Drive, Loganholme QLD 4129"
+              placeholder="Street, suburb, state and postcode"
               className={input}
             />
             <span className="mt-1 block text-xs text-neutral-400">

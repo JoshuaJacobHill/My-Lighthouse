@@ -126,7 +126,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
               value={guardianName}
               onChange={(e) => setGuardianName(e.target.value)}
               className={`${field} mt-1.5`}
-              placeholder="Leila M."
+              placeholder="Parent or guardian's name"
             />
           </div>
 
@@ -141,7 +141,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
                 value={guardianPhone}
                 onChange={(e) => setGuardianPhone(e.target.value)}
                 className={`${field} mt-1.5`}
-                placeholder="0412 884 221"
+                placeholder="Mobile number"
               />
             </div>
             <div>
@@ -154,7 +154,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
                 value={guardianEmail}
                 onChange={(e) => setGuardianEmail(e.target.value)}
                 className={`${field} mt-1.5`}
-                placeholder="leila.m@example.com"
+                placeholder="Email address"
               />
             </div>
           </div>
@@ -224,7 +224,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
                 value={child.firstName}
                 onChange={(e) => setChild(child.key, { firstName: e.target.value })}
                 className={`${field} mt-1.5`}
-                placeholder="Amira"
+                placeholder="First name"
               />
               <p className="mt-1.5 text-xs text-neutral-400">
                 A shopper sees this name. Never a surname.
@@ -279,7 +279,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
                   value={child.clothesSize}
                   onChange={(e) => setChild(child.key, { clothesSize: e.target.value })}
                   className={`${field} mt-1.5`}
-                  placeholder="Size 7"
+                  placeholder="Clothing size"
                 />
               </div>
               <div>
@@ -291,7 +291,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
                   value={child.shoesSize}
                   onChange={(e) => setChild(child.key, { shoesSize: e.target.value })}
                   className={`${field} mt-1.5`}
-                  placeholder="Size 12"
+                  placeholder="Shoe size"
                 />
               </div>
             </div>

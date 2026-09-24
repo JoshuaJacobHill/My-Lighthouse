@@ -119,7 +119,7 @@ export function DeliveryDetails({
               setAddress(e.target.value)
               setSaved(false)
             }}
-            placeholder="13–15 Monte-Khoury Drive, Loganholme QLD 4129"
+            placeholder="Street, suburb, state and postcode"
             className={`${field} mt-1.5`}
           />
           <p className="mt-1.5 text-xs text-neutral-400">
