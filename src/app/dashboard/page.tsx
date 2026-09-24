@@ -355,8 +355,13 @@ export default async function DonorHomePage() {
                     </span>
                   </span>
                 )}
+                {!slh && (
+                  <span className="mb-3 block text-[13px] leading-relaxed text-white/70">
+                    Shop for a child whose family is doing it tough this Christmas.
+                  </span>
+                )}
                 <span className="flex items-center gap-2 text-[15px] font-bold">
-                  {slh ? 'View your wish lists' : 'Sign up to shop for a child'}{' '}
+                  {slh ? 'View your wish lists' : 'Find out how it works'}{' '}
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </span>
               </span>

@@ -10,6 +10,7 @@ wrap four gifts each, and deliver them back to the organisation.
 
 | Page | Who | Shows |
 |---|---|---|
+| `/dashboard/slh/about` | A supporter | What the program is, and the button that starts sign-up |
 | `/dashboard/slh/join` | A supporter | Onboarding: welcome, pick an organisation, how many lists, drop-off acknowledgement |
 | `/dashboard/slh` | A shopper | Countdown to drop-off, their wish lists, progress per child |
 | `/dashboard/slh/[id]` | A shopper | One child: interests, their own words, sizes, four gifts, six steps to tick |
@@ -247,6 +248,17 @@ organisation takes gifts at its own address inside its own dates, so a list
 released for reassignment on 25 November is fine and the same list released on
 20 December is a child without a present. That is why the window sits on
 `GiftProgramPartner` rather than the program.
+
+**Two front doors, and the URL is the difference.** Most people reach Santa's
+Little Helpers by tapping a red tile they cannot yet name, so
+`/dashboard/slh/about` explains it — including the ~$200 and the December
+drive — before asking anybody to commit. Anyone following
+**lighthousecare.org.au/santa** has read all that already, so that link points
+straight at `/dashboard/slh/join` and skips it. No detection, no flag: one
+address explains and the other signs you up.
+
+Both carry `?next=` into sign-in, because the campaign link is the one SLH
+address a signed-out stranger is most likely to hit.
 
 **Onboarding is a takeover, not a form.** Solid colour, snow, white type —
 the one moment in the app where somebody is being welcomed into something.

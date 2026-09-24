@@ -35,7 +35,9 @@ function windowLabel(opens: Date | null, closes: Date | null): string | null {
  */
 export default async function SlhJoinPage() {
   const session = await getSession()
-  if (!session) redirect('/login')
+  // lighthousecare.org.au/santa points straight here, so this is the one SLH
+  // page a signed-out stranger is most likely to hit. Keep their destination.
+  if (!session) redirect('/login?next=/dashboard/slh/join')
   // Lighthouse, or somebody who administers an approved referring
   // organisation. The shopper flow opens to everybody when the program does.
   if (!(await canShopSlh())) notFound()

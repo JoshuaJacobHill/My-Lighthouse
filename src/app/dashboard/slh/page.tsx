@@ -29,7 +29,7 @@ export const metadata = { title: 'Santa’s Little Helpers', robots: { index: fa
  */
 export default async function SlhPage() {
   const session = await getSession()
-  if (!session) redirect('/login')
+  if (!session) redirect('/login?next=/dashboard/slh')
   // Lighthouse, or somebody who administers an approved referring
   // organisation. The shopper flow opens to everybody when the program does.
   if (!(await canShopSlh())) notFound()
@@ -37,8 +37,11 @@ export default async function SlhPage() {
   const program = await activeProgram()
   if (!program) notFound()
 
+  // Not the sign-up flow: the explanation first. Most people reach this page
+  // by tapping a red tile they cannot yet name, and asking them to commit
+  // before telling them what to is how you lose them at step two.
   const shopper = await myShopper()
-  if (!shopper) redirect('/dashboard/slh/join')
+  if (!shopper) redirect('/dashboard/slh/about')
 
   const [children, partner, capacity] = await Promise.all([
     myWishLists(),
