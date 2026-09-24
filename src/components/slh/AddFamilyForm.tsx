@@ -95,8 +95,11 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
 
   return (
     <>
-      {/* Residential and kinship care: a child nominated on their own, with no
-          parent to fill anything in. Expected, not an edge case. */}
+      {/* Who fills the list in, which is not quite the same question as
+          whether a guardian exists. Residential and kinship care are the
+          obvious cases, but so is a family the organisation would rather not
+          email — a caseworker sitting down with them and writing it out is
+          often kinder than a link. Expected, not an edge case. */}
       <button
         type="button"
         onClick={() => setNoGuardian(!noGuardian)}
@@ -111,8 +114,8 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
           <Check className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
         <span className="text-sm leading-relaxed">
-          <b>No parent or guardian</b> — residential or kinship care. Your team fills in the wish
-          list.
+          <b>Organisation is filling this list</b> — select this if the wish list is being filled
+          in by your organisation, and not being sent to a parent or guardian to fill in.
         </span>
       </button>
 

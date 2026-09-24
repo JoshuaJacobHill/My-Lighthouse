@@ -155,9 +155,9 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
 
         {loose.length > 0 && (
           <>
-            <h2 className="mt-8 text-lg font-bold tracking-tight">Not linked to a family</h2>
+            <h2 className="mt-8 text-lg font-bold tracking-tight">Your team is filling these in</h2>
             <p className="mt-1 text-sm text-neutral-500">
-              For a child in residential or kinship care, where there is no parent to fill it in.
+              Nominated without a parent or guardian to send the wish list to.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {loose.map((child) => (
