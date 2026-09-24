@@ -21,7 +21,8 @@ import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { canAdminOrg } from '@/lib/organisations'
 import { canPreviewSlh } from '@/lib/features'
-import { WISH_STEPS, doneCount } from '@/lib/slh-steps'
+import { WISH_STEPS, ageOn, doneCount } from '@/lib/slh-steps'
+import { birthdayWindow } from '@/lib/slh-admin'
 import { wishListReady } from '@/lib/slh-wishlist'
 
 export type SlhOrgSummary = {
@@ -519,4 +520,189 @@ export async function myProgramOrgCards(): Promise<ProgramOrgCard[]> {
       unfilled: mine.filter((c) => !wishListReady(c)).length,
     }
   })
+}
+
+/* ── The admin lists ───────────────────────────────────────────────────────
+ *
+ * One query each, serving both audiences. `scopeToOrgs` decides what somebody
+ * is allowed to see; the filters decide what they asked to see. Keeping those
+ * two separate is what stops a filter widening an organisation's view.
+ */
+
+/**
+ * Which organisations this viewer may read across.
+ *
+ * Null means "every enrolled organisation" — Lighthouse. An array means those
+ * and no others. An empty array means nothing, which is the safe answer for
+ * somebody who administers no enrolled organisation.
+ */
+export async function slhScope(): Promise<string[] | null> {
+  const session = await getSession()
+  if (!session) return []
+  if (canPreviewSlh(session.user)) return null
+  return myProgramOrgIds()
+}
+
+export type ShopperRow = {
+  id: string
+  name: string | null
+  email: string
+  organisationId: string
+  organisation: string
+  requested: number
+  held: number
+  delivered: number
+  steps: { done: number; total: number }
+  joinedAt: Date
+  preferredAge: string
+  preferredGender: string
+}
+
+export async function shopperRows(filters: {
+  organisationId?: string
+  status?: string
+}): Promise<ShopperRow[]> {
+  const scope = await slhScope()
+  if (scope?.length === 0) return []
+
+  const program = await activeProgram()
+  if (!program) return []
+
+  // A filter narrows what you may already see; it never widens it.
+  const orgWhere =
+    filters.organisationId && (scope === null || scope.includes(filters.organisationId))
+      ? { organisationId: filters.organisationId }
+      : scope === null
+        ? {}
+        : { organisationId: { in: scope } }
+
+  const shoppers = await prisma.giftShopper.findMany({
+    where: { programId: program.id, ...orgWhere },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      organisation: { select: { id: true, name: true } },
+      user: { select: { name: true, email: true } },
+      children: {
+        select: {
+          receivedAt: true,
+          shoppedAt: true,
+          wrappedAt: true,
+          labelsAt: true,
+          dropoffAt: true,
+          deliveredAt: true,
+        },
+      },
+    },
+  })
+
+  return shoppers.map((s) => ({
+    id: s.id,
+    name: s.user.name,
+    email: s.user.email,
+    organisationId: s.organisation.id,
+    organisation: s.organisation.name,
+    requested: s.requested,
+    held: s.children.length,
+    delivered: s.children.filter((c) => c.deliveredAt).length,
+    steps: {
+      done: s.children.reduce((n, c) => n + doneCount(c), 0),
+      total: s.children.length * WISH_STEPS.length,
+    },
+    joinedAt: s.createdAt,
+    preferredAge: s.preferredAge,
+    preferredGender: s.preferredGender,
+  }))
+}
+
+export type WishListRow = {
+  id: string
+  firstName: string
+  age: number
+  gender: string
+  organisationId: string
+  organisation: string
+  filled: boolean
+  shopperId: string | null
+  shopperName: string | null
+  deliveredAt: Date | null
+  steps: { done: number; total: number }
+  guardian: string | null
+}
+
+export async function wishListRows(filters: {
+  organisationId?: string
+  gender?: string
+  age?: string
+  search?: string
+}): Promise<WishListRow[]> {
+  const scope = await slhScope()
+  if (scope?.length === 0) return []
+
+  const program = await activeProgram()
+  if (!program) return []
+
+  const orgWhere =
+    filters.organisationId && (scope === null || scope.includes(filters.organisationId))
+      ? { organisationId: filters.organisationId }
+      : scope === null
+        ? {}
+        : { organisationId: { in: scope } }
+
+  // Ages are filtered as a birthday range rather than computed per row — see
+  // `birthdayWindow`. Comparing stored dates beats loading everybody.
+  const window = filters.age ? birthdayWindow(filters.age) : null
+
+  const children = await prisma.giftChild.findMany({
+    where: {
+      programId: program.id,
+      ...orgWhere,
+      ...(filters.gender === 'girl' || filters.gender === 'boy'
+        ? { gender: filters.gender }
+        : {}),
+      ...(window ? { dateOfBirth: { gt: window.gt, lte: window.lte } } : {}),
+      ...(filters.search?.trim()
+        ? { firstName: { contains: filters.search.trim(), mode: 'insensitive' as const } }
+        : {}),
+    },
+    orderBy: [{ organisation: { name: 'asc' } }, { firstName: 'asc' }],
+    include: {
+      organisation: { select: { id: true, name: true } },
+      family: { select: { guardianName: true } },
+      shopper: { select: { id: true, user: { select: { name: true, email: true } } } },
+    },
+  })
+
+  return children.map((c) => ({
+    id: c.id,
+    firstName: c.firstName,
+    age: ageOn(c.dateOfBirth),
+    gender: c.gender,
+    organisationId: c.organisation.id,
+    organisation: c.organisation.name,
+    filled: wishListReady(c),
+    shopperId: c.shopper?.id ?? null,
+    shopperName: c.shopper ? (c.shopper.user.name ?? c.shopper.user.email) : null,
+    deliveredAt: c.deliveredAt,
+    steps: { done: doneCount(c), total: WISH_STEPS.length },
+    guardian: c.family?.guardianName ?? null,
+  }))
+}
+
+/** The organisations a viewer may filter by, for the menus on both lists. */
+export async function slhScopeOrgs(): Promise<{ id: string; name: string }[]> {
+  const scope = await slhScope()
+  if (scope?.length === 0) return []
+
+  const program = await activeProgram()
+  if (!program) return []
+
+  const partners = await prisma.giftProgramPartner.findMany({
+    where: {
+      programId: program.id,
+      ...(scope === null ? {} : { organisationId: { in: scope } }),
+    },
+    orderBy: { organisation: { name: 'asc' } },
+    select: { organisation: { select: { id: true, name: true } } },
+  })
+  return partners.map((p) => p.organisation)
 }

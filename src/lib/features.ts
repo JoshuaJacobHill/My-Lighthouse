@@ -1,4 +1,4 @@
-import { isAdminRole } from '@/lib/permissions-core'
+import { can, isAdminRole, type PermissionUser } from '@/lib/permissions-core'
 /**
  * Feature flags for the platform.
  *
@@ -33,17 +33,25 @@ export function isOnPageTicketCheckoutEnabled(): boolean {
 /**
  * Who can see the Santa's Little Helpers preview.
  *
- * A role rather than a capability, deliberately, and this is the exception that
- * proves the rule in `AGENTS.md`. A capability answers "may this person do this
- * job"; this answers "is this finished enough to show anybody", which is a
- * different question with a different lifespan. It disappears the moment the
- * program has real data and a real audience.
+ * This used to be a role check, on the grounds that "is this finished enough to
+ * show anybody" is a different question from "may this person do this job". The
+ * sample data is gone and the program now holds real children, so that reason
+ * has expired: it is a capability like everything else, and `care.slh` is the
+ * name of it.
  *
- * Until then the pages render sample data, so nobody but a super admin should
- * find them — not because the content is sensitive, but because it is fiction.
+ * Still only SUPER_ADMIN holds it. The point of naming it is that widening it —
+ * to a care manager running the program, say — becomes one line in
+ * ROLE_CAPABILITIES rather than a hunt through pages.
  */
-export function canPreviewSlh(user: { role?: string | null }): boolean {
-  return user.role === 'SUPER_ADMIN'
+export function canPreviewSlh(user: PermissionUser | { role?: string | null }): boolean {
+  return can(
+    {
+      role: user.role ?? null,
+      canViewDonations: (user as PermissionUser).canViewDonations ?? false,
+      canViewBusinessReports: (user as PermissionUser).canViewBusinessReports ?? false,
+    },
+    'care.slh',
+  )
 }
 
 function earlyAccessEmails(): string[] {

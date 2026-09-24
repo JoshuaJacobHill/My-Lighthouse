@@ -30,8 +30,7 @@ import {
   ChevronRight,
   ChevronDown,
   Menu,
-  X,
-} from 'lucide-react'
+  X, Gift } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { Capability } from '@/lib/permissions-core'
 
@@ -88,6 +87,7 @@ const nav: NavEntry[] = [
       { href: '/admin/fundraisers', label: 'Fundraisers', icon: Megaphone, needs: ['care.giving'] },
       { href: '/admin/events', label: 'Events', icon: Ticket, needs: ['care.giving'] },
       { href: '/admin/partners', label: 'Partners', icon: Building2, needs: ['care.giving'] },
+      { href: '/admin/slh', label: 'Santa’s Little Helpers', icon: Gift, needs: ['care.slh'] },
       { href: '/admin/transactions', label: 'Transactions', icon: Receipt, needs: ['care.giving', 'church.giving'] },
       { href: '/admin/migrations', label: 'Donor Migration', icon: ArrowLeftRight, needs: ['care.giving'] },
     ],

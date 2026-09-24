@@ -46,6 +46,17 @@ export type Capability =
   | 'system.users'
   /** Store sales, order volumes and marketing performance. */
   | 'business.reports'
+  /**
+   * Santa's Little Helpers: approving referring organisations, setting their
+   * allocations, and reading every shopper and wish list across the program.
+   *
+   * A capability rather than a role check, now that the program holds real
+   * children. Held only by SUPER_ADMIN for this year — the point of naming it
+   * is that widening it later is a line in ROLE_CAPABILITIES rather than a
+   * hunt through pages. It carries children's data and the reason a family was
+   * nominated, so widen it deliberately.
+   */
+  | 'care.slh'
 
 /**
  * Giving and donor-contact capabilities that a generic ADMIN only holds when

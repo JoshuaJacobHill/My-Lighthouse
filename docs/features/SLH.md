@@ -18,10 +18,27 @@ wrap four gifts each, and deliver them back to the organisation.
 | `/dashboard/slh/org/[id]/family` | The organisation | Nominating a family: guardian, consent, their children |
 | `/dashboard/slh/org/[id]/child/[childId]` | The organisation | The wish list itself: interests, colour, sizes, four gifts, their own words |
 
-Plus a card on `/dashboard`. Everything is behind `canPreviewSlh()`, which asks
-for **SUPER_ADMIN** — a role rather than a capability, deliberately. A
-capability answers "may this person do this job"; this answers "is this
-finished enough to show anybody", and it comes out when the program opens.
+Lighthouse's own administration lives in `/admin/slh`, beside partners and
+events, because running the program is administration. The supporter side
+stays at `/dashboard/slh`, which is where a shopper lives.
+
+| Admin page | Shows |
+|---|---|
+| `/admin/slh` | The hub: how many organisations, shoppers and lists, and what needs acting on |
+| `/admin/slh/shoppers` | Every shopper, their progress, and who is waiting |
+| `/admin/slh/wishlists` | Every wish list across every organisation |
+
+An organisation gets the same two lists scoped to itself, at
+`/dashboard/slh/org/[id]/shoppers` and `.../wishlists`. **One route each, not
+four** — `slhScope()` decides what somebody may read and the filters decide
+what they asked to see, which is what stops a filter widening an
+organisation's view.
+
+Access is the **`care.slh` capability**, held only by SUPER_ADMIN. It used to
+be a bare role check on the grounds that "is this finished enough to show
+anybody" is a different question from "may this person do this job" — true
+while the pages rendered fiction, and expired the moment they held real
+children. Widening it later is one line in `ROLE_CAPABILITIES`.
 
 **There is no sample data.** `slh-sample.ts` is gone. Every name, child and
 family on these pages is a row somebody entered.
@@ -183,6 +200,29 @@ back.
 
 **Lists in hand are the floor.** The counter cannot go below what has already
 been assigned — dropping those is the separate, deliberate act above.
+
+**A status nobody stores cannot go stale.** Both lists derive their status
+from counts — a shopper is "waiting" when they hold fewer lists than they
+asked for, a list is "unfilled" when the four gifts are not all answered — so
+assigning or handing back a list cannot leave a label behind. The cost is that
+status is filtered in memory rather than in the query, which is the right
+trade at this size.
+
+**A list that is assigned but unfilled reads as "not filled in".** That is the
+more urgent fact: somebody is shopping from a list nobody has answered.
+
+**The waiting list is a filter, not a page.** Who is waiting only means
+something next to who is being served, and a separate screen is one somebody
+has to remember to open.
+
+**Filters live in the URL.** A narrowed view can be sent to a colleague,
+bookmarked, or survive a refresh. An unrecognised value shows everything
+rather than an error — a mistyped URL should not produce a screen full of
+apology.
+
+**Ages filter as a birthday range, not a computed age.** `birthdayWindow()`
+inverts the question so stored dates can be compared in the query instead of
+loading every child to work out how old they are.
 
 **Progress is per wish list.** An overall "8 of 18 steps" bar was removed: it
 measured nothing a shopper acts on. Six timestamps on `GiftChild` rather than a

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, ChevronRight, Users } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Gift, Users } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { formatDate } from '@/lib/utils'
 import {
@@ -186,6 +186,36 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
         />
 
         <div className="mt-8 divide-y divide-neutral-100 overflow-hidden rounded-[28px] border border-neutral-200">
+          <Link
+            href={`/dashboard/slh/org/${org.id}/wishlists`}
+            className="flex items-center gap-3 px-5 py-4 transition-colors hover:bg-neutral-50"
+          >
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-neutral-100 text-neutral-500">
+              <Gift className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold">All wish lists</span>
+              <span className="block text-[13px] text-neutral-400">
+                Every child, and what is holding each list up
+              </span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
+          </Link>
+          <Link
+            href={`/dashboard/slh/org/${org.id}/shoppers`}
+            className="flex items-center gap-3 px-5 py-4 transition-colors hover:bg-neutral-50"
+          >
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-neutral-100 text-neutral-500">
+              <Users className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold">Shoppers</span>
+              <span className="block text-[13px] text-neutral-400">
+                Who is shopping for your children, and who is still waiting
+              </span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
+          </Link>
           <Link
             href={`/partners/${org.slug}`}
             className="flex items-center gap-3 px-5 py-4 transition-colors hover:bg-neutral-50"
