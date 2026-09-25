@@ -29,8 +29,13 @@ export const bannedTerms = cache(async (): Promise<string[]> => {
       where: { key: BANNED_TERMS_KEY },
       select: { value: true },
     })
-    const extra = row ? parseTerms(row.value) : []
-    return [...new Set([...DEFAULT_BANNED_TERMS, ...extra])]
+    // Once somebody has edited the list, it IS the list — including the
+    // removals. The defaults are a starting point offered on the way in, not a
+    // floor underneath it: a term that cannot be taken off is one somebody
+    // will work around by typing "playstation 5 " with a space, and then the
+    // list is lying about what it catches.
+    if (row) return parseTerms(row.value)
+    return [...DEFAULT_BANNED_TERMS]
   } catch (err) {
     console.error('bannedTerms failed', err)
     // The defaults still protect the common cases. A database hiccup should
@@ -39,11 +44,15 @@ export const bannedTerms = cache(async (): Promise<string[]> => {
   }
 })
 
-/** Just the added ones, for the admin screen to show and edit. */
-export async function extraBannedTerms(): Promise<string[]> {
+/**
+ * The list as the admin screen should show it: what is saved, or the defaults
+ * for somebody who has never edited it. Seeded rather than empty, so the first
+ * person to open it can see what is already being caught and take things out.
+ */
+export async function editableBannedTerms(): Promise<string[]> {
   const row = await prisma.appSetting.findUnique({
     where: { key: BANNED_TERMS_KEY },
     select: { value: true },
   })
-  return row ? parseTerms(row.value) : []
+  return row ? parseTerms(row.value) : [...DEFAULT_BANNED_TERMS]
 }

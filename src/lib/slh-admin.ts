@@ -132,3 +132,81 @@ export function birthdayWindow(band: string, on: Date = new Date()) {
     lte: new Date(Date.UTC(year - range.min, month, day)),
   }
 }
+
+/* ── Handing lists out ─────────────────────────────────────────────────────── */
+
+export type AssignableChild = {
+  id: string
+  organisationId: string
+  gender: string
+  age: number
+  /** Oldest first is fairest: a child nominated in October should not wait. */
+  nominatedAt: number
+}
+
+export type AssignableShopper = {
+  id: string
+  organisationId: string
+  preferredAge: string
+  preferredGender: string
+  /** How many more they are owed. */
+  wants: number
+}
+
+/** Does this child match what this shopper asked for? */
+export function matches(child: AssignableChild, shopper: AssignableShopper): boolean {
+  if (child.organisationId !== shopper.organisationId) return false
+  if (shopper.preferredGender !== 'any' && child.gender !== shopper.preferredGender) return false
+  if (shopper.preferredAge !== 'any') {
+    const range = ageRange(shopper.preferredAge)
+    if (range && (child.age < range.min || child.age > range.max)) return false
+  }
+  return true
+}
+
+/**
+ * Who gets which lists.
+ *
+ * **Fussy shoppers first.** Filling people in sign-up order lets everybody who
+ * said "any" scoop up the easy children early, and then somebody who asked for
+ * a girl aged 5–8 finds none left while fifteen-year-old boys sit unassigned
+ * into December. Ordering by how small each shopper's matching pool is spends
+ * the flexible people last, where they can mop up whoever remains. Same total,
+ * very different outcome for the children nobody picked.
+ *
+ * A preference is never broken to make a number work. A shopper who asked for
+ * a girl and cannot be given one is left short, and the page says so — a
+ * supporter who gets a surprise should hear it from a person.
+ *
+ * Pure: takes what it is given, returns a plan, touches nothing.
+ */
+export function planAssignments(
+  shoppers: AssignableShopper[],
+  children: AssignableChild[],
+): { shopperId: string; childIds: string[] }[] {
+  const pool = [...children].sort((a, b) => a.nominatedAt - b.nominatedAt)
+  const taken = new Set<string>()
+
+  // Fewest options first. Ties broken by who wants more, so a single pass
+  // does not leave somebody holding one list when they asked for three.
+  const order = [...shoppers]
+    .filter((s) => s.wants > 0)
+    .map((s) => ({ shopper: s, options: pool.filter((c) => matches(c, s)).length }))
+    .sort((a, b) => a.options - b.options || b.shopper.wants - a.shopper.wants)
+
+  const plan: { shopperId: string; childIds: string[] }[] = []
+
+  for (const { shopper } of order) {
+    const childIds: string[] = []
+    for (const child of pool) {
+      if (childIds.length >= shopper.wants) break
+      if (taken.has(child.id)) continue
+      if (!matches(child, shopper)) continue
+      taken.add(child.id)
+      childIds.push(child.id)
+    }
+    if (childIds.length > 0) plan.push({ shopperId: shopper.id, childIds })
+  }
+
+  return plan
+}

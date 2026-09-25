@@ -6,7 +6,8 @@ import { getSession } from '@/lib/auth'
 import { canPreviewSlh } from '@/lib/features'
 import { activeProgram, canOpenSlhOrg, shopperCapacity } from '@/lib/slh'
 import { canSubmit, clampRequest, cleanAge, cleanCount, cleanGender } from '@/lib/slh-onboarding'
-import { WISH_STEPS, stepField, type WishStepKey } from '@/lib/slh-steps'
+import { WISH_STEPS, ageOn, stepField, type WishStepKey } from '@/lib/slh-steps'
+import { planAssignments } from '@/lib/slh-admin'
 import { cleanBand, cleanInterests } from '@/lib/slh-wishlist'
 import { bannedMessage, bannedTermIn, parseTerms } from '@/lib/wishlist-limits'
 import { BANNED_TERMS_KEY, bannedTerms } from '@/lib/wishlist-limits.server'
@@ -815,5 +816,199 @@ export async function setBannedTermsAction(formData: FormData): Promise<Result> 
   } catch (err) {
     console.error('setBannedTermsAction failed', err)
     return { success: false, error: 'Could not save that list.' }
+  }
+}
+
+/* ── Handing lists out ─────────────────────────────────────────────────────── */
+
+/**
+ * Give specific wish lists to one shopper.
+ *
+ * Scoped to the shopper's own organisation and to children nobody else holds,
+ * checked in the write rather than before it — two people doing this at once
+ * is exactly when a stale page hands the same child to two shoppers.
+ */
+export async function assignChildrenAction(formData: FormData): Promise<Result> {
+  if (!(await requireLighthouseAdmin())) return { success: false, error: 'Not allowed.' }
+
+  const shopperId = String(formData.get('shopperId') ?? '')
+  let childIds: string[] = []
+  try {
+    const raw = JSON.parse(String(formData.get('childIds') ?? '[]'))
+    if (Array.isArray(raw)) childIds = raw.map((id) => String(id))
+  } catch {
+    return { success: false, error: 'Could not read that selection.' }
+  }
+  if (!shopperId || childIds.length === 0) return { success: false, error: 'Nothing to assign.' }
+
+  const shopper = await prisma.giftShopper.findUnique({ where: { id: shopperId } })
+  if (!shopper) return { success: false, error: 'No such shopper.' }
+
+  try {
+    const { count } = await prisma.giftChild.updateMany({
+      where: {
+        id: { in: childIds },
+        organisationId: shopper.organisationId,
+        // Only children nobody is already holding.
+        shopperId: null,
+      },
+      data: { shopperId: shopper.id },
+    })
+
+    revalidatePath('/admin/slh/wishlists')
+    revalidatePath('/admin/slh/shoppers')
+    revalidatePath(`/admin/slh/shoppers/${shopper.id}`)
+
+    if (count === 0) {
+      return { success: false, error: 'Those lists have already been given to somebody else.' }
+    }
+    if (count < childIds.length) {
+      return {
+        success: true,
+        error: `${childIds.length - count} of those had already been taken.`,
+      }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error('assignChildrenAction failed', err)
+    return { success: false, error: 'Could not assign those.' }
+  }
+}
+
+/**
+ * Take wish lists back off whoever is holding them.
+ *
+ * Clears the steps with it, because the next shopper has not shopped or
+ * wrapped anything and inheriting somebody else's ticks would tell them they
+ * had. Same reasoning as a shopper handing one back themselves.
+ */
+export async function unassignChildrenAction(formData: FormData): Promise<Result> {
+  if (!(await requireLighthouseAdmin())) return { success: false, error: 'Not allowed.' }
+
+  let childIds: string[] = []
+  try {
+    const raw = JSON.parse(String(formData.get('childIds') ?? '[]'))
+    if (Array.isArray(raw)) childIds = raw.map((id) => String(id))
+  } catch {
+    return { success: false, error: 'Could not read that selection.' }
+  }
+  if (childIds.length === 0) return { success: false, error: 'Nothing selected.' }
+
+  try {
+    await prisma.giftChild.updateMany({
+      where: { id: { in: childIds } },
+      data: {
+        shopperId: null,
+        receivedAt: null,
+        shoppedAt: null,
+        wrappedAt: null,
+        labelsAt: null,
+        dropoffAt: null,
+        deliveredAt: null,
+      },
+    })
+    revalidatePath('/admin/slh/wishlists')
+    revalidatePath('/admin/slh/shoppers')
+    return { success: true }
+  } catch (err) {
+    console.error('unassignChildrenAction failed', err)
+    return { success: false, error: 'Could not take those back.' }
+  }
+}
+
+/**
+ * Give these shoppers the lists they are waiting on.
+ *
+ * The matching step, run deliberately rather than on a timer. `planAssignments`
+ * decides who gets what — fussy shoppers first, longest-waiting children
+ * first, preferences never broken to make a number work — and this writes the
+ * plan.
+ *
+ * Reports what it could NOT do as well as what it did. A shopper left short
+ * because nobody matching their request is waiting is a fact somebody needs to
+ * act on, not a silence.
+ */
+export async function fillShoppersAction(formData: FormData): Promise<
+  Result & { assigned?: number; short?: number }
+> {
+  if (!(await requireLighthouseAdmin())) return { success: false, error: 'Not allowed.' }
+
+  const program = await activeProgram()
+  if (!program) return { success: false, error: 'No program is running.' }
+
+  let shopperIds: string[] = []
+  try {
+    const raw = JSON.parse(String(formData.get('shopperIds') ?? '[]'))
+    if (Array.isArray(raw)) shopperIds = raw.map((id) => String(id))
+  } catch {
+    return { success: false, error: 'Could not read that selection.' }
+  }
+  if (shopperIds.length === 0) return { success: false, error: 'Nobody selected.' }
+
+  try {
+    const shoppers = await prisma.giftShopper.findMany({
+      where: { id: { in: shopperIds }, programId: program.id },
+      include: { _count: { select: { children: true } } },
+    })
+
+    const waiting = await prisma.giftChild.findMany({
+      where: {
+        programId: program.id,
+        shopperId: null,
+        organisationId: { in: [...new Set(shoppers.map((s) => s.organisationId))] },
+      },
+      select: {
+        id: true,
+        organisationId: true,
+        gender: true,
+        dateOfBirth: true,
+        createdAt: true,
+      },
+    })
+
+    const plan = planAssignments(
+      shoppers.map((s) => ({
+        id: s.id,
+        organisationId: s.organisationId,
+        preferredAge: s.preferredAge,
+        preferredGender: s.preferredGender,
+        wants: Math.max(0, s.requested - s._count.children),
+      })),
+      waiting.map((c) => ({
+        id: c.id,
+        organisationId: c.organisationId,
+        gender: c.gender,
+        age: ageOn(c.dateOfBirth),
+        nominatedAt: c.createdAt.getTime(),
+      })),
+    )
+
+    let assigned = 0
+    await prisma.$transaction(
+      plan.map((p) => {
+        assigned += p.childIds.length
+        return prisma.giftChild.updateMany({
+          where: { id: { in: p.childIds }, shopperId: null },
+          data: { shopperId: p.shopperId },
+        })
+      }),
+    )
+
+    const wanted = shoppers.reduce(
+      (n, s) => n + Math.max(0, s.requested - s._count.children),
+      0,
+    )
+
+    revalidatePath('/admin/slh/shoppers')
+    revalidatePath('/admin/slh/wishlists')
+
+    return {
+      success: true,
+      assigned,
+      short: Math.max(0, wanted - assigned),
+    }
+  } catch (err) {
+    console.error('fillShoppersAction failed', err)
+    return { success: false, error: 'Could not hand those out.' }
   }
 }

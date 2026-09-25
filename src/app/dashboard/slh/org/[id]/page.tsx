@@ -96,7 +96,7 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
           <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-neutral-100 text-base font-extrabold text-neutral-500">
             {org.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={org.logoUrl} alt="" className="h-full w-full object-cover" />
+              <img src={org.logoUrl} alt="" className="h-full w-full object-contain p-0.5" />
             ) : (
               org.name.slice(0, 2).toUpperCase()
             )}
@@ -150,7 +150,7 @@ export default async function SlhOrgPage({ params }: { params: Promise<{ id: str
         </Link>
 
         <div className="mt-8">
-          <FamilyList families={families} organisationId={org.id} />
+          <FamilyList families={families} organisationId={org.id} remaining={remaining} />
         </div>
 
         {loose.length > 0 && (

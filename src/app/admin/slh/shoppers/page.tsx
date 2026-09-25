@@ -6,7 +6,8 @@ import { canPreviewSlh } from '@/lib/features'
 import { shopperRows, slhScopeOrgs } from '@/lib/slh'
 import { SHOPPER_STATUS, shopperStatus, type ShopperStatus } from '@/lib/slh-admin'
 import { ListFilters } from '@/components/slh/ListFilters'
-import { ShopperSummary, ShopperTable } from '@/components/slh/ShopperTable'
+import { ShopperSummary } from '@/components/slh/ShopperTable'
+import { ShopperBulk } from '@/components/slh/ShopperBulk'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Shoppers', robots: { index: false } }
@@ -75,7 +76,7 @@ export default async function AdminShoppersPage({
         ]}
       />
 
-      <ShopperTable rows={rows} showOrganisation />
+      <ShopperBulk rows={rows} showOrganisation />
     </div>
   )
 }

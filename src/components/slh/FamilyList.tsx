@@ -27,9 +27,12 @@ export type FamilyRow = {
 export function FamilyList({
   families,
   organisationId,
+  remaining = 0,
 }: {
   families: FamilyRow[]
   organisationId: string
+  /** Allocation not yet used — children this organisation may still nominate. */
+  remaining?: number
 }) {
   const [picking, setPicking] = React.useState(false)
   const [picked, setPicked] = React.useState<string[]>([])
@@ -58,6 +61,10 @@ export function FamilyList({
         </button>
       </div>
 
+      {/* Three different states, and only the last one is good news. Saying
+          "nothing to chase" while an allocation sits unused is how an
+          organisation reaches December having nominated half the children it
+          could have. */}
       {outstanding.length > 0 ? (
         <p className="mt-1.5 text-sm text-neutral-500">
           <b className="text-[#c8102e]">
@@ -80,6 +87,15 @@ export function FamilyList({
             </button>
           )}
         </p>
+      ) : remaining > 0 ? (
+        <p className="mt-1.5 text-sm text-neutral-500">
+          <b className="text-[#c8102e]">
+            You still have {remaining} wish {remaining === 1 ? 'list' : 'lists'}
+          </b>{' '}
+          to give to {remaining === 1 ? 'a child' : 'children'}.
+        </p>
+      ) : families.length === 0 ? (
+        <p className="mt-1.5 text-sm text-neutral-500">No families nominated yet.</p>
       ) : (
         <p className="mt-1.5 text-sm text-neutral-500">
           Every wish list is filled in. Nothing to chase.

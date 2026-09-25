@@ -711,3 +711,38 @@ export async function slhScopeOrgs(): Promise<{ id: string; name: string }[]> {
   })
   return partners.map((p) => p.organisation)
 }
+
+/** One shopper, everything about them. Null when not allowed or not there. */
+export async function shopperDetail(id: string) {
+  const scope = await slhScope()
+  if (scope?.length === 0) return null
+
+  const program = await activeProgram()
+  if (!program) return null
+
+  return prisma.giftShopper.findFirst({
+    where: {
+      id,
+      programId: program.id,
+      ...(scope === null ? {} : { organisationId: { in: scope } }),
+    },
+    include: {
+      user: { select: { id: true, name: true, email: true, imageUrl: true } },
+      organisation: { select: { id: true, name: true } },
+      children: { orderBy: { firstName: 'asc' } },
+    },
+  })
+}
+
+/** Shoppers a list could be handed to, for the picker on the wish lists page. */
+export async function assignableShoppers(): Promise<
+  { id: string; name: string; organisationId: string; shortfall: number }[]
+> {
+  const rows = await shopperRows({})
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name ?? r.email,
+    organisationId: r.organisationId,
+    shortfall: Math.max(0, r.requested - r.held),
+  }))
+}

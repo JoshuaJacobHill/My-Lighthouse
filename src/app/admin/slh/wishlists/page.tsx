@@ -3,10 +3,11 @@ import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { canPreviewSlh } from '@/lib/features'
-import { wishListRows, slhScopeOrgs } from '@/lib/slh'
+import { assignableShoppers, wishListRows, slhScopeOrgs } from '@/lib/slh'
 import { AGE_FILTERS, LIST_STATUS, listStatus, type ListStatus } from '@/lib/slh-admin'
 import { ListFilters } from '@/components/slh/ListFilters'
-import { WishListSummary, WishListTable } from '@/components/slh/WishListTable'
+import { WishListSummary } from '@/components/slh/WishListTable'
+import { WishListBulk } from '@/components/slh/WishListBulk'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Wish lists', robots: { index: false } }
@@ -34,7 +35,7 @@ export default async function AdminWishListsPage({
   }
 
   const status = one('status')
-  const [orgs, all] = await Promise.all([
+  const [orgs, all, shoppers] = await Promise.all([
     slhScopeOrgs(),
     wishListRows({
       organisationId: one('org'),
@@ -42,6 +43,7 @@ export default async function AdminWishListsPage({
       age: one('age'),
       search: one('q'),
     }),
+    assignableShoppers(),
   ])
 
   // Status is derived, so it cannot be a `where` clause.
@@ -91,8 +93,9 @@ export default async function AdminWishListsPage({
         ]}
       />
 
-      <WishListTable
+      <WishListBulk
         rows={rows}
+        shoppers={shoppers}
         showOrganisation
         showGuardian={false}
         hrefFor={(row) => `/dashboard/slh/org/${row.organisationId}/child/${row.id}`}

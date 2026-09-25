@@ -12,18 +12,14 @@ import { setBannedTermsAction } from '@/lib/actions/slh.actions'
  * console puts them in an impossible position in December. Catching it as a
  * child types means the family gets asked again while there is still time.
  *
- * This box holds **additions only**. The built-in list stays whatever is here,
- * so an empty box cannot quietly un-ban a PlayStation.
+ * The box is seeded with the built-in list so it can be edited in full —
+ * things taken out as well as added. A term that cannot be removed is one
+ * somebody works around by typing it with a trailing space, and then the list
+ * is lying about what it catches.
  */
-export function BannedTerms({
-  extra,
-  builtInCount,
-}: {
-  extra: string[]
-  builtInCount: number
-}) {
+export function BannedTerms({ terms: initial }: { terms: string[] }) {
   const router = useRouter()
-  const [terms, setTerms] = useState(extra.join('\n'))
+  const [terms, setTerms] = useState(initial.join('\n'))
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [pending, startTransition] = useTransition()
@@ -53,7 +49,7 @@ export function BannedTerms({
       </p>
 
       <label className="mt-4 block text-[13px] font-bold" htmlFor="bannedTerms">
-        Add your own — one per line
+        One per line — add or remove freely
       </label>
       <textarea
         id="bannedTerms"
@@ -67,8 +63,8 @@ export function BannedTerms({
         className="mt-1.5 w-full rounded-2xl border border-neutral-200 px-4 py-3 font-mono text-sm focus:border-neutral-400 focus:outline-none"
       />
       <p className="mt-1.5 text-xs text-neutral-400">
-        {builtInCount} are built in already — consoles, tablets, phones, drones, live animals.
-        Anything here is added to those, so clearing this box cannot switch them off.
+        {initial.length} to start with — consoles, tablets, phones, drones, big-ticket toys, cash
+        and live animals. This is the whole list: whatever is here is what gets caught.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">

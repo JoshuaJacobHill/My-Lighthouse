@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { birthdayWindow, listStatus, shopperStatus, shortfall, oneOf } from './slh-admin'
+import {
+  birthdayWindow,
+  listStatus,
+  planAssignments,
+  shopperStatus,
+  shortfall,
+  oneOf,
+  type AssignableChild,
+  type AssignableShopper,
+} from './slh-admin'
 
 describe('shopperStatus', () => {
   it('is waiting when they have asked for more than they hold', () => {
@@ -75,5 +84,85 @@ describe('birthdayWindow', () => {
 
   it('is null for a band nobody offers', () => {
     expect(birthdayWindow('99-100')).toBeNull()
+  })
+})
+
+describe('planAssignments', () => {
+  const child = (
+    id: string,
+    over: Partial<AssignableChild> = {},
+  ): AssignableChild => ({
+    id,
+    organisationId: 'org',
+    gender: 'girl',
+    age: 7,
+    nominatedAt: 1,
+    ...over,
+  })
+  const shopper = (
+    id: string,
+    over: Partial<AssignableShopper> = {},
+  ): AssignableShopper => ({
+    id,
+    organisationId: 'org',
+    preferredAge: 'any',
+    preferredGender: 'any',
+    wants: 1,
+    ...over,
+  })
+
+  it('never gives one child to two shoppers', () => {
+    const plan = planAssignments([shopper('a'), shopper('b')], [child('kid')])
+    expect(plan.flatMap((p) => p.childIds)).toEqual(['kid'])
+  })
+
+  it('spends the fussy shoppers first, so nobody is starved', () => {
+    // The bug this exists to prevent: "any" takes the only girl, and the
+    // shopper who asked for a girl gets nothing while a boy goes unassigned.
+    const plan = planAssignments(
+      [shopper('flexible'), shopper('wants-girl', { preferredGender: 'girl' })],
+      [child('girl-1', { gender: 'girl' }), child('boy-1', { gender: 'boy' })],
+    )
+    const byShopper = Object.fromEntries(plan.map((p) => [p.shopperId, p.childIds]))
+    expect(byShopper['wants-girl']).toEqual(['girl-1'])
+    expect(byShopper['flexible']).toEqual(['boy-1'])
+  })
+
+  it('respects an age band and leaves somebody short rather than breaking it', () => {
+    const plan = planAssignments(
+      [shopper('teens', { preferredAge: '13-17' })],
+      [child('little', { age: 6 })],
+    )
+    // No match is better than a surprise: they are left short and the page
+    // says so.
+    expect(plan).toEqual([])
+  })
+
+  it('takes the longest-waiting children first', () => {
+    const plan = planAssignments(
+      [shopper('a', { wants: 1 })],
+      [child('newer', { nominatedAt: 200 }), child('older', { nominatedAt: 100 })],
+    )
+    expect(plan[0].childIds).toEqual(['older'])
+  })
+
+  it('never crosses organisations', () => {
+    const plan = planAssignments(
+      [shopper('a', { organisationId: 'org-1' })],
+      [child('kid', { organisationId: 'org-2' })],
+    )
+    expect(plan).toEqual([])
+  })
+
+  it('gives a shopper no more than they asked for', () => {
+    const plan = planAssignments(
+      [shopper('a', { wants: 2 })],
+      [child('1'), child('2'), child('3')],
+    )
+    expect(plan[0].childIds).toHaveLength(2)
+  })
+
+  it('ignores somebody who is not owed anything', () => {
+    expect(planAssignments([shopper('a', { wants: 0 })], [child('1')])).toEqual([])
   })
 })

@@ -270,7 +270,7 @@ export default async function DonorHomePage() {
                   <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-neutral-100 text-sm font-extrabold text-neutral-500">
                     {org.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={org.logoUrl} alt="" className="h-full w-full object-cover" />
+                      <img src={org.logoUrl} alt="" className="h-full w-full object-contain p-0.5" />
                     ) : (
                       org.name.slice(0, 2).toUpperCase()
                     )}
