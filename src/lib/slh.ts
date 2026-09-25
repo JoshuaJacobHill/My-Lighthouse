@@ -450,19 +450,24 @@ export async function myProgramOrgIds(): Promise<string[]> {
 /**
  * May this person use the shopper side?
  *
- * Wider than `canPreviewSlh` on purpose. While the program is being set up the
- * audience is "people involved in it" rather than "Lighthouse staff": somebody
- * who administers an approved referring organisation needs to walk the shopper
- * flow, both to test it and because they are often the first shopper.
+ * **Anybody with an account, once a program is running.** Shopping for a child
+ * is not an administrative privilege — it is the thing the program is asking
+ * the public to do, and lighthousecare.org.au/santa points members of the
+ * public straight at the sign-up flow.
  *
- * This is the gate that opens to everybody when the program goes live. The
- * super-admin clause is scaffolding; the organisation clause is not.
+ * The gate that remains is the program itself. Before one is started there is
+ * nothing to sign up to, and an empty onboarding flow is worse than an honest
+ * absence: somebody who gets three screens in and finds no organisations has
+ * been wasted, whereas somebody who never sees the card has lost nothing.
+ *
+ * Note what this is NOT: `canPreviewSlh` (`care.slh`) still guards everything
+ * administrative — approving referrers, allocations, every shopper and every
+ * wish list across the program. This opens the supporter's own door only.
  */
 export async function canShopSlh(): Promise<boolean> {
   const session = await getSession()
   if (!session) return false
-  if (canPreviewSlh(session.user)) return true
-  return (await myProgramOrgIds()).length > 0
+  return (await activeProgram()) !== null
 }
 
 export type ProgramOrgCard = {

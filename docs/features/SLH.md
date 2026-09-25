@@ -35,7 +35,15 @@ four** — `slhScope()` decides what somebody may read and the filters decide
 what they asked to see, which is what stops a filter widening an
 organisation's view.
 
-Access is the **`care.slh` capability**, held only by SUPER_ADMIN. It used to
+**The supporter side is open to anybody with an account**, once a program is
+running — shopping for a child is the thing the program asks the public to do,
+and lighthousecare.org.au/santa points straight at
+`/dashboard/slh/join`. `canShopSlh()` is that gate, and the only condition
+left in it is that a program exists: an empty onboarding flow is worse than an
+honest absence, because somebody three screens in with no organisations to
+choose has been wasted.
+
+Administration is the **`care.slh` capability**, held only by SUPER_ADMIN. It used to
 be a bare role check on the grounds that "is this finished enough to show
 anybody" is a different question from "may this person do this job" — true
 while the pages rendered fiction, and expired the moment they held real
