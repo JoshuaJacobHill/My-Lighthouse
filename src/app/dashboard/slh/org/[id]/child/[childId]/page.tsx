@@ -7,6 +7,7 @@ import { canOpenSlhOrg, slhOrg } from '@/lib/slh'
 import { ageOn } from '@/lib/slh-steps'
 import { ChildAvatar } from '@/components/slh/ChildAvatar'
 import { WishListForm } from '@/components/slh/WishListForm'
+import { bannedTerms } from '@/lib/wishlist-limits.server'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Wish list', robots: { index: false } }
@@ -29,7 +30,7 @@ export default async function OrgWishListPage({
   const { id, childId } = await params
   if (!(await canOpenSlhOrg(id))) notFound()
 
-  const [org, child] = await Promise.all([
+  const [org, child, banned] = await Promise.all([
     slhOrg(id),
     // Scoped to this organisation, so an admin of one referrer cannot open
     // another's child by guessing an id.
@@ -37,6 +38,7 @@ export default async function OrgWishListPage({
       where: { id: childId, organisationId: id },
       include: { family: { select: { guardianName: true } } },
     }),
+    bannedTerms(),
   ])
   if (!org || !child) notFound()
 
@@ -69,6 +71,7 @@ export default async function OrgWishListPage({
           childId={child.id}
           childName={child.firstName}
           storyApproved={child.storyApproved}
+          bannedTerms={banned}
           initial={{
             favouriteColour: child.favouriteColour ?? '',
             clothesBand: child.clothesBand ?? '',

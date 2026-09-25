@@ -23,29 +23,42 @@
 
 export const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'CARE_MANAGER', 'CHURCH_MANAGER'] as const
 
-export type Capability =
+/**
+ * Every capability, as a value rather than only a type.
+ *
+ * A list, so `getCapabilities()` can iterate it. That used to be a second,
+ * hand-written copy in `permissions.ts` — and it was missed three times:
+ * `business.reports` (which hid marketing and media from everyone, SUPER_ADMIN
+ * included), then `care.slh` and `care.families`, which hid their nav items
+ * the same way. A capability the sidebar never hears about is a page nobody
+ * can reach.
+ *
+ * `Capability` is derived from this, so adding one here is the only step and
+ * forgetting is no longer possible.
+ */
+export const ALL_CAPABILITIES = [
   /** Volunteer, staff and trainee records; rosters, attendance, inductions, feedback. */
-  | 'care.people'
+  'care.people',
   /** Staff tasks and the cleaning/maintenance checklists. */
-  | 'care.tasks'
+  'care.tasks',
   /** Good news stories aimed at volunteers, staff and Care supporters. */
-  | 'care.stories'
+  'care.stories',
   /** Lighthouse Care giving — donors, funds, fundraisers, events, Care transactions. */
-  | 'care.giving'
+  'care.giving',
   /** Contact details of church members. */
-  | 'church.members'
+  'church.members',
   /** Tithes and church giving transactions. */
-  | 'church.giving'
+  'church.giving',
   /** Good news stories aimed at the church. */
-  | 'church.stories'
+  'church.stories',
   /** Church serving teams. */
-  | 'church.teams'
+  'church.teams',
   /** App-wide settings and email templates. */
-  | 'system.settings'
+  'system.settings',
   /** Creating admins and assigning roles. */
-  | 'system.users'
+  'system.users',
   /** Store sales, order volumes and marketing performance. */
-  | 'business.reports'
+  'business.reports',
   /**
    * Santa's Little Helpers: approving referring organisations, setting their
    * allocations, and reading every shopper and wish list across the program.
@@ -56,7 +69,7 @@ export type Capability =
    * hunt through pages. It carries children's data and the reason a family was
    * nominated, so widen it deliberately.
    */
-  | 'care.slh'
+  'care.slh',
   /**
    * The households Lighthouse supports: who they are, what they have received,
    * case notes and referrals.
@@ -67,7 +80,10 @@ export type Capability =
    * somebody decides otherwise on purpose, and deliberately NOT bundled with
    * `care.people`: knowing the roster is not a reason to read a case note.
    */
-  | 'care.families'
+  'care.families',
+] as const
+
+export type Capability = (typeof ALL_CAPABILITIES)[number]
 
 /**
  * Giving and donor-contact capabilities that a generic ADMIN only holds when

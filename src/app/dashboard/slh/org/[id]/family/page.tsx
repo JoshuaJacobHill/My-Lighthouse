@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { canOpenSlhOrg, slhOrg } from '@/lib/slh'
 import { AddFamilyForm } from '@/components/slh/AddFamilyForm'
+import { bannedTerms } from '@/lib/wishlist-limits.server'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Add a family', robots: { index: false } }
@@ -21,7 +22,7 @@ export default async function AddFamilyPage({ params }: { params: Promise<{ id: 
 
   const { id } = await params
   if (!(await canOpenSlhOrg(id))) notFound()
-  const org = await slhOrg(id)
+  const [org, banned] = await Promise.all([slhOrg(id), bannedTerms()])
   if (!org) notFound()
 
   return (
@@ -39,7 +40,7 @@ export default async function AddFamilyPage({ params }: { params: Promise<{ id: 
           The guardian&rsquo;s details stay with you and Lighthouse. A shopper never sees them.
         </p>
 
-        <AddFamilyForm organisationId={org.id} />
+        <AddFamilyForm organisationId={org.id} bannedTerms={banned} />
 
         <div className="mt-8 rounded-[28px] bg-neutral-50 p-5">
           <b className="text-sm">Would the family rather fill it in themselves?</b>

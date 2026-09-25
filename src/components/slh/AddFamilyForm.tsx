@@ -47,7 +47,14 @@ const emptyChild = (key: number): ChildRow => ({
   wish: { ...EMPTY_WISH_LIST },
 })
 
-export function AddFamilyForm({ organisationId }: { organisationId: string }) {
+export function AddFamilyForm({
+  organisationId,
+  bannedTerms = [],
+}: {
+  organisationId: string
+  /** Things a wish list cannot ask for. Checked again on save. */
+  bannedTerms?: string[]
+}) {
   const router = useRouter()
   const [noGuardian, setNoGuardian] = useState(false)
   const [guardianName, setGuardianName] = useState('')
@@ -335,6 +342,7 @@ export function AddFamilyForm({ organisationId }: { organisationId: string }) {
                     setChild(child.key, { wish: { ...child.wish, ...patch } })
                   }
                   childName={child.firstName}
+                  bannedTerms={bannedTerms}
                 />
               </div>
             </details>

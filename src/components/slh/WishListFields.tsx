@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { GARMENTS, INTERESTS, SIZE_BANDS, SWATCHES, WISH_KINDS } from '@/lib/slh-wishlist'
+import { bannedMessage, bannedTermIn } from '@/lib/wishlist-limits'
 
 /**
  * The wish list questions themselves.
@@ -89,6 +90,7 @@ export function WishListFields({
   onChange,
   childName,
   storyNote,
+  bannedTerms = [],
 }: {
   /** Unique per child, so labels and inputs stay paired when there are siblings. */
   idPrefix: string
@@ -96,6 +98,8 @@ export function WishListFields({
   onChange: (patch: Partial<WishListValues>) => void
   childName?: string
   storyNote?: string
+  /** Things we cannot promise. Checked again on save; this is the kind version. */
+  bannedTerms?: string[]
 }) {
   const [custom, setCustom] = useState('')
 
@@ -281,6 +285,9 @@ export function WishListFields({
 
       {WISH_KINDS.map(([key, title, hint]) => {
         const prop = `wish${key[0].toUpperCase()}${key.slice(1)}` as keyof WishListValues
+        // Said while they are still typing, so the answer can be changed in
+        // the moment rather than bounced back at them on save.
+        const banned = bannedTermIn(String(v[prop] ?? ''), bannedTerms)
         return (
           <div key={key}>
             <label
@@ -294,8 +301,14 @@ export function WishListFields({
               id={`${idPrefix}-${key}`}
               value={v[prop] as string}
               onChange={(e) => onChange({ [prop]: e.target.value } as Partial<WishListValues>)}
-              className={`${field} mt-2`}
+              aria-invalid={banned ? true : undefined}
+              className={`${field} mt-2 ${banned ? 'border-[#c8102e] focus:border-[#c8102e]' : ''}`}
             />
+            {banned && (
+              <p role="status" className="mt-1.5 text-[13px] font-semibold text-[#c8102e]">
+                {bannedMessage(banned)}
+              </p>
+            )}
           </div>
         )
       })}

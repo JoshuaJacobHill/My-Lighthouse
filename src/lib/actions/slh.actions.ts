@@ -8,6 +8,8 @@ import { activeProgram, canOpenSlhOrg, shopperCapacity } from '@/lib/slh'
 import { canSubmit, clampRequest, cleanAge, cleanCount, cleanGender } from '@/lib/slh-onboarding'
 import { WISH_STEPS, stepField, type WishStepKey } from '@/lib/slh-steps'
 import { cleanBand, cleanInterests } from '@/lib/slh-wishlist'
+import { bannedMessage, bannedTermIn, parseTerms } from '@/lib/wishlist-limits'
+import { BANNED_TERMS_KEY, bannedTerms } from '@/lib/wishlist-limits.server'
 import { formatDay, parseDays, withinWindow } from '@/lib/slh-dropoff'
 
 /**
@@ -380,6 +382,17 @@ export async function addFamilyAction(formData: FormData): Promise<Result> {
     return { success: false, error: 'Add at least one child with a name, birthday and gender.' }
   }
 
+  // A wish list can arrive with the nomination, so it is checked here too.
+  const terms = await bannedTerms()
+  for (const child of children) {
+    for (const wish of [child.wishWant, child.wishNeed, child.wishWear, child.wishRead]) {
+      const hit = bannedTermIn(String(wish ?? ''), terms)
+      if (hit) {
+        return { success: false, error: `${child.firstName}: ${bannedMessage(hit)}` }
+      }
+    }
+  }
+
   // The allocation is a ceiling, not a suggestion. Checked here rather than in
   // the form, because the form's copy of the count can be minutes out of date.
   const partner = await prisma.giftProgramPartner.findUnique({
@@ -600,6 +613,15 @@ export async function saveWishListAction(formData: FormData): Promise<Result> {
   const text = (raw: FormDataEntryValue | null, max = 200) =>
     String(raw ?? '').trim().slice(0, max) || null
 
+  // Checked before anything is written. A list asking for a PlayStation puts a
+  // shopper in an impossible position in December; catching it here means the
+  // family is asked again while there is still time.
+  const terms = await bannedTerms()
+  for (const field of ['wishWant', 'wishNeed', 'wishWear', 'wishRead'] as const) {
+    const hit = bannedTermIn(String(formData.get(field) ?? ''), terms)
+    if (hit) return { success: false, error: bannedMessage(hit) }
+  }
+
   const storyText = text(formData.get('storyText'), 1200)
   const storyChanged = (storyText ?? '') !== (child.storyText ?? '')
 
@@ -761,5 +783,37 @@ export async function updateProgramAction(formData: FormData): Promise<Result> {
   } catch (err) {
     console.error('updateProgramAction failed', err)
     return { success: false, error: 'Could not save the program.' }
+  }
+}
+
+/**
+ * Add to the banned-item list.
+ *
+ * Adds only. The defaults in `wishlist-limits.ts` stay whatever is typed here,
+ * so nobody can un-ban a PlayStation by clearing a text box — which is exactly
+ * the kind of quiet failure that surfaces in December, holding a wish list
+ * nobody can fulfil.
+ */
+export async function setBannedTermsAction(formData: FormData): Promise<Result> {
+  if (!(await requireLighthouseAdmin())) return { success: false, error: 'Not allowed.' }
+
+  const terms = parseTerms(String(formData.get('terms') ?? ''))
+
+  try {
+    await prisma.appSetting.upsert({
+      where: { key: BANNED_TERMS_KEY },
+      create: {
+        key: BANNED_TERMS_KEY,
+        value: terms.join('\n'),
+        label: 'Santa’s Little Helpers — extra banned wish list items',
+        group: 'slh',
+      },
+      update: { value: terms.join('\n') },
+    })
+    revalidatePath('/admin/slh')
+    return { success: true }
+  } catch (err) {
+    console.error('setBannedTermsAction failed', err)
+    return { success: false, error: 'Could not save that list.' }
   }
 }

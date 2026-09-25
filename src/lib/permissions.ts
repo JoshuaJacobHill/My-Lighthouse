@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { can, isAdminRole, type Capability, type PermissionUser } from '@/lib/permissions-core'
+import { ALL_CAPABILITIES, can, isAdminRole, type Capability, type PermissionUser } from '@/lib/permissions-core'
 
 /**
  * Server-side permission guards. The rules themselves live in
@@ -33,23 +33,10 @@ export const getPermissionUser = cache(async function getPermissionUser(): Promi
 export async function getCapabilities(): Promise<Capability[]> {
   const user = await getPermissionUser()
   if (!user) return []
-  const all: Capability[] = [
-    'care.people',
-    'care.tasks',
-    'care.stories',
-    'care.giving',
-    'church.members',
-    'church.giving',
-    'church.stories',
-    'church.teams',
-    'system.settings',
-    'system.users',
-    // Granted by the canViewBusinessReports switch rather than a role. It was
-    // missing here, which left the marketing and media nav items hidden from
-    // everyone — including SUPER_ADMIN — because the sidebar never saw it.
-    'business.reports',
-  ]
-  return all.filter((c) => can(user, c))
+  // Iterated from the single list in permissions-core, never a copy of it. A
+  // hand-written second copy here hid business.reports, care.slh and
+  // care.families from the sidebar in turn — including from SUPER_ADMIN.
+  return ALL_CAPABILITIES.filter((c) => can(user, c))
 }
 
 /** Boolean for nav/UI decisions (does the signed-in admin have donations access?). */

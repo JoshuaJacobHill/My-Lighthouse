@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { getSession } from '@/lib/auth'
 import { SantaMark } from '@/components/slh/SantaMark'
 import { activeProgram, canShopSlh, myShopper, orgsOpenToShoppers } from '@/lib/slh'
@@ -40,8 +40,12 @@ export default async function SlhAboutPage() {
       body: 'Refuges, schools and community services who already walk alongside these families, and who know which children would otherwise wake up to nothing.',
     },
     {
+      title: 'You choose an organisation',
+      body: 'You choose from a list of trusted organisations you would like to shop for.',
+    },
+    {
       title: 'You get their wish list',
-      body: 'Their first name, their age, what they are into, and four gifts — something they want, something they need, something to wear and something to read. We ask for around $200 across the four, so every child receives the same care.',
+      body: 'Their first name, their age, what they are into, and what they would love. We ask for around $200 to be spent, so every child receives the same care.',
     },
     {
       title: 'You shop and wrap',
@@ -49,7 +53,7 @@ export default async function SlhAboutPage() {
     },
     {
       title: 'You drop the gifts back',
-      body: 'To the organisation that nominated them, inside their drop-off window. They hand them to the family, because they are the ones the family already trusts.',
+      body: 'To the organisation you chose, inside their drop-off window. They hand them to the family, because they are the ones the family already trusts.',
     },
   ]
 
@@ -80,8 +84,8 @@ export default async function SlhAboutPage() {
         </h1>
         <div className="mt-4 space-y-3.5 text-[15px] leading-relaxed text-neutral-600">
           <p>
-            Every year there are children across Logan whose families are doing it tough — and for
-            whom Christmas morning is a day to get through rather than look forward to.
+            Every year there are children whose families are doing it tough — and for whom
+            Christmas morning is a day to get through rather than look forward to.
           </p>
           <p>
             Santa&rsquo;s Little Helpers matches those children with people like you. You shop for
@@ -106,24 +110,6 @@ export default async function SlhAboutPage() {
             </li>
           ))}
         </ol>
-
-        {/* Said plainly and early, because it is the thing somebody would
-            otherwise find out halfway through and quietly back out of. */}
-        <div className="mt-8 rounded-[28px] bg-neutral-50 p-5">
-          <b className="text-sm">What you never see</b>
-          <ul className="mt-2.5 grid gap-2 text-sm text-neutral-600">
-            {[
-              'No surname, no address, no photograph — a first name and an age.',
-              'You never meet the family, and they never have your details.',
-              'Everything goes through the organisation that knows them.',
-            ].map((line) => (
-              <li key={line} className="flex gap-2.5">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
 
         <div className="mt-8 rounded-[28px] border-2 border-[#c8102e] p-6 text-center">
           <p className="text-lg font-extrabold tracking-tight">

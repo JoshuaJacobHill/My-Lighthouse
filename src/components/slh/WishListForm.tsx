@@ -20,12 +20,14 @@ export function WishListForm({
   childName,
   initial,
   storyApproved,
+  bannedTerms = [],
 }: {
   organisationId: string
   childId: string
   childName: string
   initial: WishListValues
   storyApproved: boolean
+  bannedTerms?: string[]
 }) {
   const router = useRouter()
   const [v, setV] = useState<WishListValues>(initial)
@@ -81,6 +83,7 @@ export function WishListForm({
           value={v}
           onChange={set}
           childName={childName}
+          bannedTerms={bannedTerms}
           storyNote={
             storyApproved && v.storyText === initial.storyText
               ? 'Approved — shoppers can read this.'

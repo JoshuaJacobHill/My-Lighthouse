@@ -5,6 +5,9 @@ import { getSession } from '@/lib/auth'
 import { canPreviewSlh } from '@/lib/features'
 import { activeProgram, shopperRows, wishListRows, slhScopeOrgs } from '@/lib/slh'
 import { listStatus, shopperStatus, shortfall } from '@/lib/slh-admin'
+import { DEFAULT_BANNED_TERMS } from '@/lib/wishlist-limits'
+import { extraBannedTerms } from '@/lib/wishlist-limits.server'
+import { BannedTerms } from '@/components/slh/BannedTerms'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Santa’s Little Helpers', robots: { index: false } }
@@ -23,10 +26,11 @@ export default async function AdminSlhPage() {
   if (!canPreviewSlh(session.user)) notFound()
 
   const program = await activeProgram()
-  const [orgs, shoppers, lists] = await Promise.all([
+  const [orgs, shoppers, lists, extraBanned] = await Promise.all([
     slhScopeOrgs(),
     shopperRows({}),
     wishListRows({}),
+    extraBannedTerms(),
   ])
 
   const waiting = shoppers.filter((s) => shopperStatus(s) === 'waiting')
@@ -101,6 +105,8 @@ export default async function AdminSlhPage() {
           </Link>
         ))}
       </div>
+
+      <BannedTerms extra={extraBanned} builtInCount={DEFAULT_BANNED_TERMS.length} />
     </div>
   )
 }
