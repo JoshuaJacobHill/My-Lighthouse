@@ -274,14 +274,45 @@ Nothing saves until the last screen, so a half-finished sign-up does not
 survive a refresh as a row nobody meant to create. Snow is decorative, behind
 `aria-hidden`, and stops entirely under `prefers-reduced-motion`.
 
+## The family's own link
+
+`/wishlist/[token]` — **the one public page in the program.**
+
+One link per family, covering every child on it: a parent with three children
+should not be sent three links and left wondering whether they did the middle
+one. The organisation makes it from the family's record, copies it, and sends
+it however they already talk to that family.
+
+The token is the whole of its security, so it is treated like a password: 32
+random bytes, generated server-side, never derived from the family id.
+Replacing it is the revoke, and it is one tap, because "I sent it to the wrong
+number" happens.
+
+**What the page shows is the minimum that makes the job possible** — the
+children's first names and their wish lists. Not the guardian's name, phone or
+address, not why they were nominated, not the organisation's other families. A
+withdrawn or mistyped link is a 404 rather than an explanation: "that link has
+been withdrawn" confirms it once existed.
+
+The family can correct a child's name, birthday and gender, because a
+caseworker who did not know them typed placeholders to nominate them at all.
+They cannot **add** a child — the organisation's allocation decides how many.
+
+It is the same takeover as shopper onboarding — solid colour, snow, white type
+— across four short screens per child. A nine-year-old abandons a page of
+twelve fields and answers all twelve when they arrive three at a time. Saved
+per child, so a family with three can do one tonight and the rest tomorrow.
+
+Music plays if somebody drops a file at `/public/audio/slh.mp3`; the toggle
+hides itself when there is none, and it never autoplays.
+
 ## Not built yet
 
 - **Handing lists out.** `GiftChild.shopperId` exists, every read respects it
   and a shopper can give one back, but nothing *assigns* it — matching a
   shopper's request to waiting children is the next piece.
-- **The family's own link.** The organisation can now fill a wish list in at
-  `/dashboard/slh/org/[id]/child/[childId]`, but "send the family a link to do
-  it themselves" is not built.
+- **Emailing the family link.** The link exists and can be copied; sending it
+  from here does not.
 - **Reminder emails.** `FamilyList` shows the confirm-before-send dialog and
   does not send. Wiring it needs an email template — see `docs/features/ADMIN.md`.
 - **Gift tags and scanning at drop-off.** The `labels` and `delivered` steps are

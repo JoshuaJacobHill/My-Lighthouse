@@ -122,9 +122,15 @@ export function FamilyList({
                 </button>
               )}
               <div className="min-w-0 flex-1">
-                <p className="font-bold">{family.guardian}</p>
+                <Link
+                  href={`/dashboard/slh/org/${organisationId}/family/${family.id}`}
+                  className="font-bold hover:underline"
+                >
+                  {family.guardian}
+                </Link>
                 <p className="text-[13px] text-neutral-400">
-                  {family.phone} · {family.email}
+                  {[family.phone, family.email].filter(Boolean).join(' · ') ||
+                    'No contact details'}
                 </p>
               </div>
             </div>

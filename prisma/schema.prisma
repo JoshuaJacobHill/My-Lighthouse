@@ -1160,6 +1160,22 @@ model GiftFamily {
   /// worse than leaving it open.
   householdId String?
 
+  /// A link the organisation sends the family, so they can fill the wish lists
+  /// in themselves.
+  ///
+  /// Long and random, and the ONLY thing standing between the internet and
+  /// this family's children — so it is treated like a password: generated
+  /// server-side, never derived from the family id, and replaceable if it ends
+  /// up somewhere it should not have.
+  ///
+  /// The page it opens shows children's first names and the wish list fields.
+  /// Not the guardian's details, not the address, not the nomination reason,
+  /// and no other family. See docs/features/SLH.md.
+  shareToken    String?   @unique
+  shareTokenAt  DateTime?
+  /// When the family last opened it — the organisation's cue to chase, or not.
+  shareOpenedAt DateTime?
+
   program      GiftProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
   organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   household    Household?   @relation(fields: [householdId], references: [id], onDelete: SetNull)

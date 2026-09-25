@@ -1,5 +1,6 @@
 'use server'
 
+import { randomBytes } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
@@ -1010,5 +1011,311 @@ export async function fillShoppersAction(formData: FormData): Promise<
   } catch (err) {
     console.error('fillShoppersAction failed', err)
     return { success: false, error: 'Could not hand those out.' }
+  }
+}
+
+/* ── The family's own link ─────────────────────────────────────────────────── */
+
+/**
+ * Make (or replace) the link a family uses to fill in their own wish lists.
+ *
+ * The token is the only thing standing between the internet and a page about
+ * this family's children, so it is generated the way a password would be:
+ * 32 random bytes from the crypto source, never derived from the family id.
+ *
+ * Replacing is the revoke: somebody who forwarded the link to the wrong person
+ * makes a new one and the old address stops working immediately.
+ */
+export async function createFamilyLinkAction(formData: FormData): Promise<
+  Result & { url?: string }
+> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const familyId = String(formData.get('familyId') ?? '')
+  const family = await prisma.giftFamily.findUnique({
+    where: { id: familyId },
+    select: { id: true, organisationId: true },
+  })
+  if (!family) return { success: false, error: 'No such family.' }
+  if (!(await canOpenSlhOrg(family.organisationId))) {
+    return { success: false, error: 'Not allowed.' }
+  }
+
+  const token = randomBytes(32).toString('base64url')
+
+  try {
+    await prisma.giftFamily.update({
+      where: { id: family.id },
+      data: { shareToken: token, shareTokenAt: new Date(), shareOpenedAt: null },
+    })
+    revalidatePath(`/dashboard/slh/org/${family.organisationId}`)
+    return { success: true, url: `/wishlist/${token}` }
+  } catch (err) {
+    console.error('createFamilyLinkAction failed', err)
+    return { success: false, error: 'Could not make that link.' }
+  }
+}
+
+/** Withdraw the link. The address stops working; nothing else changes. */
+export async function revokeFamilyLinkAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const familyId = String(formData.get('familyId') ?? '')
+  const family = await prisma.giftFamily.findUnique({
+    where: { id: familyId },
+    select: { id: true, organisationId: true },
+  })
+  if (!family) return { success: false, error: 'No such family.' }
+  if (!(await canOpenSlhOrg(family.organisationId))) {
+    return { success: false, error: 'Not allowed.' }
+  }
+
+  try {
+    await prisma.giftFamily.update({
+      where: { id: family.id },
+      data: { shareToken: null, shareTokenAt: null },
+    })
+    revalidatePath(`/dashboard/slh/org/${family.organisationId}`)
+    return { success: true }
+  } catch (err) {
+    console.error('revokeFamilyLinkAction failed', err)
+    return { success: false, error: 'Could not withdraw that link.' }
+  }
+}
+
+/**
+ * A family filling in one of their own children's wish lists.
+ *
+ * **The only action in this file with no session.** The token is the
+ * authorisation, so everything it touches is scoped through it: the child must
+ * belong to the family the token names, which is checked in the query rather
+ * than trusted from the form.
+ *
+ * Deliberately narrow. A family can fill in a wish list and nothing else — not
+ * their own contact details, not the nomination reason, not another child.
+ */
+export async function saveFamilyWishListAction(formData: FormData): Promise<Result> {
+  const token = String(formData.get('token') ?? '')
+  const childId = String(formData.get('childId') ?? '')
+  if (!token || !childId) return { success: false, error: 'That link is not working.' }
+
+  const child = await prisma.giftChild.findFirst({
+    where: { id: childId, family: { shareToken: token } },
+    select: { id: true, storyText: true, organisationId: true },
+  })
+  if (!child) return { success: false, error: 'That link is not working.' }
+
+  const terms = await bannedTerms()
+  for (const field of ['wishWant', 'wishNeed', 'wishWear', 'wishRead'] as const) {
+    const hit = bannedTermIn(String(formData.get(field) ?? ''), terms)
+    if (hit) return { success: false, error: bannedMessage(hit) }
+  }
+
+  let interests: string[] = []
+  try {
+    interests = cleanInterests(JSON.parse(String(formData.get('interests') ?? '[]')))
+  } catch {
+    return { success: false, error: 'Could not read the interests.' }
+  }
+
+  const text = (raw: FormDataEntryValue | null, max = 200) =>
+    String(raw ?? '').trim().slice(0, max) || null
+
+  const storyText = text(formData.get('storyText'), 1200)
+
+  try {
+    await prisma.giftChild.update({
+      where: { id: child.id },
+      data: {
+        // The family can correct who this is. A caseworker who did not know the
+        // names typed placeholders in order to nominate them at all, and the
+        // person who knows is the one reading this page. They cannot ADD a
+        // child — the organisation's allocation decides how many.
+        ...(String(formData.get('firstName') ?? '').trim()
+          ? { firstName: String(formData.get('firstName')).trim().slice(0, 80) }
+          : {}),
+        ...(/^\d{4}-\d{2}-\d{2}$/.test(String(formData.get('dateOfBirth') ?? ''))
+          ? { dateOfBirth: new Date(`${String(formData.get('dateOfBirth'))}T00:00:00.000Z`) }
+          : {}),
+        ...(formData.get('gender') === 'girl' || formData.get('gender') === 'boy'
+          ? { gender: String(formData.get('gender')) }
+          : {}),
+        favouriteColour: text(formData.get('favouriteColour'), 40),
+        clothesBand: cleanBand(formData.get('clothesBand')),
+        topSize: text(formData.get('topSize'), 40),
+        bottomSize: text(formData.get('bottomSize'), 40),
+        dressSize: text(formData.get('dressSize'), 40),
+        clothesSize: text(formData.get('clothesSize'), 40),
+        shoesBand: cleanBand(formData.get('shoesBand')),
+        shoesSize: text(formData.get('shoesSize'), 40),
+        interests,
+        wishWant: text(formData.get('wishWant')),
+        wishNeed: text(formData.get('wishNeed')),
+        wishWear: text(formData.get('wishWear')),
+        wishRead: text(formData.get('wishRead')),
+        storyText,
+        // Words a family typed have not been read by us yet, whoever typed
+        // them. Approval is Lighthouse's, and it is never granted here.
+        ...(storyText !== child.storyText ? { storyApproved: false } : {}),
+      },
+    })
+    revalidatePath(`/dashboard/slh/org/${child.organisationId}`)
+    return { success: true }
+  } catch (err) {
+    console.error('saveFamilyWishListAction failed', err)
+    return { success: false, error: 'Could not save that. Please try again.' }
+  }
+}
+
+/** Change a family's details after they were nominated. */
+export async function updateFamilyAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const familyId = String(formData.get('familyId') ?? '')
+  const family = await prisma.giftFamily.findUnique({
+    where: { id: familyId },
+    select: { id: true, organisationId: true },
+  })
+  if (!family) return { success: false, error: 'No such family.' }
+  if (!(await canOpenSlhOrg(family.organisationId))) {
+    return { success: false, error: 'Not allowed.' }
+  }
+
+  const guardianName = String(formData.get('guardianName') ?? '').trim().slice(0, 120)
+  if (!guardianName) return { success: false, error: 'Who is the parent or guardian?' }
+
+  try {
+    await prisma.giftFamily.update({
+      where: { id: family.id },
+      data: {
+        guardianName,
+        guardianEmail: String(formData.get('guardianEmail') ?? '').trim() || null,
+        guardianPhone: String(formData.get('guardianPhone') ?? '').trim() || null,
+        notes: String(formData.get('notes') ?? '').trim().slice(0, 2000) || null,
+      },
+    })
+    revalidatePath(`/dashboard/slh/org/${family.organisationId}`)
+    return { success: true }
+  } catch (err) {
+    console.error('updateFamilyAction failed', err)
+    return { success: false, error: 'Could not save that.' }
+  }
+}
+
+/**
+ * Add a child to a family already nominated, or change one.
+ *
+ * The allocation is re-counted on an add, the same as it is on a nomination —
+ * a ceiling that only applies at the front door is not a ceiling.
+ */
+export async function saveChildAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const familyId = String(formData.get('familyId') ?? '')
+  const family = await prisma.giftFamily.findUnique({
+    where: { id: familyId },
+    select: { id: true, organisationId: true, programId: true },
+  })
+  if (!family) return { success: false, error: 'No such family.' }
+  if (!(await canOpenSlhOrg(family.organisationId))) {
+    return { success: false, error: 'Not allowed.' }
+  }
+
+  const firstName = String(formData.get('firstName') ?? '').trim().slice(0, 80)
+  const dob = asDateOnly(String(formData.get('dateOfBirth') ?? '').trim())
+  const genderRaw = String(formData.get('gender') ?? '')
+  const gender = genderRaw === 'girl' || genderRaw === 'boy' ? genderRaw : null
+
+  if (!firstName || !dob || !gender) {
+    return { success: false, error: 'A first name, a birthday and a boy or a girl.' }
+  }
+
+  const childId = String(formData.get('childId') ?? '')
+
+  try {
+    if (childId) {
+      await prisma.giftChild.update({
+        where: { id: childId },
+        data: { firstName, dateOfBirth: dob, gender },
+      })
+    } else {
+      const partner = await prisma.giftProgramPartner.findUnique({
+        where: {
+          programId_organisationId: {
+            programId: family.programId,
+            organisationId: family.organisationId,
+          },
+        },
+      })
+      if (partner && partner.allocation > 0) {
+        const already = await prisma.giftChild.count({
+          where: { programId: family.programId, organisationId: family.organisationId },
+        })
+        if (already >= partner.allocation) {
+          return {
+            success: false,
+            error: 'Your allocation is full. Talk to Lighthouse before nominating more.',
+          }
+        }
+      }
+
+      await prisma.giftChild.create({
+        data: {
+          programId: family.programId,
+          organisationId: family.organisationId,
+          familyId: family.id,
+          firstName,
+          dateOfBirth: dob,
+          gender,
+          createdById: session.userId,
+        },
+      })
+    }
+    revalidatePath(`/dashboard/slh/org/${family.organisationId}`)
+    return { success: true }
+  } catch (err) {
+    console.error('saveChildAction failed', err)
+    return { success: false, error: 'Could not save that child.' }
+  }
+}
+
+/**
+ * Remove a child from a nomination.
+ *
+ * Refused once somebody is shopping for them: a shopper holding a list for a
+ * child who has just been deleted is a worse problem than a wrong record, and
+ * the fix there is to take the list back first.
+ */
+export async function removeChildAction(formData: FormData): Promise<Result> {
+  const session = await getSession()
+  if (!session) return { success: false, error: 'Please sign in.' }
+
+  const childId = String(formData.get('childId') ?? '')
+  const child = await prisma.giftChild.findUnique({
+    where: { id: childId },
+    select: { id: true, organisationId: true, shopperId: true, firstName: true },
+  })
+  if (!child) return { success: false, error: 'No such child.' }
+  if (!(await canOpenSlhOrg(child.organisationId))) {
+    return { success: false, error: 'Not allowed.' }
+  }
+  if (child.shopperId) {
+    return {
+      success: false,
+      error: `Somebody is already shopping for ${child.firstName}. Ask Lighthouse to take that list back first.`,
+    }
+  }
+
+  try {
+    await prisma.giftChild.delete({ where: { id: child.id } })
+    revalidatePath(`/dashboard/slh/org/${child.organisationId}`)
+    return { success: true }
+  } catch (err) {
+    console.error('removeChildAction failed', err)
+    return { success: false, error: 'Could not remove that child.' }
   }
 }
