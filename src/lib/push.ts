@@ -24,6 +24,31 @@ type Ready = { ok: true } | { ok: false; reason: string }
 let cached: Ready | null = null
 
 /**
+ * Accept a VAPID key however it was pasted in.
+ *
+ * `web-push` insists on unpadded base64**url** and throws on anything else —
+ * "Vapid private key must be a URL safe Base 64 (without '=')". But the tools
+ * people generate these with hand out standard base64 about as often, and a
+ * key copied out of one of those arrives with `+`, `/` and a trailing `=`.
+ *
+ * The bytes are identical either way. Rejecting the key over its punctuation
+ * cost this app three weeks of notifications that silently never sent, so the
+ * encoding is normalised here rather than left as a trap in a dashboard field
+ * nobody can read back.
+ *
+ * Also strips whitespace: a value pasted into an environment variable picks up
+ * a trailing newline remarkably easily.
+ */
+function normaliseKey(raw: string): string {
+  return raw.trim().replace(/\s+/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** How many bytes a base64url string decodes to, without decoding it. */
+function byteLength(key: string): number {
+  return Math.floor((key.length * 3) / 4)
+}
+
+/**
  * Configure `web-push`, once.
  *
  * **Never throws.** `setVapidDetails` rejects a subject that is not a
@@ -50,8 +75,29 @@ function ready(): Ready {
     return cached
   }
 
+  const cleanPublic = normaliseKey(publicKey)
+  const cleanPrivate = normaliseKey(privateKey)
+
+  // Checked before the library sees them, so the message names the key and the
+  // size rather than repeating a rule about punctuation. A P-256 private key
+  // is 32 bytes; the public key is an uncompressed point, 65.
+  if (byteLength(cleanPrivate) !== 32) {
+    cached = {
+      ok: false,
+      reason: `VAPID_PRIVATE_KEY decodes to ${byteLength(cleanPrivate)} bytes; it should be 32. It is probably truncated or is not the private half of the pair.`,
+    }
+    return cached
+  }
+  if (byteLength(cleanPublic) !== 65) {
+    cached = {
+      ok: false,
+      reason: `NEXT_PUBLIC_VAPID_PUBLIC_KEY decodes to ${byteLength(cleanPublic)} bytes; it should be 65.`,
+    }
+    return cached
+  }
+
   try {
-    webpush.setVapidDetails(subject, publicKey, privateKey)
+    webpush.setVapidDetails(subject, cleanPublic, cleanPrivate)
     cached = { ok: true }
   } catch (err) {
     // Almost always the subject: it has to be mailto:… or https://…
