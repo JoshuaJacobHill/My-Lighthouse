@@ -185,12 +185,13 @@ model User {
   tasksCreated   StaffTask[]           @relation("TaskAssigner")
   checklistDone  ChecklistCompletion[]
 
-  notifications     NotificationRecipient[]
-  notificationsSent Notification[]          @relation("NotificationSender")
-  comments          Comment[]
-  commentMentions   CommentMention[]
-  pushSubscriptions PushSubscription[]
-  giftShopping      GiftShopper[]
+  notifications        NotificationRecipient[]
+  notificationsSent    Notification[]          @relation("NotificationSender")
+  comments             Comment[]
+  commentMentions      CommentMention[]
+  pushSubscriptions    PushSubscription[]
+  giftShopping         GiftShopper[]
+  householdMemberships HouseholdMember[]
 }
 
 // ─── Volunteer Profiles ───────────────────────────────────────────────────────
@@ -1153,8 +1154,15 @@ model GiftFamily {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  /// The household this nomination belongs to, once somebody has matched them.
+  /// Optional and matched deliberately: a referring organisation nominates a
+  /// family we may never have met, and guessing the link from a name would be
+  /// worse than leaving it open.
+  householdId String?
+
   program      GiftProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
   organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  household    Household?   @relation(fields: [householdId], references: [id], onDelete: SetNull)
   children     GiftChild[]
 
   @@index([programId, organisationId])
@@ -1327,6 +1335,7 @@ model Organisation {
   posts        OrgPost[]
   giftPrograms GiftProgramPartner[]
   giftShopping GiftShopper[]
+  supportGiven SupportGiven[]
   giftFamilies GiftFamily[]
   giftChildren GiftChild[]
   fundraisers  Fundraiser[]
@@ -2422,4 +2431,230 @@ model MarketingChat {
   updatedAt DateTime @updatedAt
 
   @@index([userId, updatedAt])
+}
+
+/// A household Lighthouse is walking alongside.
+///
+/// **Not a list of recipients.** `PURPOSE.md` opens with the woman who
+/// volunteers on Thursdays, gives monthly, and shops at Loganholme being one
+/// family and five relationships — and says the whole point of this app is
+/// that it does not keep four separate records of her. A household here is the
+/// same idea: the mum collecting a free trolley may also be a $25 Trolley
+/// customer, her son may have an account, and her husband may be at the
+/// church. `HouseholdMember.userId` is what keeps those the same people.
+///
+/// It is also why this is not called a client, a case or a recipient. The
+/// dignity rules in PURPOSE.md are structural, not decorative, and a schema
+/// that sorts people into helpers and helped is where that starts to rot.
+///
+/// **The most sensitive data in this app.** Crisis circumstances, children's
+/// names and dates of birth, a home address. Behind the `care.families`
+/// capability, and nothing here is ever public. See docs/features/FAMILIES.md
+/// for the retention rule.
+model Household {
+  id String @id @default(cuid())
+
+  /// What to call them in a list — usually the primary contact's name.
+  /// Deliberately a plain string rather than assembled from members: a
+  /// household is "Leila M." or "the Nguyen family" depending on who you ask,
+  /// and guessing it wrong in a support conversation is worse than storing it.
+  name String
+
+  /// One line, as somebody would write it on a parcel.
+  address  String?
+  suburb   String?
+  postcode String?
+
+  phone String?
+  email String?
+
+  status HouseholdStatus @default(ACTIVE)
+
+  /// When the family agreed to us holding a record, and who recorded that.
+  /// A timestamp rather than a boolean: consent is given on a day, by someone.
+  consentAt     DateTime?
+  consentByName String?
+
+  /// Anything that does not belong in a dated case note — standing facts:
+  /// access needs, an interpreter, a safe contact time.
+  standingNotes String? @db.Text
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members      HouseholdMember[]
+  support      SupportGiven[]
+  notes        CaseNote[]
+  referrals    Referral[]
+  /// Santa's Little Helpers nominations, once a family is linked to one.
+  giftFamilies GiftFamily[]
+
+  @@index([status])
+  @@index([phone])
+  @@index([email])
+}
+
+enum HouseholdStatus {
+  /// Currently being supported.
+  ACTIVE
+  /// Known to us, nothing open right now. Still searchable.
+  INACTIVE
+  /// Closed at the family's request or on review. Kept for the retention
+  /// period, then anonymised — see docs/features/FAMILIES.md.
+  CLOSED
+}
+
+/// A person in a household.
+///
+/// `userId` is the link that stops this becoming a second database of people.
+/// Most members will never have an account and that is fine — the column is
+/// optional, and matching is a deliberate act rather than something guessed
+/// from a name.
+model HouseholdMember {
+  id          String @id @default(cuid())
+  householdId String
+
+  /// Their account, where they have one. Set deliberately, never inferred.
+  userId String?
+
+  firstName   String
+  lastName    String?
+  /// A date, not an age: an age entered in March is wrong by December.
+  dateOfBirth DateTime? @db.Date
+
+  relationship MemberRelationship @default(ADULT)
+  isPrimary    Boolean            @default(false)
+
+  /// Only what is needed to support them well — allergies, a school, a
+  /// disability that changes what help looks like. Not a diagnosis list.
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([householdId])
+  @@index([userId])
+}
+
+enum MemberRelationship {
+  GUARDIAN
+  ADULT
+  CHILD
+  OTHER
+}
+
+/// One thing given to a household, on one day.
+///
+/// The row people will actually read: "has this family had a trolley this
+/// month?" is the question that makes distribution fair, and it cannot be
+/// answered by anything else in the app.
+model SupportGiven {
+  id          String @id @default(cuid())
+  householdId String
+
+  kind    SupportKind
+  givenAt DateTime    @default(now())
+
+  /// How many — two hampers, three trolleys. Not a dollar value: what a
+  /// family received should not be recorded as what it cost us.
+  quantity Int @default(1)
+
+  /// Where it came from, when that is not us: a referring organisation, a
+  /// partner's drive.
+  organisationId String?
+
+  notes String? @db.Text
+
+  recordedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  household    Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  organisation Organisation? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, givenAt])
+  @@index([kind, givenAt])
+}
+
+/// What was given. New kinds are added here — an enum value is additive and
+/// safe, and naming them keeps reporting honest.
+enum SupportKind {
+  FREE_TROLLEY
+  FOOD_HAMPER
+  CHRISTMAS_HAMPER
+  SANTAS_LITTLE_HELPERS
+  EMERGENCY_RELIEF
+  DISASTER_RELIEF
+  SCHOOL_SUPPLIES
+  OTHER
+}
+
+/// A dated note on a household.
+///
+/// **Append-only by intention.** A case note is a record of what somebody
+/// believed on a day; silently rewriting it turns a history into an opinion.
+/// Corrections are a new note, which is also how a team stays honest with each
+/// other.
+model CaseNote {
+  id          String @id @default(cuid())
+  householdId String
+
+  body     String       @db.Text
+  category NoteCategory @default(GENERAL)
+
+  authorId   String?
+  /// Denormalised so a note still says who wrote it after an account is
+  /// closed. A note signed by nobody is not much of a record.
+  authorName String?
+
+  createdAt DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, createdAt])
+}
+
+enum NoteCategory {
+  GENERAL
+  VISIT
+  PHONE_CALL
+  ASSESSMENT
+  SAFEGUARDING
+}
+
+/// A referral out to another service, and what came of it.
+model Referral {
+  id          String @id @default(cuid())
+  householdId String
+
+  /// Who they were sent to. Free text, because most of these are services we
+  /// have no record of — a housing provider, a financial counsellor.
+  service String
+  reason  String? @db.Text
+
+  referredAt DateTime       @default(now())
+  status     ReferralStatus @default(OPEN)
+  /// What happened. The point of tracking a referral at all.
+  outcome    String?        @db.Text
+  closedAt   DateTime?
+
+  referredById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@index([status])
+}
+
+enum ReferralStatus {
+  OPEN
+  ACCEPTED
+  DECLINED
+  CLOSED
 }

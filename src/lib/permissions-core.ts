@@ -57,6 +57,17 @@ export type Capability =
    * nominated, so widen it deliberately.
    */
   | 'care.slh'
+  /**
+   * The households Lighthouse supports: who they are, what they have received,
+   * case notes and referrals.
+   *
+   * The most sensitive capability in the app. It carries crisis circumstances,
+   * children's names and dates of birth, and home addresses — for families who
+   * came to us for food, not to be catalogued. Held only by SUPER_ADMIN until
+   * somebody decides otherwise on purpose, and deliberately NOT bundled with
+   * `care.people`: knowing the roster is not a reason to read a case note.
+   */
+  | 'care.families'
 
 /**
  * Giving and donor-contact capabilities that a generic ADMIN only holds when
