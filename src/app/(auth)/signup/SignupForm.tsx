@@ -1,6 +1,8 @@
 'use client'
 
 import * as React from 'react'
+import { useSearchParams } from 'next/navigation'
+import { safeNext } from '@/lib/safe-next'
 import { emailHint } from '@/lib/email-hint'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -33,13 +35,29 @@ export function SignupForm() {
     })
   }
 
+  /**
+   * Where to send somebody once they have an account.
+   *
+   * Carried in from whichever page turned them away — a campaign link like
+   * lighthousecare.org.au/santa sends people here before they have signed in,
+   * and landing them on a generic dashboard afterwards loses the thing they
+   * actually came to do. Validated by `safeNext`, so the parameter cannot be
+   * used to bounce anybody off to another site.
+   */
+  const next = safeNext(useSearchParams().get('next'))
+  /** The same destination, kept when we hand them over to sign-in. */
+  const withNext = (path: string) => (next ? `${path}?next=${encodeURIComponent(next)}` : path)
+
   function submitDetails(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     startTransition(async () => {
       const res = await createAccountAction({ email, name, company, password })
       if (!res.success) return setError(res.error ?? 'Something went wrong. Please try again.')
-      router.push(res.redirectTo ?? '/dashboard')
+      // A brand new account normally lands on the dashboard; honour where
+      // they were headed instead, when they were headed somewhere.
+      const landing = res.redirectTo ?? '/dashboard'
+      router.push(landing === '/dashboard' && next ? next : landing)
       router.refresh()
     })
   }
@@ -57,7 +75,7 @@ export function SignupForm() {
             <strong>{email}</strong> is already set up. Sign in to pick up where you left off.
           </p>
           <Link
-            href="/login"
+            href={withNext('/login')}
             className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 hover:from-orange-600 hover:to-red-600"
           >
             Sign in
@@ -100,7 +118,7 @@ export function SignupForm() {
           </p>
         </div>
         <div className="mt-6 text-center text-sm text-gray-500">
-          <Link href="/login" className="font-medium text-orange-500 hover:underline">
+          <Link href={withNext('/login')} className="font-medium text-orange-500 hover:underline">
             &larr; Back to sign in
           </Link>
         </div>
@@ -260,7 +278,7 @@ export function SignupForm() {
 
       <div className="mt-6 text-center text-sm text-gray-500">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-orange-500 hover:underline">
+        <Link href={withNext('/login')} className="font-medium text-orange-500 hover:underline">
           Sign in
         </Link>
       </div>

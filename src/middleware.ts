@@ -7,7 +7,21 @@ const SESSION_COOKIE_NAME = 'SESSION_TOKEN'
  * Lightweight route protection middleware.
  * Only checks for cookie existence — full session validation
  * (including expiry and role checks) happens at the page/action level.
+ *
+ * The destination is carried as `?next=`, which is the parameter the sign-in
+ * page actually reads. It used to send `callbackUrl`, which nothing read, so
+ * every deep link into a protected page quietly dumped people on the dashboard
+ * after they signed in — the private event they clicked, the campaign link
+ * they followed, gone.
  */
+function toLogin(request: NextRequest) {
+  const loginUrl = new URL('/login', request.url)
+  // Path AND query: a filtered list or a campaign link is not the same page
+  // without its parameters.
+  loginUrl.searchParams.set('next', request.nextUrl.pathname + request.nextUrl.search)
+  return NextResponse.redirect(loginUrl)
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value
@@ -19,23 +33,24 @@ export function middleware(request: NextRequest) {
   }
 
   // Volunteer portal routes — must be authenticated
+  // The (auth) route group doesn't add to the URL: (auth)/login → /login
   if (pathname.startsWith('/volunteer')) {
-    if (!sessionToken) {
-      // The (auth) route group doesn't add to the URL: (auth)/login → /login
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('callbackUrl', pathname)
-      return NextResponse.redirect(loginUrl)
-    }
+    if (!sessionToken) return toLogin(request)
     return NextResponse.next()
   }
 
   // Admin routes — must be authenticated (role enforced in page)
   if (pathname.startsWith('/admin')) {
-    if (!sessionToken) {
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('callbackUrl', pathname)
-      return NextResponse.redirect(loginUrl)
-    }
+    if (!sessionToken) return toLogin(request)
+    return NextResponse.next()
+  }
+
+  // The supporter portal. Guarded here as well as in the layout, because the
+  // layout can only redirect to a bare /login — it cannot see which page
+  // inside it was asked for, and that is exactly what a campaign link needs
+  // kept.
+  if (pathname.startsWith('/dashboard')) {
+    if (!sessionToken) return toLogin(request)
     return NextResponse.next()
   }
 

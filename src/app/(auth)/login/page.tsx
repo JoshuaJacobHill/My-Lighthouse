@@ -44,7 +44,9 @@ function GoodbyeBanner() {
  */
 function useNextDestination(): string | null {
   const params = useSearchParams()
-  return safeNext(params.get('next'))
+  // `callbackUrl` is what the middleware used to send. Read as a fallback so
+  // links already sitting in inboxes and browser histories still land right.
+  return safeNext(params.get('next') ?? params.get('callbackUrl'))
 }
 
 /**
@@ -154,7 +156,10 @@ function LoginForm() {
 
       <p className="mt-8 text-center text-sm text-gray-500">
         New here?{' '}
-        <Link href="/signup" className="font-medium text-orange-500 hover:underline">
+        <Link
+            href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}
+            className="font-medium text-orange-500 hover:underline"
+          >
           Sign up here &rarr;
         </Link>
       </p>
