@@ -20,6 +20,11 @@ import { useToast } from '@/components/ui/use-toast'
  * The permission prompt is only ever raised by a tap. A browser gives one
  * chance per site — asked at a bad moment and refused, it cannot be asked
  * again — so it is never triggered on page load.
+ *
+ * Turning it on sends one notification straight away. That arriving is the
+ * proof, delivered at the only moment anybody wants it, which is why an
+ * ordinary supporter has no "Test" button cluttering their settings — that
+ * stays with the people who diagnose things.
  */
 
 /**
@@ -119,7 +124,14 @@ function initialState(publicKey: string | null): State {
   return 'checking'
 }
 
-export function PushToggle({ publicKey }: { publicKey: string | null }) {
+export function PushToggle({
+  publicKey,
+  showTest = false,
+}: {
+  publicKey: string | null
+  /** The manual test button. Staff only — see the page that renders this. */
+  showTest?: boolean
+}) {
   const { toast } = useToast()
   const [state, setState] = React.useState<State>(() => initialState(publicKey))
   const [busy, setBusy] = React.useState(false)
@@ -196,6 +208,14 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       setState('on')
       await check()
       toast.success('Notifications on', `${deviceLabel()} will get a nudge for new things.`)
+
+      // The proof, at the one moment somebody wants it. A notification that
+      // actually arrives says more than any wording here could, and it means
+      // an ordinary supporter never needs a button labelled "Test".
+      void testPushAction().catch(() => {
+        // Already on, and the toast above said so. A failed confirmation is
+        // not worth a second, contradicting message.
+      })
     } catch (err) {
       const message = (err as Error).message ?? ''
       const step = message.startsWith('STEP:') ? message.slice(5) : null
@@ -333,7 +353,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {state === 'on' && (
+          {state === 'on' && showTest && (
             <button
               type="button"
               onClick={test}

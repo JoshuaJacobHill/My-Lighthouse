@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { isAdminRole } from '@/lib/permissions-core'
 import { PushToggle } from '@/components/notifications/PushToggle'
 import { NotifyToggles } from './NotifyToggles'
 
@@ -40,7 +41,14 @@ export default async function NotificationSettingsPage() {
         </p>
 
         <div className="mt-7">
-          <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+          {/* The manual test is a diagnostic, and diagnostics belong with the
+              people who diagnose. Everybody else gets one automatically the
+              moment they turn notifications on, which is the only moment the
+              reassurance is worth anything. */}
+          <PushToggle
+            publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+            showTest={isAdminRole(session.user.role)}
+          />
         </div>
 
         <h2 className="mt-8 text-xs font-bold uppercase tracking-wide text-neutral-400">
