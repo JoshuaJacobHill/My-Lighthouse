@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma'
 import { canPreviewSlh, isDonorPortalEnabled } from '@/lib/features'
 import { SantaMark } from '@/components/slh/SantaMark'
 import { canShopSlh, myProgramOrgCards, slhDashboardCard } from '@/lib/slh'
+import { InstallBadges } from '@/components/notifications/InstallBadges'
 import { claimDonationsForUser, getDonorGifts, summariseGifts } from '@/lib/donations'
 import { StoriesGrid } from '@/components/donor/StoriesGrid'
 import { commentsForStories } from '@/lib/story-comments'
@@ -459,6 +460,14 @@ export default async function DonorHomePage() {
         )}
 
         {isStaffOrTrainee && <div className="mt-14">{givingAndVolunteering}</div>}
+
+        {/* Last thing on the page, for everybody, and it removes itself once
+            the app is installed or somebody says no. Bottom rather than top
+            on purpose: it is an offer, not an errand, and it should never be
+            standing between a person and what they opened the app to do. */}
+        <div className="mt-14">
+          <InstallBadges />
+        </div>
       </div>
     </div>
   )
