@@ -73,6 +73,10 @@ function encode(bytes: Uint8Array): string {
 function normaliseKey(raw: string, expectedBytes: number): string {
   const cleaned = raw
     .trim()
+    // Quotes, if the value was pasted with them. An environment variable does
+    // not need quoting and they are not part of the key, but a value copied
+    // out of a JSON blob or a .env line brings them along.
+    .replace(/^['"`]+|['"`]+$/g, '')
     .replace(/\s+/g, '')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -101,8 +105,15 @@ function byteLength(key: string): number | null {
  */
 function describeKey(key: string): string {
   const bytes = byteLength(key)
-  const shape = /^[A-Za-z0-9_-]+$/.test(key) ? 'base64url characters' : 'unexpected characters'
-  return `${key.length} ${shape}, ${bytes === null ? 'does not decode' : `${bytes} bytes`}`
+  if (/^[A-Za-z0-9_-]+$/.test(key)) {
+    return `${key.length} base64url characters, ${bytes === null ? 'does not decode' : `${bytes} bytes`}`
+  }
+
+  // Name the offending characters, deduplicated. They are punctuation, not key
+  // material, and knowing WHICH ones is the difference between guessing and
+  // fixing — a stray quote, a comma, a colon from a copied JSON line.
+  const odd = [...new Set(key.replace(/[A-Za-z0-9_-]/g, '').split(''))].join(' ')
+  return `${key.length} characters including ${odd || 'something unprintable'}, which a key cannot contain`
 }
 
 /**
