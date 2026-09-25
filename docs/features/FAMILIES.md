@@ -3,8 +3,8 @@
 A record of the households Lighthouse walks alongside, and what they have
 received. `/admin/families` · **`care.families`, SUPER_ADMIN only**
 
-> Status: schema and vocabulary built. The screens are next — see
-> **What is not built yet**.
+> Status: the list, the profile and recording support are built. Case notes
+> and referrals are not — see **What is not built yet**.
 
 ## The one decision everything else follows from
 
@@ -77,9 +77,35 @@ the roster is not a reason to read a case note.
 - **New tables need the RLS lockdown re-run** after `prisma db push` — see
   `docs/DATA.md`.
 
+## The screens
+
+| Page | Does |
+|---|---|
+| `/admin/families` | Search by name, suburb, phone or a member's name; filter by status |
+| `/admin/families/new` | Add a household, with duplicate checking before it saves |
+| `/admin/families/[id]` | Who they are, who is in the house, what they have received |
+| `/admin/families/[id]/edit` | The same form, plus status |
+
+**The duplicate check runs before the save, not after.** Two records of one
+family is what makes a database like this useless within a month, and it
+happens because somebody wrote a phone number differently. Matches are shown as
+a prompt and never block: people share a surname and a street, and a service
+that refuses to record a second family at one address is worse than one that
+asks.
+
+**"Last free trolley: 9 days ago" appears while the entry is being made**, on
+the kind being recorded, not as a report somebody could have run afterwards.
+
+**Consent is visible on the record**, and its absence says so in amber. A
+family came to us for food, not to be catalogued.
+
 ## What is not built yet
 
-Everything above the database: the list and search, the household profile, the
-form that records support given, notes, referrals, and matching a household to
-an existing `User` or to a Santa's Little Helpers nomination. The schema and
-`households-core.ts` are the foundation those sit on.
+- **Case notes and referrals.** Tables exist, screens do not — deliberately.
+  The retention rule and who may read a `SAFEGUARDING` note are decisions for a
+  person, and building the form first would mean a real disclosure sitting
+  under a rule nobody chose.
+- **Matching a member to a `User` account.** The column exists and the profile
+  shows the link where one is set; nothing sets it yet.
+- **Matching a Santa's Little Helpers nomination to a household.**
+  `GiftFamily.householdId` exists and the profile lists linked nominations.

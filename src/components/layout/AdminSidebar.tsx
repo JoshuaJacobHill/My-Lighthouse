@@ -30,7 +30,7 @@ import {
   ChevronRight,
   ChevronDown,
   Menu,
-  X, Gift } from 'lucide-react'
+  X, Gift, Home as HomeIcon } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { Capability } from '@/lib/permissions-core'
 
@@ -70,6 +70,7 @@ const nav: NavEntry[] = [
     icon: Users,
     items: [
       { href: '/admin/users', label: 'Users', icon: Users, needs: ['care.people', 'church.members', 'care.giving'] },
+      { href: '/admin/families', label: 'Families', icon: HomeIcon, needs: ['care.families'] },
       { href: '/admin/roster', label: 'Roster / Calendar', icon: Calendar, needs: ['care.people'] },
       { href: '/admin/on-site', label: 'On-Site Now', icon: MapPin, needs: ['care.people'] },
       { href: '/admin/attendance', label: 'Attendance', icon: CheckSquare, needs: ['care.people'] },
