@@ -82,29 +82,64 @@ export async function pushStatusAction(
 }
 
 /**
- * Send a test notification to the signed-in person's devices.
+ * Send a test notification to the signed-in person's devices, and say exactly
+ * what happened.
  *
- * Worth having: push has a lot of moving parts — keys, worker, permission,
- * subscription — and "did it actually work?" should not require waiting for
- * someone else to assign you a task.
+ * The old version returned "Nothing was delivered. The device may have revoked
+ * permission." — a guess, presented as a diagnosis, for a chain with five
+ * links in it. Push depends on the server's keys, a service worker, a browser
+ * permission, a stored subscription and somebody else's push service, and the
+ * only useful test is one that names which of those is the problem.
  */
-export async function testPushAction(): Promise<Result & { sent?: number }> {
+export async function testPushAction(): Promise<
+  Result & { sent?: number; devices?: number; detail?: string }
+> {
   const session = await getSession()
   if (!session) return { success: false, error: 'Not signed in.' }
 
-  const { pushToUsers } = await import('@/lib/push')
-  const sent = await pushToUsers([session.userId], {
+  const { pushToUsers, pushConfigured } = await import('@/lib/push')
+
+  const config = pushConfigured()
+  if (!config.ok) {
+    return {
+      success: false,
+      error: 'Push is not set up on the server.',
+      detail: config.reason,
+    }
+  }
+
+  const result = await pushToUsers([session.userId], {
     title: 'My Lighthouse',
     body: 'Notifications are working on this device.',
     href: '/dashboard/notifications',
     tag: 'test',
   })
 
-  if (sent === 0) {
+  if (result.devices === 0) {
     return {
       success: false,
-      error: 'Nothing was delivered. The device may have revoked permission.',
+      error: 'This account has no registered devices.',
+      detail:
+        'Turn notifications off and on again on this device — the subscription is missing from the server.',
     }
   }
-  return { success: true, sent }
+
+  if (result.sent === 0) {
+    return {
+      success: false,
+      error: `None of your ${result.devices} ${result.devices === 1 ? 'device' : 'devices'} accepted it.`,
+      // The push service's own words, rather than our guess at them.
+      detail: result.problems.join(' ') || 'No reason was given by the push service.',
+    }
+  }
+
+  return {
+    success: true,
+    sent: result.sent,
+    devices: result.devices,
+    detail:
+      result.problems.length > 0
+        ? `Sent to ${result.sent} of ${result.devices}. ${result.problems.join(' ')}`
+        : undefined,
+  }
 }

@@ -127,6 +127,8 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
   const [endpoint, setEndpoint] = React.useState<string | null>(null)
   /** Which step failed, shown so a phone problem can be reported precisely. */
   const [stuckAt, setStuckAt] = React.useState<string | null>(null)
+  /** What the last test said, kept on the page rather than in a toast. */
+  const [detail, setDetail] = React.useState<string | null>(null)
 
   // Only the part that needs the service worker registry and the database.
   const check = React.useCallback(async () => {
@@ -232,10 +234,28 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
 
   async function test() {
     setBusy(true)
-    const res = await testPushAction()
-    setBusy(false)
-    if (res.success) toast.success('Sent', 'It should appear in a moment.')
-    else toast.error('Nothing arrived', res.error ?? 'Please try again.')
+    setStuckAt(null)
+    setDetail(null)
+    try {
+      const res = await testPushAction()
+      if (res.success) {
+        toast.success('Sent', res.detail ?? 'It should appear in a moment.')
+        if (res.detail) setDetail(res.detail)
+      } else {
+        // Keep the detail on the page. A toast disappears, and this is
+        // precisely the sentence somebody needs to read twice or pass on.
+        toast.error(res.error ?? 'Nothing arrived', res.detail ?? 'Please try again.')
+        setDetail([res.error, res.detail].filter(Boolean).join(' '))
+      }
+      // A failed send may have dropped a dead subscription, which changes
+      // what this switch should say.
+      await check()
+    } catch (err) {
+      console.error('push test failed', err)
+      setDetail('The test itself failed to run. That is a server error, not a phone problem.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (state === 'checking') {
@@ -345,6 +365,12 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
         <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700">
           Setting up stopped at <strong>{stuckAt}</strong>. Nothing is broken — telling Josh which
           step it named is enough to fix it.
+        </p>
+      )}
+
+      {detail && (
+        <p className="mt-4 rounded-xl bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-600">
+          {detail}
         </p>
       )}
     </Wrap>
