@@ -37,7 +37,12 @@ export function InstallPrompt({
     if (isStandalone() || wasDismissed(dismissKey)) return
 
     if (isIOS()) {
+      // Deciding this during render would mean reading `navigator` on the
+      // server, where it does not exist, and shipping a hydration mismatch.
+      // The effect is the correct place; the rule cannot see that.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIos(true)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHidden(false)
       return
     }

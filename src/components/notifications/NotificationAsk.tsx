@@ -50,8 +50,16 @@ export function NotificationAsk({
     if (wasDismissed(dismissKey)) return
     const support = pushSupport(publicKey)
     // Nothing to ask when it is already on, already refused, or impossible.
+    //
+    // Decided in an effect rather than during render because it reads
+    // `Notification.permission` and the user agent, neither of which exists on
+    // the server — computing it during render would ship a hydration mismatch.
+    // The rule cannot see that, so it is silenced here rather than the code
+    // being bent around it.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (support.kind === 'ready') setShow(true)
     else if (support.kind === 'needs-install') setNeedsInstall(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [publicKey, dismissKey])
 
   async function turnOn() {
