@@ -59,5 +59,11 @@ export default async function SlhJoinPage() {
     window: windowLabel(o.dropOffOpensAt, o.dropOffClosesAt),
   }))
 
-  return <JoinFlow orgs={orgs} year={program.year} />
+  return (
+    <JoinFlow
+      orgs={orgs}
+      year={program.year}
+      pushPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null}
+    />
+  )
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CalendarDays, Check } from 'lucide-react'
 import { SantaMark } from '@/components/slh/SantaMark'
 import { joinAsShopperAction } from '@/lib/actions/slh.actions'
+import { NotificationAsk } from '@/components/notifications/NotificationAsk'
 import {
   AGE_BANDS,
   GENDERS,
@@ -142,7 +143,16 @@ function WhiteButton({
   )
 }
 
-export function JoinFlow({ orgs, year }: { orgs: JoinOrg[]; year: number }) {
+export function JoinFlow({
+  orgs,
+  year,
+  pushPublicKey = null,
+}: {
+  orgs: JoinOrg[]
+  year: number
+  /** Null when push is not configured; the ask hides itself. */
+  pushPublicKey?: string | null
+}) {
   const router = useRouter()
   const [step, setStep] = useState<Step>('welcome')
   const [orgId, setOrgId] = useState<string | null>(null)
@@ -426,6 +436,16 @@ export function JoinFlow({ orgs, year }: { orgs: JoinOrg[]; year: number }) {
             {count === 1 ? 'list is' : 'lists are'} ready.
           </p>
         </div>
+        {/* Asked here and nowhere earlier: they have just committed, and
+            "shall we tell you when your lists are ready?" answers itself at
+            this moment in a way it never does on a settings page. */}
+        <NotificationAsk
+          publicKey={pushPublicKey}
+          tone="dark"
+          dismissKey="slh-join"
+          reason={`We'll tell you the moment your wish ${count === 1 ? 'list is' : 'lists are'} ready, without you having to check back.`}
+        />
+
         <div className="flex-1" />
         <div className="mt-8 space-y-4">
           <WhiteButton onClick={() => router.push('/dashboard/slh')}>

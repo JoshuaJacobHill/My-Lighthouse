@@ -9,6 +9,12 @@ import {
   testPushAction,
 } from '@/lib/actions/push.actions'
 import { useToast } from '@/components/ui/use-toast'
+import {
+  deviceLabel,
+  isIOS,
+  isStandalone,
+  subscribeThisDevice,
+} from '@/lib/push-client'
 
 /**
  * Turn phone notifications on for this device.
@@ -27,67 +33,9 @@ import { useToast } from '@/components/ui/use-toast'
  * stays with the people who diagnose things.
  */
 
-/**
- * Nothing here is allowed to hang.
- *
- * The original version awaited each browser call directly, and on iOS one of
- * them never settled — so the button span forever, no error was thrown, and
- * there was nothing to report. A rejected promise is recoverable; a pending
- * one is not.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number, step: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`STEP:${step}`)), ms),
-    ),
-  ])
-}
 
-/**
- * Permission, whichever form this browser supports.
- *
- * Safari shipped the callback signature years before the promise one, and on
- * an older iOS the promise simply never resolves. Asking for both means the
- * callback settles it even where the promise will not.
- */
-function requestPermission(): Promise<NotificationPermission> {
-  return new Promise((resolve, reject) => {
-    try {
-      let settled = false
-      const done = (p: NotificationPermission) => {
-        if (!settled) {
-          settled = true
-          resolve(p)
-        }
-      }
-      // Callback form — harmless where it is ignored.
-      const maybe = Notification.requestPermission(done)
-      // Promise form, where it exists.
-      if (maybe && typeof maybe.then === 'function') void maybe.then(done, reject)
-    } catch (err) {
-      reject(err)
-    }
-  })
-}
 
-function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
-  const normalised = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const raw = atob(normalised)
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)))
-}
 
-/** A rough device name, so someone can tell their phone from their laptop. */
-function deviceLabel(): string {
-  const ua = navigator.userAgent
-  if (/iPhone/.test(ua)) return 'iPhone'
-  if (/iPad/.test(ua)) return 'iPad'
-  if (/Android/.test(ua)) return 'Android phone'
-  if (/Macintosh/.test(ua)) return 'Mac'
-  if (/Windows/.test(ua)) return 'Windows PC'
-  return 'This device'
-}
 
 function Wrap({ children }: { children: React.ReactNode }) {
   return <div className="rounded-[28px] border border-neutral-200 p-5">{children}</div>
@@ -113,11 +61,7 @@ function initialState(publicKey: string | null): State {
     // On iOS these APIs only exist once the site is on the home screen, so an
     // iPhone in a Safari tab lands here — and needs different advice from a
     // browser that simply cannot do push at all.
-    const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true
-    return iOS && !standalone ? 'needs-install' : 'unsupported'
+    return isIOS() && !isStandalone() ? 'needs-install' : 'unsupported'
   }
 
   if (Notification.permission === 'denied') return 'blocked'
@@ -168,43 +112,33 @@ export function PushToggle({
     setBusy(true)
     setStuckAt(null)
     try {
-      const permission = await withTimeout(requestPermission(), 60_000, 'permission')
-      if (permission !== 'granted') {
-        setState(permission === 'denied' ? 'blocked' : 'off')
+      const result = await subscribeThisDevice(publicKey)
+      if (!result.ok) {
+        if (result.reason === 'denied') setState('blocked')
+        else if (result.reason === 'failed') {
+          setStuckAt(result.step ?? 'unknown')
+          toast.error(
+            'Could not turn on',
+            result.step
+              ? `It stopped at: ${result.step}. Nothing is broken — tell Josh which step and he can fix it.`
+              : 'Something went wrong setting this up.',
+          )
+        }
         return
       }
 
-      const reg = await withTimeout(
-        navigator.serviceWorker.register('/sw.js'),
-        20_000,
-        'service worker',
-      )
-      // Not fatal on its own: a registration can be usable before anything
-      // controls the page, so a slow claim should not stop us subscribing.
-      await withTimeout(navigator.serviceWorker.ready, 15_000, 'worker ready').catch(() => {})
-
-      const sub = await withTimeout(
-        reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
-        }),
-        20_000,
-        'subscribe',
-      )
-
-      const json = sub.toJSON() as { keys?: { p256dh?: string; auth?: string } }
       const res = await subscribePushAction({
-        endpoint: sub.endpoint,
-        p256dh: json.keys?.p256dh ?? '',
-        auth: json.keys?.auth ?? '',
-        label: deviceLabel(),
+        endpoint: result.endpoint,
+        p256dh: result.p256dh,
+        auth: result.auth,
+        label: result.label,
       })
 
       if (!res.success) {
         toast.error('Could not turn on', res.error ?? 'Please try again.')
         return
       }
-      setEndpoint(sub.endpoint)
+      setEndpoint(result.endpoint)
       setState('on')
       await check()
       toast.success('Notifications on', `${deviceLabel()} will get a nudge for new things.`)
@@ -217,16 +151,9 @@ export function PushToggle({
         // not worth a second, contradicting message.
       })
     } catch (err) {
-      const message = (err as Error).message ?? ''
-      const step = message.startsWith('STEP:') ? message.slice(5) : null
       console.error('push subscribe failed', err)
-      setStuckAt(step ?? 'unknown')
-      toast.error(
-        'Could not turn on',
-        step
-          ? `It stopped at: ${step}. Nothing is broken — tell Josh which step and he can fix it.`
-          : 'Something went wrong setting this up.',
-      )
+      setStuckAt('unknown')
+      toast.error('Could not turn on', 'Something went wrong setting this up.')
     } finally {
       // Always, whatever happened. A stuck spinner tells nobody anything.
       setBusy(false)
