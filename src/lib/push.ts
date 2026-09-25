@@ -24,38 +24,63 @@ type Ready = { ok: true } | { ok: false; reason: string }
 let cached: Ready | null = null
 
 /**
- * Accept a VAPID key however it was pasted in.
+ * Accept a VAPID key however it was generated.
  *
- * `web-push` insists on unpadded base64**url** and throws on anything else —
- * "Vapid private key must be a URL safe Base 64 (without '=')". But the tools
- * people generate these with hand out standard base64 about as often, and a
- * key copied out of one of those arrives with `+`, `/` and a trailing `=`.
+ * Two things go wrong with these, and both did here.
  *
- * The bytes are identical either way. Rejecting the key over its punctuation
- * cost this app three weeks of notifications that silently never sent, so the
- * encoding is normalised here rather than left as a trap in a dashboard field
- * nobody can read back.
+ * **Encoding.** `web-push` insists on unpadded base64url and throws on
+ * anything else — "Vapid private key must be a URL safe Base 64 (without
+ * '=')". Plenty of tools emit standard base64 instead, so a key arrives with
+ * `+`, `/` and a trailing `=`. Same bytes, different punctuation.
  *
- * Also strips whitespace: a value pasted into an environment variable picks up
- * a trailing newline remarkably easily.
+ * **A leading zero byte.** A P-256 private key is a 32-byte scalar, but some
+ * generators encode it as a signed integer — which prepends `0x00` whenever
+ * the high bit is set, giving 33 bytes. Roughly half of all generated keys
+ * look like this. The extra byte is an artefact of the encoding, not key
+ * material, and dropping it yields exactly the key that was generated.
+ *
+ * Rejecting a valid key over either of these cost this app three weeks of
+ * notifications that silently never sent, so both are normalised here rather
+ * than left as traps in a dashboard field nobody can read back.
  */
-function normaliseKey(raw: string): string {
-  return raw.trim().replace(/\s+/g, '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+function normaliseKey(raw: string, expectedBytes: number): string {
+  const cleaned = raw
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  try {
+    const bytes = Buffer.from(cleaned, 'base64url')
+    // The signed-integer artefact, and only that: a leading zero on a key
+    // that is otherwise exactly one byte too long.
+    if (bytes.length === expectedBytes + 1 && bytes[0] === 0) {
+      return bytes.subarray(1).toString('base64url')
+    }
+  } catch {
+    // Not decodable — leave it alone and let the size check report it.
+  }
+  return cleaned
 }
 
-/** How many bytes a base64url string decodes to, without decoding it. */
+/** What this key actually decodes to. Decoded, not estimated from length. */
 function byteLength(key: string): number {
-  return Math.floor((key.length * 3) / 4)
+  try {
+    return Buffer.from(key, 'base64url').length
+  } catch {
+    return 0
+  }
 }
 
 /**
  * Configure `web-push`, once.
  *
  * **Never throws.** `setVapidDetails` rejects a subject that is not a
- * `mailto:` or `https:` URL, and a key that is not valid base64url — and this
- * used to be called outside the try/catch in `pushToUsers`, so a bad
- * environment variable surfaced as an unhandled exception inside a server
- * action rather than as a message anybody could act on.
+ * `mailto:` or `https:` URL, and a key it does not like — and this used to be
+ * called outside the try/catch in `pushToUsers`, so a bad environment variable
+ * surfaced as an unhandled exception inside a server action rather than as a
+ * message anybody could act on.
  */
 function ready(): Ready {
   if (cached !== null) return cached
@@ -75,12 +100,12 @@ function ready(): Ready {
     return cached
   }
 
-  const cleanPublic = normaliseKey(publicKey)
-  const cleanPrivate = normaliseKey(privateKey)
+  // 32 bytes for the private scalar; 65 for the uncompressed public point.
+  const cleanPublic = normaliseKey(publicKey, 65)
+  const cleanPrivate = normaliseKey(privateKey, 32)
 
   // Checked before the library sees them, so the message names the key and the
-  // size rather than repeating a rule about punctuation. A P-256 private key
-  // is 32 bytes; the public key is an uncompressed point, 65.
+  // size rather than repeating a rule about punctuation.
   if (byteLength(cleanPrivate) !== 32) {
     cached = {
       ok: false,
