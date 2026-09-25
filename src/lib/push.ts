@@ -43,6 +43,33 @@ let cached: Ready | null = null
  * notifications that silently never sent, so both are normalised here rather
  * than left as traps in a dashboard field nobody can read back.
  */
+/**
+ * base64url → bytes, without `Buffer`.
+ *
+ * `Buffer` is not reliably present in every runtime this can be bundled into,
+ * and reaching for it turned a 33-byte key into a reported "0 bytes" — a
+ * decoder failure dressed up as a key problem. `atob` is available everywhere
+ * this runs.
+ */
+function decode(key: string): Uint8Array | null {
+  try {
+    const standard = key.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = standard + '='.repeat((4 - (standard.length % 4)) % 4)
+    const binary = atob(padded)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return bytes
+  } catch {
+    return null
+  }
+}
+
+function encode(bytes: Uint8Array): string {
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 function normaliseKey(raw: string, expectedBytes: number): string {
   const cleaned = raw
     .trim()
@@ -51,26 +78,31 @@ function normaliseKey(raw: string, expectedBytes: number): string {
     .replace(/\//g, '_')
     .replace(/=+$/, '')
 
-  try {
-    const bytes = Buffer.from(cleaned, 'base64url')
-    // The signed-integer artefact, and only that: a leading zero on a key
-    // that is otherwise exactly one byte too long.
-    if (bytes.length === expectedBytes + 1 && bytes[0] === 0) {
-      return bytes.subarray(1).toString('base64url')
-    }
-  } catch {
-    // Not decodable — leave it alone and let the size check report it.
+  const bytes = decode(cleaned)
+  // The signed-integer artefact, and only that: a leading zero on a key that
+  // is otherwise exactly one byte too long.
+  if (bytes && bytes.length === expectedBytes + 1 && bytes[0] === 0) {
+    return encode(bytes.subarray(1))
   }
   return cleaned
 }
 
-/** What this key actually decodes to. Decoded, not estimated from length. */
-function byteLength(key: string): number {
-  try {
-    return Buffer.from(key, 'base64url').length
-  } catch {
-    return 0
-  }
+/** What this key decodes to, or null when it will not decode at all. */
+function byteLength(key: string): number | null {
+  return decode(key)?.length ?? null
+}
+
+/**
+ * Describe a key without revealing it.
+ *
+ * Characters and bytes only. Enough to tell a truncated key from a
+ * wrongly-encoded one from a decoder that is not working, and nothing that
+ * would matter if it appeared in a screenshot.
+ */
+function describeKey(key: string): string {
+  const bytes = byteLength(key)
+  const shape = /^[A-Za-z0-9_-]+$/.test(key) ? 'base64url characters' : 'unexpected characters'
+  return `${key.length} ${shape}, ${bytes === null ? 'does not decode' : `${bytes} bytes`}`
 }
 
 /**
@@ -109,14 +141,14 @@ function ready(): Ready {
   if (byteLength(cleanPrivate) !== 32) {
     cached = {
       ok: false,
-      reason: `VAPID_PRIVATE_KEY decodes to ${byteLength(cleanPrivate)} bytes; it should be 32. It is probably truncated or is not the private half of the pair.`,
+      reason: `VAPID_PRIVATE_KEY should be 32 bytes; this one is ${describeKey(cleanPrivate)}.`,
     }
     return cached
   }
   if (byteLength(cleanPublic) !== 65) {
     cached = {
       ok: false,
-      reason: `NEXT_PUBLIC_VAPID_PUBLIC_KEY decodes to ${byteLength(cleanPublic)} bytes; it should be 65.`,
+      reason: `NEXT_PUBLIC_VAPID_PUBLIC_KEY should be 65 bytes; this one is ${describeKey(cleanPublic)}.`,
     }
     return cached
   }
